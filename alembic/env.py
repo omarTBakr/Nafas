@@ -1,12 +1,16 @@
-"""Alembic environment: migrations run against DATABASE_URL from utils.config.
+"""Alembic environment: migrations run against DATABASE_URL from nafas_core.config.
 
 `uv run alembic upgrade head` to migrate; `uv run alembic revision
 --autogenerate -m "..."` to draft a migration from the models, which then gets
 read and edited by hand — autogenerate misses exclusion constraints, RLS
 policies and extensions, and those are exactly what this schema relies on.
+
+One history covers every service's schema (docs/PLAN.md §4), so migrations
+from different services never race each other.
 """
 
 import asyncio
+import importlib
 from logging.config import fileConfig
 
 from alembic import context
@@ -14,9 +18,16 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
-import utils.db.models  # noqa: F401  (registers every table on Base.metadata)
-from utils.config import get_setting
-from utils.db.base import Base
+from nafas_core.config import get_setting
+from nafas_core.db.base import Base
+
+# Every service's ORM module. Autogenerate only sees tables whose classes are
+# imported by the time it reads Base.metadata, so a service's models module is
+# added here in the same commit that creates the service.
+MODEL_MODULES: list[str] = []
+
+for module in MODEL_MODULES:
+    importlib.import_module(module)
 
 config = context.config
 

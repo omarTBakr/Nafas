@@ -10,9 +10,9 @@ The order of work for [PLAN.md](PLAN.md). Each item is ticked in the same commit
 - [x] Protocols and factories for llm, stt, embeddings, storage and channels, with fake implementations for tests
 - [x] LangSmith tracing: every Claude call traced as an LLM run with usage, a no-op unless `LANGSMITH_TRACING=true`
 - [ ] `@traceable` on each agent loop and pipeline step as they are written (phases 2–8)
-- [ ] Restructure into a uv workspace: `packages/core` (`nafas_core`) and `services/gateway`; tests per package; CI and pre-commit updated
-- [ ] `Makefile` running compose on the native Docker engine (the GPU is unreachable from Docker Desktop)
-- [ ] `dialect-router` GPU service (FastAPI + transformers, CUDA image, model baked in at a pinned revision) and the `interfaces/dialect` client, fake and factory
+- [x] Restructure into a uv workspace: `packages/core` (`nafas_core`) and `services/gateway`; tests per package; CI and pre-commit updated
+- [x] `Makefile` running compose on the native Docker engine (the GPU is unreachable from Docker Desktop)
+- [x] `dialect-router` GPU service (FastAPI + transformers, CUDA image, model baked in at a pinned revision, config on `/health`, Prometheus `/metrics`, low-confidence predictions logged for feedback) and the `interfaces/dialect` client, fake and factory
 - [ ] STT vendor spike on Arabic dialect samples, with the decision recorded in PLAN.md
 
 **Phase 1: Doctors, specializations and scheduling core** (creates the `identity` and `scheduling` services)
@@ -64,7 +64,12 @@ The order of work for [PLAN.md](PLAN.md). Each item is ticked in the same commit
 - [ ] LiveKit room per online appointment, with the link sent in the confirmation
 - [ ] Egress recording to S3 that triggers `ConsultationWorkflow`
 
-**Phase 10: Hardening and launch**
+**Phase 10: Hardening and launch** (the production-readiness gates in PLAN.md §6b)
+- [ ] Reproducible config: every model pinned (HF sha, Claude model ID plus prompt version on each trace), images pinned by digest, config reported on `/health`
+- [ ] dev / staging / prod environments; eval gates in CI; staging replay; canary rollout with automatic rollback bounds; a promotion log
+- [ ] Prometheus `/metrics` on every service, Grafana dashboards and alerts (system and behavioural), and drift alerts
+- [ ] Feedback store and pipeline (summary edits, escalation answers, thumbs, low-confidence dialect items) into de-identified eval and training datasets
+- [ ] Written SLOs per service, a capacity plan including GPU, load tests that prove them, and horizontal scaling per service and queue
 - [ ] RLS policies verified by tests (doctor A cannot read doctor B's rows)
 - [ ] Audit log, PHI log redaction, rate limiting on webhooks
 - [ ] Observability (structured logs, Temporal UI, error tracking)

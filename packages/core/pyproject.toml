@@ -1,0 +1,26 @@
+[project]
+name = "nafas-core"
+version = "0.1.0"
+description = "What every Nafas service shares: settings, database, Temporal, provider interfaces"
+license = "PolyForm-Noncommercial-1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "aioboto3>=15.5.0",
+    "aiogram>=3.31.0",
+    "alembic>=1.20.0",
+    "anthropic>=1.8.0",
+    "asyncpg>=0.31.0",
+    "httpx>=0.28.1",
+    "langsmith>=0.14.1",
+    "pgvector>=0.5.0",
+    "pydantic-settings>=2.0",
+    "sqlalchemy[asyncio]>=2.1.1",
+    "temporalio>=1.32.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""

@@ -1,0 +1,5 @@
+# `make up-cpu`: the same stack for machines without an NVIDIA GPU. GPU
+# services fall back to CPU (DIALECT_DEVICE=auto picks it), just slower.
+services:
+  dialect-router:
+    devices: !reset []

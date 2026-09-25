@@ -1,0 +1,15 @@
+# The model this service serves, pinned. Changing any line here is a model
+# change: it goes through the eval gate and promotion (docs/PLAN.md §6b).
+
+model_id = "oddadmix/dialect-router-v0.1"
+# the Hugging Face commit, so a rebuild can never pick up a different model
+model_revision = "2318b628f86bad2a62acae396030f941a986fcbd"
+# where the Dockerfile bakes the weights; the container never downloads
+model_dir = "/models/dialect-router"
+
+# tokens; the model's own limit is 512
+max_length = 128
+max_batch_size = 64
+# below this top-label probability a prediction is flagged low_confidence,
+# counted in metrics, and worth routing to the feedback pipeline
+low_confidence_threshold = 0.6

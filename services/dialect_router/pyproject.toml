@@ -1,0 +1,47 @@
+[project]
+name = "nafas-dialect-router"
+version = "0.1.0"
+description = "Arabic dialect identification as a GPU service (oddadmix/dialect-router-v0.1)"
+license = "PolyForm-Noncommercial-1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "prometheus-client>=0.23",
+    "pydantic-settings>=2.0",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[project.optional-dependencies]
+# the model runtime; the image installs it, the unit tests do not need it
+model = [
+    "torch>=2.8",
+    "transformers>=4.56",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13",
+    "pytest>=9.1.1",
+]
+
+# CUDA 12.8 wheels bundle their own CUDA runtime; the host only needs a
+# driver new enough for 12.8 (570+)
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu128" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+module-name = "dialect_router"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

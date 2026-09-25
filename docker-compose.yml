@@ -1,8 +1,11 @@
-# Local infrastructure: `docker compose up -d`.
+# The local stack: `make up` (not plain `docker compose`; see the Makefile:
+# Nafas runs on the native Docker engine, because Docker Desktop's VM cannot
+# see the GPU).
 #
-# The API and the worker run on the host (`uv run python main.py`,
-# `uv run python worker.py`) and reach these on localhost. Credentials here are
-# for a laptop only and match the defaults in utils/config.py.
+# Infrastructure plus each service that exists so far. During development a
+# service can equally run on the host (`uv run python -m nafas_gateway.main`)
+# and reach the infrastructure on localhost. Credentials here are for a laptop
+# only and match the defaults in nafas_core/config.py.
 #
 # Host ports are shifted off the usual ones (5433, 7234, 8234) so the stack
 # sits beside a system Postgres or another project's Temporal without a fight.
@@ -51,6 +54,37 @@ services:
     volumes:
       - s3-data:/data
       - ./deploy/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+
+  # --- services -----------------------------------------------------------
+
+  gateway:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        PACKAGE: nafas-gateway
+        MODULE: nafas_gateway.main
+    image: nafas/gateway:dev
+    environment: &service-env
+      DATABASE_URL: postgresql+asyncpg://nafas:nafas@postgres:5432/nafas
+      TEMPORAL_HOST: temporal:7233
+      S3_ENDPOINT_URL: http://s3:8333
+      DIALECT_ROUTER_URL: http://dialect-router:8410
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  dialect-router:
+    # GPU: needs the NVIDIA container toolkit's CDI devices, which the native
+    # engine has and Docker Desktop does not. Without a GPU, `make up-cpu`.
+    build: ./services/dialect_router
+    image: nafas/dialect-router:dev
+    ports:
+      - "8410:8410"
+    devices:
+      - nvidia.com/gpu=all
 
 volumes:
   postgres-data:

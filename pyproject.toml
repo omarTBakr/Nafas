@@ -1,28 +1,28 @@
 [project]
 name = "nafas"
 version = "0.1.0"
-description = "A Temporal and FastAPI backend"
+description = "AI assistant for patients and doctors: one repository, one service per domain"
 readme = "README.md"
 license = "PolyForm-Noncommercial-1.0.0"
 requires-python = ">=3.12"
+# the workspace root is not a package; depending on every member makes a
+# plain `uv sync` install them all (editable) for development and the suite
 dependencies = [
-    "aioboto3>=15.5.0",
-    "aiogram>=3.31.0",
-    "alembic>=1.20.0",
-    "anthropic>=1.8.0",
-    "argon2-cffi>=25.1.0",
-    "asyncpg>=0.31.0",
-    "fastapi>=0.141.1",
-    "httpx>=0.28.1",
-    "langsmith>=0.14.1",
-    "pgvector>=0.5.0",
-    "pydantic-settings>=2.0",
-    "pyjwt>=2.15.0",
-    "python-multipart>=0.0.32",
-    "sqlalchemy[asyncio]>=2.1.1",
-    "temporalio>=1.32.0",
-    "uvicorn[standard]>=0.52.4",
+    "nafas-core",
+    "nafas-gateway",
 ]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/*", "services/*"]
+# GPU services carry their own CUDA-pinned lockfile and never share this one
+exclude = ["services/dialect_router"]
+
+[tool.uv.sources]
+nafas-core = { workspace = true }
+nafas-gateway = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -46,21 +46,8 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.isort]
-# the root modules too (main, worker), or isort files them as third-party
-known-first-party = [
-    "activities",
-    "enums",
-    "exceptions",
-    "interfaces",
-    "main",
-    "prompts",
-    "routes",
-    "schemas",
-    "scripts",
-    "utils",
-    "worker",
-    "workflows",
-]
+# every workspace package, and the dev scripts
+known-first-party = ["nafas_*", "dialect_router", "scripts"]
 
 # the migrations folder is named alembic/ too; without this the library is
 # filed as first-party
@@ -71,8 +58,10 @@ known-third-party = ["alembic"]
 extend-immutable-calls = ["fastapi.Depends", "fastapi.File", "fastapi.Form", "fastapi.Query", "fastapi.Body"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["packages", "services"]
 pythonpath = ["."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-addopts = "-q"
+# importlib: every package has a tests/ with a test_app.py or similar, and
+# the default mode would collide on the duplicate basenames
+addopts = "-q --import-mode=importlib"

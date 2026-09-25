@@ -49,3 +49,9 @@ jobs:
 
       - name: Run tests
         run: uv run pytest
+
+      # GPU services keep their own environment; their API suite needs no GPU
+      # and no model runtime
+      - name: Run dialect-router tests
+        working-directory: services/dialect_router
+        run: uv run pytest

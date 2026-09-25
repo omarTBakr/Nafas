@@ -2,8 +2,8 @@
 
 import asyncio
 
-from interfaces.storage.s3 import S3Storage
-from utils.config import get_setting
+from nafas_core.config import get_setting
+from nafas_core.interfaces.storage.s3 import S3Storage
 
 
 async def main() -> None:

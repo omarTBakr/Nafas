@@ -60,9 +60,10 @@ Decisions confirmed with the user:
   - Hosted Whisper-large-v3-class, used for voice notes.
   - A diarizing provider for sessions (doctor vs patient speakers).
   - Pick the vendors in a Phase 0 spike that tests Egyptian, Gulf and Levantine Arabic plus code-switching.
-- **Dialect identification (`interfaces/dialect`, the `dialect-router` service on GPU):** [`oddadmix/dialect-router-v0.1`](https://huggingface.co/oddadmix/dialect-router-v0.1). It is a small BERT (`bert-mini-arabic`, MIT) that labels Arabic text with one of 11 dialects: eg, sa, mo, iq, sd, tn, lb, sy, ly, ps, or ar for MSA.
+- **Dialect identification (`interfaces/dialect`, the `dialect-router` service on GPU):** [`oddadmix/dialect-router-v0.1`](https://huggingface.co/oddadmix/dialect-router-v0.1). It is a small BERT (`bert-mini-arabic`, MIT) that labels text with one of 12 codes from its `config.json`: ar (MSA), eg, sa, ma, iq, sd, tn, lb, sy, ly, ps, and en for English. The model card lists 11 and calls Moroccan `mo`; `config.json` is authoritative.
   - Uses: tagging transcripts and messages (for the STT spike, analytics and reply tone), and later choosing a dialect voice for TTS replies. Its home project, Lahgtna, is built for exactly that.
   - Limits: no published accuracy, unreliable on short or code-switched text, and adjacent dialects get confused. **It is never an input to a safety or clinical decision.** Before relying on it, evaluate it on our own labelled samples.
+  - First probe, 2026-09-26, on an RTX 4060: 8 of 9 labelled sentences were right. Syrian came back as Palestinian (0.87). Code-switched "عندي pain في الـ chest" came back as MSA at 0.90, which is confidently wrong, and the low-confidence flag cannot catch that. "شكرا" was correctly flagged low-confidence (0.26).
 - **Embeddings (`interfaces/embeddings`):** `bge-m3`, which is multilingual Arabic/English with 1024 dimensions. It sits behind a Protocol so a hosted model can replace it.
 - **Channels (`interfaces/channels`):** a `ChannelAdapter` Protocol (`parse_inbound`, `send_text`, `send_voice`, `download_media`).
   - Implementations: `telegram` (aiogram, webhook mode) and `email` (inbound-parse webhook, SMTP out).
@@ -258,6 +259,36 @@ Where the plan's earlier modules land:
 - The design targets the Egypt PDPL (Law 151/2020) and HIPAA-style controls. A zero-data-retention agreement with the LLM and STT vendors is needed before any real patients use the system.
 
 ---
+
+## 6b. Production readiness (every model and every service, before production)
+
+Here "model" means anything whose behaviour is learned or prompted: the dialect-router, the STT and embedding models, and every Claude call with its prompt. The same five gates apply to each one.
+
+1. **Clear, reproducible model config.**
+   - Every model is pinned exactly. Hugging Face models use a commit sha. Claude calls use a model ID plus a versioned prompt module under `prompts/`, and the prompt version is recorded on every trace and message.
+   - Container images are pinned by digest in staging and production.
+   - The service's config (model, revision, thresholds, batch sizes) lives in a versioned file inside the service, and the service reports it on `/health`. Anyone can then tell exactly what answered a request.
+2. **Promotion rules and rollback conditions across dev → staging → prod.**
+   - Each model has an eval set and pass thresholds, for example the safety-gate evals from Phase 5 and a labelled dialect set. CI runs them, and a change is promoted only if it passes.
+   - Staging runs the candidate against replayed, de-identified traffic.
+   - Production rolls out as a canary. It rolls back automatically on error-rate, latency or behavioural-metric regressions beyond set bounds, and by hand at any time by redeploying the previous pinned version.
+   - Promotions and rollbacks are recorded, including who did it, what changed and why.
+3. **Monitoring and observability, both behavioural and system.**
+   - System: every service exposes Prometheus `/metrics` (request rate, latency histograms, errors, and GPU memory and utilisation for GPU services), plus structured logs and the Temporal UI. Grafana holds the dashboards and alerts.
+   - Behavioural: LangSmith traces for every LLM call. Rates of escalations, refusals and output-guard triggers. The intent and scope mix. The confidence distribution of the dialect-router. Summary edit distance, meaning how much doctors change AI summaries. Alerts fire on drift from the baseline.
+4. **Feedback → data pipeline.**
+   - Signals are captured where they happen:
+     - doctor edits to consultation summaries
+     - doctor answers to escalations
+     - thumbs up/down on doctor-chat answers
+     - dialect predictions with low confidence
+     - patient "that's wrong" replies
+   - These signals go to a feedback store and to LangSmith datasets. Items are de-identified, and only included where consent covers training or evaluation.
+   - They feed the next eval sets and the next model or prompt generation, and they catch regressions early.
+5. **Infrastructure sized to the SLOs and able to scale.**
+   - Each service has written SLOs, for example booking replies at p95 under 5 s, voice-note transcription at p95 under 10 s, 99.5 % availability, and escalations reaching the doctor in under 1 min.
+   - A capacity plan sets requests per doctor and the GPU memory and throughput each GPU service needs. This dev machine has one RTX 4060 with 8 GB.
+   - Load tests prove the SLOs. Services scale horizontally: stateless APIs and workers scale by replica count, and each Temporal queue scales by adding workers.
 
 ## 7. Execution checklist
 

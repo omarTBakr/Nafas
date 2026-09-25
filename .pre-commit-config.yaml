@@ -17,6 +17,8 @@ repos:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
+        # compose's own `!reset` tag is not plain YAML; `docker compose config` validates it
+        exclude: ^docker-compose\.cpu\.yml$
       - id: check-toml
       - id: check-added-large-files
         # a lockfile is legitimately large once the dependency tree grows
@@ -32,6 +34,13 @@ repos:
         language: system
         pass_filenames: false
         types: [python]
+
+      - id: pytest-dialect-router
+        name: pytest (dialect-router)
+        entry: bash -c 'cd services/dialect_router && uv run pytest'
+        language: system
+        pass_filenames: false
+        files: ^services/dialect_router/
 
       # a hand-maintained table of contents drifts; this one is generated
       - id: readme-contents
