@@ -10,15 +10,18 @@ The order of work for [PLAN.md](PLAN.md). Each item is ticked in the same commit
 - [x] Protocols and factories for llm, stt, embeddings, storage and channels, with fake implementations for tests
 - [x] LangSmith tracing: every Claude call traced as an LLM run with usage, a no-op unless `LANGSMITH_TRACING=true`
 - [ ] `@traceable` on each agent loop and pipeline step as they are written (phases 2–8)
+- [ ] Restructure into a uv workspace: `packages/core` (`nafas_core`) and `services/gateway`; tests per package; CI and pre-commit updated
+- [ ] `Makefile` running compose on the native Docker engine (the GPU is unreachable from Docker Desktop)
+- [ ] `dialect-router` GPU service (FastAPI + transformers, CUDA image, model baked in at a pinned revision) and the `interfaces/dialect` client, fake and factory
 - [ ] STT vendor spike on Arabic dialect samples, with the decision recorded in PLAN.md
 
-**Phase 1: Doctors, specializations and scheduling core**
+**Phase 1: Doctors, specializations and scheduling core** (creates the `identity` and `scheduling` services)
 - [ ] Migrations: users, specializations, doctors, availability_rules, time_off, patients, patient_channels, doctor_patients, consents, appointments (with the exclusion constraint)
 - [ ] Seed specializations (AR/EN scope descriptions) and a demo doctor
 - [ ] `utils/scheduling.py`: slot generation, holds and confirm, timezone handling, natural-time parsing; unit tests including DST, overlap races and minute precision
 - [ ] Doctor auth routes (login/logout/me) and admin-created doctor accounts
 
-**Phase 2: Telegram and booking by text**
+**Phase 2: Telegram and booking by text** (creates `channels` and `conversation`)
 - [ ] Telegram adapter (webhook, secret-token check) and the `/telegram/webhook` route
 - [ ] Patient onboarding: link the chat to a patient, capture name, phone and language, and record consent
 - [ ] `PatientConversationWorkflow` (signal-with-start, continue_as_new)
@@ -35,24 +38,25 @@ The order of work for [PLAN.md](PLAN.md). Each item is ticked in the same commit
 - [ ] `.ics` in the confirmation email
 
 **Phase 5: Patient medical chat and escalation**
+- [ ] Evaluate the dialect-router on our labelled AR samples; tag inbound messages with the dialect if it holds up
 - [ ] Gates: emergency, scope, sensitivity and output guard (prompts plus `utils/safety.py`)
 - [ ] Patient-visible RAG retrieval
 - [ ] `EscalationWorkflow` and the escalations table
 - [ ] Safety eval set (~150 AR/EN prompts covering in-scope, out-of-scope, sensitive and emergency) run in CI with threshold assertions
 
-**Phase 6: Doctor dashboard**
+**Phase 6: Doctor dashboard** (fills `gateway`, creates `doctor_assistant`)
 - [ ] `web/` scaffold with login
 - [ ] Today and week schedule, and the next-patient card
 - [ ] Patient list and timeline (history, documents, consultations)
 - [ ] Escalations inbox with a reply that relays to the patient
 - [ ] Doctor chat (SSE streaming, patient-scoped RAG and tools)
 
-**Phase 7: Documents and RAG**
+**Phase 7: Documents and RAG** (creates `clinical_records`)
 - [ ] Upload route (presigned PUT) → `DocumentIngestionWorkflow`
 - [ ] PDF text, OCR and image vision description; chunk, embed, hybrid search
 - [ ] Visibility toggle per document
 
-**Phase 8: In-person session recording**
+**Phase 8: In-person session recording** (creates `consultation`)
 - [ ] Browser recorder with chunked upload and a recording-consent checkbox
 - [ ] `ConsultationWorkflow`: diarized transcript → SOAP draft → doctor review/edit UI → approve → history and embeddings → optional patient summary
 

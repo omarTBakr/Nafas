@@ -34,7 +34,7 @@ Decisions confirmed with the user:
         │ channel webhooks · doctor API · auth · uploads    │
         └──────────────┬────────────────────────────────────┘
                        │ signal-with-start / update
-                ┌──────▼──────── Temporal ──────────────┐
+                ┌──────▼──── Temporal (queue per service) ──┐
                 │ workflows: conversation, booking,     │
                 │ escalation, session, document ingest  │
                 └──────┬────────────────────────────────┘
@@ -60,6 +60,9 @@ Decisions confirmed with the user:
   - Hosted Whisper-large-v3-class, used for voice notes.
   - A diarizing provider for sessions (doctor vs patient speakers).
   - Pick the vendors in a Phase 0 spike that tests Egyptian, Gulf and Levantine Arabic plus code-switching.
+- **Dialect identification (`interfaces/dialect`, the `dialect-router` service on GPU):** [`oddadmix/dialect-router-v0.1`](https://huggingface.co/oddadmix/dialect-router-v0.1). It is a small BERT (`bert-mini-arabic`, MIT) that labels Arabic text with one of 11 dialects: eg, sa, mo, iq, sd, tn, lb, sy, ly, ps, or ar for MSA.
+  - Uses: tagging transcripts and messages (for the STT spike, analytics and reply tone), and later choosing a dialect voice for TTS replies. Its home project, Lahgtna, is built for exactly that.
+  - Limits: no published accuracy, unreliable on short or code-switched text, and adjacent dialects get confused. **It is never an input to a safety or clinical decision.** Before relying on it, evaluate it on our own labelled samples.
 - **Embeddings (`interfaces/embeddings`):** `bge-m3`, which is multilingual Arabic/English with 1024 dimensions. It sits behind a Protocol so a hosted model can replace it.
 - **Channels (`interfaces/channels`):** a `ChannelAdapter` Protocol (`parse_inbound`, `send_text`, `send_voice`, `download_media`).
   - Implementations: `telegram` (aiogram, webhook mode) and `email` (inbound-parse webhook, SMTP out).
@@ -178,22 +181,56 @@ The Temporal conventions come from the existing README and `workflows/__init__.p
 
 ---
 
-## 4. Code layout (follows the existing layer rules)
+## 4. Services and code layout
 
-- `utils/db/`: engine, session and RLS helper, plus ORM models per table group (`models/identity.py`, `scheduling.py`, `clinical.py`, `chat.py`). `alembic/` sits at the repository root.
-- `utils/scheduling.py`: slot generation, the timezone and natural-time parser, and hold/confirm logic.
-- `utils/safety.py`: the emergency keywords and the gate orchestration, as pure functions over the classifier results.
-- `utils/rag.py`: chunking, hybrid retrieval and visibility filtering.
-- `utils/booking_agent.py`, `utils/patient_chat.py` and `utils/doctor_chat.py`: the LLM tool loops.
-- `interfaces/{llm,stt,embeddings,storage,channels}/`: a Protocol plus implementations and a factory in each.
-- `prompts/`: `intent.py`, `scope.py`, `sensitivity.py`, `output_guard.py`, `booking.py`, `patient_chat.py`, `doctor_chat.py`, `consultation_summary.py`, `document_describe.py`.
-- `enums/`: every enum listed above.
-- `exceptions/`: new subtrees `scheduling.py` (SlotUnavailable, OutsideAvailability, HoldExpired), `channels.py`, `safety.py` and `auth.py`.
-- `schemas/`, `activities/` and `workflows/`: one file per step and per flow, registered in `ACTIVITIES` and `WORKFLOWS`.
-- `routes/`: `telegram.py`, `email.py`, `auth.py`, `doctor_schedule.py`, `doctor_patients.py`, `doctor_chat.py`, `documents.py`, `consultations.py` and `escalations.py`. Auth is attached where the routers are included in `main.py`.
-- `utils/config.py`: new settings for DB, S3, Anthropic, STT, embeddings, Telegram, email and JWT.
-- `docker-compose.yml`: postgres+pgvector, temporal plus UI, SeaweedFS (S3); api, worker and web join once they have Dockerfiles.
-- `web/`: the dashboard.
+Every feature is its own deployable service, and all of them live in one repository as a **uv workspace**. That was decided on 2026-09-26.
+- Services coordinate through Temporal: each worker polls its own task queue, and workflows call activities across queues.
+- Each service can be built, deployed, scaled and rolled back on its own.
+- One shared library keeps settings, the database layer, the provider interfaces and the error hierarchy identical everywhere.
+
+### Service map
+
+| Service | Package | Runs | Task queue / port | Owns (Postgres schema) |
+|---|---|---|---|---|
+| gateway | `services/gateway` | FastAPI | :8000 | none. It is the HTTP edge for the dashboard: auth, then routes to domain services |
+| channels | `services/channels` | FastAPI + worker | `channels` | the Telegram and email webhooks in; outbound sends as activities |
+| identity | `services/identity` | FastAPI + worker | `identity` | `identity`: users, specializations, doctors, patients, patient_channels, doctor_patients, consents |
+| scheduling | `services/scheduling` | worker (+ internal API) | `scheduling` | `scheduling`: availability_rules, time_off, appointments, and `BookingWorkflow` |
+| conversation | `services/conversation` | worker | `conversation` | `conversation`: conversations, messages, escalations, plus `PatientConversationWorkflow`, the safety gates and `EscalationWorkflow` |
+| doctor-assistant | `services/doctor_assistant` | FastAPI (SSE) | :8020 | none. Doctor chat, reading clinical data through the clinical-records API |
+| clinical-records | `services/clinical_records` | FastAPI + worker | `clinical` | `clinical`: history_entries, documents, chunks, `DocumentIngestionWorkflow`, and RAG retrieval |
+| consultation | `services/consultation` | worker | `consultation` | `consultation`: consultations and `ConsultationWorkflow` |
+| dialect-router | `services/dialect_router` | FastAPI on **GPU** | :8410 | none. Arabic dialect identification (see §1) |
+| stt / embeddings | `services/stt`, `services/embeddings` | FastAPI on GPU, if self-hosted | :8420, :8430 | none. Built only if the vendor spike picks a self-hosted model |
+| web | `web/` | static | :5173 | none. The doctor dashboard |
+
+**Rules**
+- A service reads and writes only its own schema.
+- It gets anything else by calling the owning service: a Temporal activity on that service's queue, or its internal API.
+- The one allowed coupling is foreign keys to `identity` (doctor_id, patient_id), so row-level security and referential integrity still hold.
+- There is one Alembic history, at the repository root, covering every schema. This means migrations never race each other across services.
+- Services are created when their phase starts, not ahead of time. An empty service is just maintenance.
+
+### Shared library, `packages/core` (`nafas_core`)
+- `config`, `logger` and `tracing` (LangSmith).
+- `temporal`: the client, the worker factory, and `TaskQueue`, the enum naming every queue.
+- `db`: the engine, `session_scope(doctor_id=...)` for RLS, and `Base`. Each service keeps its ORM models in its own package.
+- `interfaces/{llm,stt,embeddings,storage,channels,dialect}`: a Protocol, the implementations, a fake and a factory.
+- `enums` and `exceptions`: vocabulary shared across services.
+
+### Inside a Python service (the original layer rules, per service)
+`routes/` (HTTP, no logic) → `workflows/` (order, no I/O) → `activities/` (one side effect each) → `logic/` (the actual work, framework-free and unit-tested). Plus `schemas/` (dataclasses that cross Temporal), `prompts/`, `models.py` (ORM), and `worker.py` / `main.py` entrypoints. Tests live in each service's `tests/`.
+
+Where the plan's earlier modules land:
+- `utils/scheduling.py` goes to scheduling's `logic/`.
+- `utils/safety.py` goes to conversation.
+- `utils/rag.py` goes to clinical-records.
+- Each LLM tool loop lives in the service that runs it.
+
+### Containers
+- Python services share one `docker/service.Dockerfile`, built with the package name as a build argument (`uv sync --package ...`).
+- GPU services have their own CUDA Dockerfile.
+- Compose runs against the **native Docker engine** through the `Makefile` (`DOCKER_CONTEXT=default`). Docker Desktop's VM cannot see the GPU.
 
 ---
 
