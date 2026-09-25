@@ -53,7 +53,7 @@ Decisions confirmed with the user:
   - `claude-haiku-4-5` for the cheap classifiers (intent, scope, sensitivity, output guard).
   - `claude-opus-5-5` for session summaries.
   - Claude vision gives descriptive text for images that are uploaded to the doctor side. It is never a diagnosis.
-- **Tracing:** LangSmith. The Claude client is wrapped with `langsmith.wrappers.wrap_anthropic`, and each agent loop and pipeline step is decorated with `@traceable`, so a patient message shows up as one trace: intent → gates → retrieval → answer → guard.
+- **Tracing:** LangSmith. Every Claude call is an LLM run through `@traceable(run_type="llm")` in `interfaces/llm/claude.py` (langsmith 0.14.1's `wrap_anthropic` breaks on anthropic 1.x), and each agent loop and pipeline step is decorated with `@traceable`, so a patient message shows up as one trace: intent → gates → retrieval → answer → guard.
   - It is off unless `LANGSMITH_TRACING=true`. The key comes from `LANGSMITH_API_KEY`, and `LANGSMITH_PROJECT` separates environments.
   - Traces carry prompts, and prompts carry PHI. Before any real patient data, either self-host LangSmith or set `LANGSMITH_HIDE_INPUTS`/`LANGSMITH_HIDE_OUTPUTS`, and never trace to the cloud from production without a data agreement.
 - **STT (`interfaces/stt`):** a Protocol with two implementations.

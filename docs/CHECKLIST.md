@@ -7,8 +7,9 @@ The order of work for [PLAN.md](PLAN.md). Each item is ticked in the same commit
 - [x] `docker-compose.yml` with postgres+pgvector, Temporal plus UI, and an S3 store (SeaweedFS — MinIO images are no longer published)
 - [x] Add dependencies (sqlalchemy, asyncpg, alembic, pgvector, anthropic, langsmith, aiogram, aioboto3, pyjwt, argon2-cffi) and extend `Settings` and `.env.example`
 - [x] `utils/db` engine, session and RLS helper; Alembic initialized
-- [ ] Protocols and factories for llm, stt, embeddings, storage and channels, with fake implementations for tests
-- [ ] LangSmith tracing: the Claude client wrapped with `wrap_anthropic`, `@traceable` on the agent loops, and a no-op unless `LANGSMITH_TRACING=true`
+- [x] Protocols and factories for llm, stt, embeddings, storage and channels, with fake implementations for tests
+- [x] LangSmith tracing: every Claude call traced as an LLM run with usage, a no-op unless `LANGSMITH_TRACING=true`
+- [ ] `@traceable` on each agent loop and pipeline step as they are written (phases 2–8)
 - [ ] STT vendor spike on Arabic dialect samples, with the decision recorded in PLAN.md
 
 **Phase 1: Doctors, specializations and scheduling core**

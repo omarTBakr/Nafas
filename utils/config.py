@@ -3,6 +3,8 @@ from pathlib import Path
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from enums.providers import EmbeddingsProvider, LLMProvider, StorageProvider, STTProvider
+
 
 class Settings(BaseSettings):
     """
@@ -32,9 +34,14 @@ class Settings(BaseSettings):
     s3_secret_key: SecretStr = Field(SecretStr("nafas-secret"), description="S3 secret key")
     s3_bucket: str = Field("nafas", description="Bucket holding recordings, voice notes and documents")
 
+    llm_provider: LLMProvider = Field(LLMProvider.ANTHROPIC, description="Which language model backend to use")
+    stt_provider: STTProvider = Field(STTProvider.NONE, description="Speech-to-text backend; chosen after the dialect spike")
+    embeddings_provider: EmbeddingsProvider = Field(EmbeddingsProvider.NONE, description="Embeddings backend")
+    storage_provider: StorageProvider = Field(StorageProvider.S3, description="Object storage backend")
+
     anthropic_api_key: SecretStr = Field(SecretStr(""), description="Claude API key")
     llm_chat_model: str = Field("claude-sonnet-5", description="Model for patient and doctor chat")
-    llm_classifier_model: str = Field("claude-haiku-4-5-20251001", description="Model for intent and safety classifiers")
+    llm_classifier_model: str = Field("claude-haiku-4-5", description="Model for intent and safety classifiers")
     llm_summary_model: str = Field("claude-opus-5-5", description="Model for consultation summaries")
 
     # LangSmith reads these from the process environment, not from this object;

@@ -7,9 +7,16 @@
     |     +-- InvalidSettingError
     |
     +-- WorkflowError
-          +-- ActivityFailedError
-          +-- TemporalConnectionError
-          +-- WorkflowExecutionError
+    |     +-- ActivityFailedError
+    |     +-- TemporalConnectionError
+    |     +-- WorkflowExecutionError
+    |
+    +-- ProviderError
+          +-- LLMError
+          |     +-- LLMRefusalError
+          +-- STTError
+          +-- StorageError
+          +-- ChannelError
 
 Catch `NafasError` for anything the project raised on purpose; catch a subtree
 (`WorkflowError`) when the handling is the same across a domain.
@@ -20,14 +27,21 @@ importing `NafasError` from `exceptions.base` — and re-exporting it here.
 
 from exceptions.base import NafasError
 from exceptions.config import ConfigurationError, InvalidSettingError, MissingSettingError
+from exceptions.providers import ChannelError, LLMError, LLMRefusalError, ProviderError, StorageError, STTError
 from exceptions.workflow import ActivityFailedError, TemporalConnectionError, WorkflowError, WorkflowExecutionError
 
 __all__ = [
     "ActivityFailedError",
+    "ChannelError",
     "ConfigurationError",
     "InvalidSettingError",
+    "LLMError",
+    "LLMRefusalError",
     "MissingSettingError",
     "NafasError",
+    "ProviderError",
+    "STTError",
+    "StorageError",
     "TemporalConnectionError",
     "WorkflowError",
     "WorkflowExecutionError",

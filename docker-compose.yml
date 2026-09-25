@@ -43,7 +43,7 @@ services:
     # SeaweedFS as the local S3 (MinIO no longer publishes images). The app
     # only speaks S3, so production can point at any S3-compatible store.
     # Laptop credentials live in deploy/seaweedfs/s3.json; the bucket is
-    # created by `uv run python scripts/init_storage.py`.
+    # created by `uv run python -m scripts.init_storage`.
     image: chrislusf/seaweedfs:latest
     command: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json", "-ip.bind=0.0.0.0"]
     ports:
