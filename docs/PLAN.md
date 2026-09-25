@@ -40,19 +40,22 @@ Decisions confirmed with the user:
                 └──────┬────────────────────────────────┘
                        │ activities (thin) → utils (logic) → interfaces (ports)
    ┌──────────┬────────┼─────────┬──────────┬──────────┬───────────┐
- Postgres   MinIO/S3  Claude     STT       Embeddings  Channel     LiveKit
+ Postgres   S3 store  Claude     STT       Embeddings  Channel     LiveKit
  +pgvector  (files)   (LLM)    (Whisper-   (bge-m3,    senders     (phase 9)
                                class)      multiling.) (TG/email)
 ```
 
 **Stack choices**
 - **DB:** Postgres 16 with `pgvector`, accessed through SQLAlchemy 2 (async, asyncpg). Migrations use Alembic.
-- **Files:** MinIO locally and S3-compatible storage in production. Objects are keyed by `doctor/{id}/patient/{id}/...` and served through presigned URLs.
+- **Files:** SeaweedFS (S3 API) locally and S3-compatible storage in production. Objects are keyed by `doctor/{id}/patient/{id}/...` and served through presigned URLs.
 - **LLM (`interfaces/llm`):** Claude.
   - `claude-sonnet-5` for patient and doctor chat.
   - `claude-haiku-4-5` for the cheap classifiers (intent, scope, sensitivity, output guard).
   - `claude-opus-5-5` for session summaries.
   - Claude vision gives descriptive text for images that are uploaded to the doctor side. It is never a diagnosis.
+- **Tracing:** LangSmith. The Claude client is wrapped with `langsmith.wrappers.wrap_anthropic`, and each agent loop and pipeline step is decorated with `@traceable`, so a patient message shows up as one trace: intent → gates → retrieval → answer → guard.
+  - It is off unless `LANGSMITH_TRACING=true`. The key comes from `LANGSMITH_API_KEY`, and `LANGSMITH_PROJECT` separates environments.
+  - Traces carry prompts, and prompts carry PHI. Before any real patient data, either self-host LangSmith or set `LANGSMITH_HIDE_INPUTS`/`LANGSMITH_HIDE_OUTPUTS`, and never trace to the cloud from production without a data agreement.
 - **STT (`interfaces/stt`):** a Protocol with two implementations.
   - Hosted Whisper-large-v3-class, used for voice notes.
   - A diarizing provider for sessions (doctor vs patient speakers).
@@ -189,7 +192,7 @@ The Temporal conventions come from the existing README and `workflows/__init__.p
 - `schemas/`, `activities/` and `workflows/`: one file per step and per flow, registered in `ACTIVITIES` and `WORKFLOWS`.
 - `routes/`: `telegram.py`, `email.py`, `auth.py`, `doctor_schedule.py`, `doctor_patients.py`, `doctor_chat.py`, `documents.py`, `consultations.py` and `escalations.py`. Auth is attached where the routers are included in `main.py`.
 - `utils/config.py`: new settings for DB, S3, Anthropic, STT, embeddings, Telegram, email and JWT.
-- `docker-compose.yml`: postgres+pgvector, temporal plus UI, minio, api, worker and web.
+- `docker-compose.yml`: postgres+pgvector, temporal plus UI, SeaweedFS (S3); api, worker and web join once they have Dockerfiles.
 - `web/`: the dashboard.
 
 ---
@@ -214,6 +217,7 @@ The Temporal conventions come from the existing README and `workflows/__init__.p
 - Encryption: TLS in transit, and encrypted disk and bucket at rest.
 - PHI stays out of logs; the logger redacts it.
 - `audit_log` records every clinical read.
+- LangSmith traces contain PHI, so the same vendor rules apply to them as to the LLM.
 - The design targets the Egypt PDPL (Law 151/2020) and HIPAA-style controls. A zero-data-retention agreement with the LLM and STT vendors is needed before any real patients use the system.
 
 ---

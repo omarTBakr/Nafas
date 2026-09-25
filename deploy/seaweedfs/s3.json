@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "nafas",
+      "credentials": [{ "accessKey": "nafas", "secretKey": "nafas-secret" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

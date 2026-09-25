@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     api_host: str = Field("0.0.0.0", description="Host the FastAPI server binds to")
     api_port: int = Field(8000, description="Port the FastAPI server listens on")
 
-    temporal_host: str = Field("localhost:7233", description="host:port of the Temporal frontend service")
+    temporal_host: str = Field("localhost:7234", description="host:port of the Temporal frontend service")
     temporal_namespace: str = Field("default", description="Temporal namespace the worker and client use")
     temporal_task_queue: str = Field("nafas_queue", description="Task queue the workflow and activities are polled from")
 

@@ -4,10 +4,11 @@ The order of work for [PLAN.md](PLAN.md). Each item is ticked in the same commit
 
 **Phase 0: Foundations**
 - [x] Write `docs/PLAN.md` and `docs/CHECKLIST.md`
-- [ ] `docker-compose.yml` with postgres+pgvector, Temporal plus UI, and MinIO
-- [ ] Add dependencies (sqlalchemy, asyncpg, alembic, pgvector, anthropic, aiogram, aioboto3, pyjwt, argon2-cffi) and extend `Settings` and `.env.example`
+- [x] `docker-compose.yml` with postgres+pgvector, Temporal plus UI, and an S3 store (SeaweedFS — MinIO images are no longer published)
+- [ ] Add dependencies (sqlalchemy, asyncpg, alembic, pgvector, anthropic, langsmith, aiogram, aioboto3, pyjwt, argon2-cffi) and extend `Settings` and `.env.example`
 - [ ] `utils/db` engine, session and RLS helper; Alembic initialized
 - [ ] Protocols and factories for llm, stt, embeddings, storage and channels, with fake implementations for tests
+- [ ] LangSmith tracing: the Claude client wrapped with `wrap_anthropic`, `@traceable` on the agent loops, and a no-op unless `LANGSMITH_TRACING=true`
 - [ ] STT vendor spike on Arabic dialect samples, with the decision recorded in PLAN.md
 
 **Phase 1: Doctors, specializations and scheduling core**

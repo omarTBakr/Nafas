@@ -1,0 +1,58 @@
+# Local infrastructure: `docker compose up -d`.
+#
+# The API and the worker run on the host (`uv run python main.py`,
+# `uv run python worker.py`) and reach these on localhost. Credentials here are
+# for a laptop only and match the defaults in utils/config.py.
+#
+# Host ports are shifted off the usual ones (5433, 7234, 8234) so the stack
+# sits beside a system Postgres or another project's Temporal without a fight.
+
+services:
+  postgres:
+    # pgvector for embeddings; btree_gist (for the appointment exclusion
+    # constraint) ships with Postgres and is enabled by the first migration
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: nafas
+      POSTGRES_PASSWORD: nafas
+      POSTGRES_DB: nafas
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nafas -d nafas"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  temporal:
+    # the single-binary dev server: frontend on 7234, web UI on 8234,
+    # state in a SQLite file on the volume so workflows survive a restart
+    image: temporalio/temporal:latest
+    # the image's own user cannot write to a fresh named volume
+    user: root
+    command: ["server", "start-dev", "--ip", "0.0.0.0", "--db-filename", "/data/temporal.db"]
+    ports:
+      - "7234:7233"
+      - "8234:8233"
+    volumes:
+      - temporal-data:/data
+
+  s3:
+    # SeaweedFS as the local S3 (MinIO no longer publishes images). The app
+    # only speaks S3, so production can point at any S3-compatible store.
+    # Laptop credentials live in deploy/seaweedfs/s3.json; the bucket is
+    # created by `uv run python scripts/init_storage.py`.
+    image: chrislusf/seaweedfs:latest
+    command: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json", "-ip.bind=0.0.0.0"]
+    ports:
+      - "8333:8333"
+    volumes:
+      - s3-data:/data
+      - ./deploy/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro
+
+volumes:
+  postgres-data:
+  temporal-data:
+  s3-data:
