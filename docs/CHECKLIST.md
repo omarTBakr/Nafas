@@ -32,6 +32,10 @@ The order of work for [PLAN.md](PLAN.md). Each item is ticked in the same commit
 **Phase 3: Voice**
 - [ ] Download Telegram voice notes → STT → the same pipeline; store audio in S3 and the transcript on the message
 - [ ] Arabic and English voice booking tested end to end
+- [ ] `tts` GPU service: Lahgtna OmniVoice v3 pinned at its sha in a CUDA image, `/health` config, `/metrics`, and the `interfaces/tts` client and fake
+- [ ] Reference voice: record one with the speaker's written consent, and store it with that consent
+- [ ] Text normaliser before TTS: numbers, dates and times to Egyptian words; refuse text with Latin script or clinical content
+- [ ] Voice replies for Egyptian patients (dialect-router `eg`, confident) on admin messages, always sent with the text
 
 **Phase 4: Email channel**
 - [ ] Email adapter (inbound-parse webhook, SMTP out, threading by Message-ID)

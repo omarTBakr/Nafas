@@ -59,11 +59,15 @@ Decisions confirmed with the user:
 - **STT (`interfaces/stt`):** a Protocol with two implementations.
   - Hosted Whisper-large-v3-class, used for voice notes.
   - A diarizing provider for sessions (doctor vs patient speakers).
-  - Pick the vendors in a Phase 0 spike that tests Egyptian, Gulf and Levantine Arabic plus code-switching.
+  - Pick the vendors in a Phase 0 spike that tests Egyptian, Gulf and Levantine Arabic plus code-switching. The self-hosted candidates include `oddadmix/whisper-large-v3-arabic-dialectal-v2` and the other Arabic-dialect ASR fine-tunes by the same author, run as a GPU service beside the hosted vendors.
 - **Dialect identification (`interfaces/dialect`, the `dialect-router` service on GPU):** [`oddadmix/dialect-router-v0.1`](https://huggingface.co/oddadmix/dialect-router-v0.1). It is a small BERT (`bert-mini-arabic`, MIT) that labels text with one of 12 codes from its `config.json`: ar (MSA), eg, sa, ma, iq, sd, tn, lb, sy, ly, ps, and en for English. The model card lists 11 and calls Moroccan `mo`; `config.json` is authoritative.
   - Uses: tagging transcripts and messages (for the STT spike, analytics and reply tone), and later choosing a dialect voice for TTS replies. Its home project, Lahgtna, is built for exactly that.
   - Limits: no published accuracy, unreliable on short or code-switched text, and adjacent dialects get confused. **It is never an input to a safety or clinical decision.** Before relying on it, evaluate it on our own labelled samples.
   - First probe, 2026-09-26, on an RTX 4060: 8 of 9 labelled sentences were right. Syrian came back as Palestinian (0.87). Code-switched "عندي pain في الـ chest" came back as MSA at 0.90, which is confidently wrong, and the low-confidence flag cannot catch that. "شكرا" was correctly flagged low-confidence (0.26).
+- **Text-to-speech (`interfaces/tts`, the `tts` GPU service, Phase 3):** [`ehabnegm/lahgtna-omnivoice-egyptian-v3`](https://huggingface.co/ehabnegm/lahgtna-omnivoice-egyptian-v3), decided on 2026-09-26. It is an OmniVoice fine-tune (the `omnivoice` package, Apache-2.0) continued from `oddadmix/lahgtna-omnivoice-v2`, and reads raw, non-diacritized Egyptian text. The weights are Apache-2.0, about 2.4 GB, and run in fp16 alongside the dialect-router on 8 GB. It is pinned at `e859e1f49e2d45eb0d6dfc48e48e03697dfccc65`.
+  - Routing: patients whose messages the dialect-router labels `eg` with confidence get voice replies. Everyone else gets text until there is a model for their dialect.
+  - Voice: **zero-shot cloning from a reference recording Nafas owns, made with the speaker's written consent.** The two trained voices (Eqkawkab, Noselleel) come from YouTube creators' audio, their card asks for permission before commercial use, and v2 declares no licence. They are not shipped.
+  - Safety: the model cannot say English words and mangles digits. So TTS speaks **booking and administrative messages only** (confirmations, reminders, "your question went to the doctor"). Clinical answers, drug names and doses are text-only, and every voice note is sent with its text. Numbers, dates and times are converted to words by our own code before synthesis, never left to the model.
 - **Embeddings (`interfaces/embeddings`):** `bge-m3`, which is multilingual Arabic/English with 1024 dimensions. It sits behind a Protocol so a hosted model can replace it.
 - **Channels (`interfaces/channels`):** a `ChannelAdapter` Protocol (`parse_inbound`, `send_text`, `send_voice`, `download_media`).
   - Implementations: `telegram` (aiogram, webhook mode) and `email` (inbound-parse webhook, SMTP out).
@@ -202,6 +206,7 @@ Every feature is its own deployable service, and all of them live in one reposit
 | clinical-records | `services/clinical_records` | FastAPI + worker | `clinical` | `clinical`: history_entries, documents, chunks, `DocumentIngestionWorkflow`, and RAG retrieval |
 | consultation | `services/consultation` | worker | `consultation` | `consultation`: consultations and `ConsultationWorkflow` |
 | dialect-router | `services/dialect_router` | FastAPI on **GPU** | :8410 | none. Arabic dialect identification (see §1) |
+| tts | `services/tts` | FastAPI on **GPU** | :8440 | none. Egyptian TTS (Lahgtna OmniVoice v3), for administrative messages only |
 | stt / embeddings | `services/stt`, `services/embeddings` | FastAPI on GPU, if self-hosted | :8420, :8430 | none. Built only if the vendor spike picks a self-hosted model |
 | web | `web/` | static | :5173 | none. The doctor dashboard |
 
@@ -242,7 +247,7 @@ Where the plan's earlier modules land:
 - **Pre-visit intake:** the bot asks for the reason for the visit, symptoms, meds and allergies, and saves an `intake` history entry for the doctor.
 - **Next-patient brief:** generated automatically 10 minutes before each appointment and pushed to the dashboard.
 - **Post-visit patient summary and instructions** in the patient's language, sent after the doctor approves.
-- **Voice replies (TTS)** for patients who send voice notes.
+- **Voice replies (TTS)** for patients who send voice notes. **Chosen**: Lahgtna OmniVoice v3 for Egyptian, admin messages only (see §1).
 - **`.ics` invites** by email, and Google Calendar export for the doctor.
 - **No-show tracking** and a simple per-doctor stats page.
 
