@@ -1,0 +1,64 @@
+[project]
+name = "nafas"
+version = "0.1.0"
+description = "A Temporal and FastAPI backend"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.0",
+    "python-multipart>=0.0.32",
+    "temporalio>=1.32.0",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[dependency-groups]
+dev = [
+    "black>=26.5.1",
+    "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.16.6",
+]
+
+[tool.black]
+line-length = 130
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 130
+target-version = "py312"
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, isort, pyupgrade, bugbear
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+# the root modules too (main, worker), or isort files them as third-party
+known-first-party = [
+    "activities",
+    "enums",
+    "exceptions",
+    "interfaces",
+    "main",
+    "prompts",
+    "routes",
+    "schemas",
+    "scripts",
+    "utils",
+    "worker",
+    "workflows",
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's dependency-injection idiom puts these calls in argument defaults
+extend-immutable-calls = ["fastapi.Depends", "fastapi.File", "fastapi.Form", "fastapi.Query", "fastapi.Body"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-q"

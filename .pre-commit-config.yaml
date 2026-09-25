@@ -1,0 +1,42 @@
+# Runs on every `git commit`. Install once with: uv run pre-commit install
+repos:
+  - repo: https://github.com/psf/black
+    rev: 26.5.1
+    hooks:
+      - id: black
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        # a lockfile is legitimately large once the dependency tree grows
+        args: [--maxkb=1024]
+      - id: detect-private-key
+
+  # runs the suite locally before the commit is created
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: uv run pytest
+        language: system
+        pass_filenames: false
+        types: [python]
+
+      # a hand-maintained table of contents drifts; this one is generated
+      - id: readme-contents
+        name: README contents are up to date
+        entry: uv run python scripts/toc.py --check
+        language: system
+        pass_filenames: false
+        files: ^README\.md$
