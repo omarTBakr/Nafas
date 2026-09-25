@@ -3,7 +3,7 @@ name = "nafas"
 version = "0.1.0"
 description = "A Temporal and FastAPI backend"
 readme = "README.md"
-license = "MIT"
+license = "PolyForm-Noncommercial-1.0.0"
 requires-python = ">=3.12"
 dependencies = [
     "aioboto3>=15.5.0",

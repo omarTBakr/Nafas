@@ -155,4 +155,6 @@ guards payload schema drift, which is why the first item exists.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[PolyForm Noncommercial 1.0.0](LICENSE). Personal, research, educational and
+non-profit use is free. Commercial use of any kind needs a separate written
+license from the copyright holder; open an issue or contact omarTBakr to ask.
