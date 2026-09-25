@@ -10,6 +10,23 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+
+    # the database tests skip without a Postgres; here they must run
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: nafas
+          POSTGRES_PASSWORD: nafas
+          POSTGRES_DB: nafas
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U nafas -d nafas"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
     steps:
       - uses: actions/checkout@v4
 
