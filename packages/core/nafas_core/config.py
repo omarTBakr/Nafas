@@ -23,8 +23,12 @@ class Settings(BaseSettings):
     temporal_namespace: str = Field("default", description="Temporal namespace the worker and client use")
 
     database_url: str = Field(
+        "postgresql+asyncpg://nafas_service:nafas@localhost:5433/nafas",
+        description="What services connect as: a role row-level security applies to",
+    )
+    database_owner_url: str = Field(
         "postgresql+asyncpg://nafas:nafas@localhost:5433/nafas",
-        description="SQLAlchemy async URL of the Postgres database",
+        description="The schema owner, for migrations only; RLS does not apply to it",
     )
 
     s3_endpoint_url: str = Field("http://localhost:8333", description="S3 endpoint; empty for AWS itself")

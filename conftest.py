@@ -1,5 +1,5 @@
 import asyncio
-import os
+from pathlib import Path
 
 import pytest
 from alembic import command
@@ -36,27 +36,33 @@ def fresh_settings(monkeypatch, tmp_path):
 # --- database -------------------------------------------------------------
 #
 # Tests that take the `database` fixture run against a real Postgres, in a
-# database of their own (nafas_test by default, TEST_DATABASE_URL to change it)
-# that is created if missing and migrated to head once per run. Without a
-# reachable Postgres they are skipped, so the rest of the suite runs anywhere.
+# database of their own (nafas_test on the server DATABASE_URL points at) that
+# is created if missing, given the roles, and migrated to head once per run.
+# The test then connects as nafas_service, exactly as a service does, so
+# row-level security applies. Without a reachable Postgres they are skipped,
+# so the rest of the suite runs anywhere.
+
+TEST_DATABASE = "nafas_test"
+ROLES_SQL = Path(__file__).parent / "deploy" / "postgres" / "roles.sql"
 
 
-def test_database_url() -> str:
-    if url := os.environ.get("TEST_DATABASE_URL"):
-        return url
+def _test_urls() -> tuple[str, str]:
+    """(app URL, owner URL) for the test database."""
+    settings = nafas_core.config.Settings()
+    app, owner = (
+        make_url(url).set(database=TEST_DATABASE).render_as_string(hide_password=False)
+        for url in (settings.database_url, settings.database_owner_url)
+    )
+    return app, owner
 
-    return make_url(nafas_core.config.Settings().database_url).set(database="nafas_test").render_as_string(hide_password=False)
 
-
-test_database_url.__test__ = False  # a helper, not a test, despite its name
-
-
-async def _ensure_database(url: str) -> None:
-    """Creates the test database through the server's `postgres` database if it is missing."""
-    target = make_url(url)
+async def _prepare_server(owner_url: str) -> None:
+    """Creates the roles and the test database if missing, through the server's `postgres` database."""
+    target = make_url(owner_url)
     admin = create_async_engine(target.set(database="postgres"), isolation_level="AUTOCOMMIT")
     try:
         async with admin.connect() as connection:
+            await connection.exec_driver_sql(ROLES_SQL.read_text())
             exists = await connection.scalar(text("SELECT 1 FROM pg_database WHERE datname = :name"), {"name": target.database})
             if not exists:
                 await connection.execute(text(f'CREATE DATABASE "{target.database}"'))
@@ -64,27 +70,59 @@ async def _ensure_database(url: str) -> None:
         await admin.dispose()
 
 
-@pytest.fixture(scope="session")
-def migrated_database_url() -> str:
-    url = test_database_url()
+async def _empty_service_tables(owner_url: str) -> None:
+    """Truncates every table in every service schema, so each test starts from nothing."""
+    engine = create_async_engine(owner_url)
     try:
-        asyncio.run(asyncio.wait_for(_ensure_database(url), timeout=5))
+        async with engine.begin() as connection:
+            tables = (
+                (
+                    await connection.execute(
+                        text(
+                            "SELECT format('%I.%I', schemaname, tablename) FROM pg_tables"
+                            " WHERE schemaname NOT IN ('public', 'pg_catalog', 'information_schema')"
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            if tables:
+                await connection.execute(text(f"TRUNCATE {', '.join(tables)} CASCADE"))
+    finally:
+        await engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def migrated_database() -> tuple[str, str]:
+    app_url, owner_url = _test_urls()
+    try:
+        asyncio.run(asyncio.wait_for(_prepare_server(owner_url), timeout=5))
     except (OSError, TimeoutError) as exc:
-        pytest.skip(f"no Postgres for database tests at {make_url(url).render_as_string()}: {exc}")
+        pytest.skip(f"no Postgres for database tests at {make_url(owner_url).render_as_string()}: {exc}")
 
     config = Config("alembic.ini")
-    config.set_main_option("sqlalchemy.url", url)
+    config.set_main_option("sqlalchemy.url", owner_url)
     command.upgrade(config, "head")
 
-    return url
+    return app_url, owner_url
 
 
 @pytest.fixture
-async def database(migrated_database_url, monkeypatch):
-    """Points DATABASE_URL, and so nafas_core.db, at the migrated test database for one test."""
-    monkeypatch.setenv("DATABASE_URL", migrated_database_url)
+async def database(migrated_database, monkeypatch):
+    """
+    Points nafas_core.db at the empty, migrated test database for one test.
+
+    Yields the owner URL, for the rare test that must set up or inspect rows
+    past row-level security; everything else goes through session_scope.
+    """
+    app_url, owner_url = migrated_database
+    await _empty_service_tables(owner_url)
+
+    monkeypatch.setenv("DATABASE_URL", app_url)
+    monkeypatch.setenv("DATABASE_OWNER_URL", owner_url)
     await dispose_engine()
 
-    yield migrated_database_url
+    yield owner_url
 
     await dispose_engine()

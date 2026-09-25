@@ -5,7 +5,7 @@ export DOCKER_CONTEXT ?= default
 
 COMPOSE := docker compose
 
-.PHONY: up up-cpu down ps logs build migrate storage test test-gpu-services gpu-check
+.PHONY: up up-cpu down ps logs build db-roles migrate seed storage test test-gpu-services gpu-check
 
 up:  ## the whole stack, GPU services on the GPU
 	$(COMPOSE) up -d --build
@@ -24,6 +24,9 @@ logs:
 
 build:
 	$(COMPOSE) build
+
+db-roles:  ## create the database roles on a volume made before they existed
+	$(COMPOSE) exec -T postgres psql -U nafas -d nafas -v ON_ERROR_STOP=1 < deploy/postgres/roles.sql
 
 migrate:  ## apply database migrations (against the stack's Postgres on :5433)
 	uv run alembic upgrade head

@@ -28,18 +28,35 @@ async def test_the_doctor_scope_does_not_outlive_its_transaction(database):
 
 
 async def test_an_exception_rolls_the_transaction_back(database):
-    async with session_scope() as session:
-        await session.execute(text("CREATE TABLE IF NOT EXISTS rollback_probe (id int)"))
-        await session.execute(text("DELETE FROM rollback_probe"))
-
+    # a temporary table needs no privileges beyond connecting
     with pytest.raises(RuntimeError):
         async with session_scope() as session:
-            await session.execute(text("INSERT INTO rollback_probe VALUES (1)"))
+            await session.execute(text("CREATE TEMP TABLE rollback_probe (id int)"))
             raise RuntimeError("boom")
 
     async with session_scope() as session:
-        assert await session.scalar(text("SELECT count(*) FROM rollback_probe")) == 0
-        await session.execute(text("DROP TABLE rollback_probe"))
+        assert await session.scalar(text("SELECT to_regclass('pg_temp.rollback_probe')")) is None
+
+
+async def test_services_connect_as_a_role_rls_applies_to(database):
+    """A superuser or table owner bypasses row-level security; the service role must be neither."""
+    async with session_scope() as session:
+        user, superuser = (
+            await session.execute(text("SELECT current_user, usesuper FROM pg_user WHERE usename = current_user"))
+        ).one()
+
+    assert user == "nafas_service"
+    assert superuser is False
+
+
+async def test_current_doctor_is_null_without_a_scope(database):
+    """Every policy compares against this, and NULL matches nothing."""
+    doctor_id = uuid4()
+
+    async with session_scope() as session:
+        assert await session.scalar(text("SELECT nafas_current_doctor()")) is None
+    async with session_scope(doctor_id=doctor_id) as session:
+        assert await session.scalar(text("SELECT nafas_current_doctor()")) == doctor_id
 
 
 async def test_migrations_enable_the_extensions(database):

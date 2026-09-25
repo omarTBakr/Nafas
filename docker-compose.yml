@@ -23,6 +23,7 @@ services:
       - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./deploy/postgres/roles.sql:/docker-entrypoint-initdb.d/10-roles.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U nafas -d nafas"]
       interval: 5s
@@ -66,7 +67,7 @@ services:
         MODULE: nafas_gateway.main
     image: nafas/gateway:dev
     environment: &service-env
-      DATABASE_URL: postgresql+asyncpg://nafas:nafas@postgres:5432/nafas
+      DATABASE_URL: postgresql+asyncpg://nafas_service:nafas@postgres:5432/nafas
       TEMPORAL_HOST: temporal:7233
       S3_ENDPOINT_URL: http://s3:8333
       DIALECT_ROUTER_URL: http://dialect-router:8410

@@ -1,4 +1,4 @@
-"""Alembic environment: migrations run against DATABASE_URL from nafas_core.config.
+"""Alembic environment: migrations run as the owner, DATABASE_OWNER_URL from nafas_core.config.
 
 `uv run alembic upgrade head` to migrate; `uv run alembic revision
 --autogenerate -m "..."` to draft a migration from the models, which then gets
@@ -38,8 +38,8 @@ target_metadata = Base.metadata
 
 
 def database_url() -> str:
-    """A URL set on the Config (the test suite does this) wins over DATABASE_URL."""
-    return config.get_main_option("sqlalchemy.url") or get_setting().database_url
+    """A URL set on the Config (the test suite does this) wins over DATABASE_OWNER_URL."""
+    return config.get_main_option("sqlalchemy.url") or get_setting().database_owner_url
 
 
 def run_migrations_offline() -> None:
