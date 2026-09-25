@@ -28,8 +28,8 @@ purpose, and each one's `__init__.py` says what belongs in it.
 
 - Python 3.12 (pinned in `.python-version`)
 - [uv](https://docs.astral.sh/uv/)
-- A Temporal server, once you have a workflow to run. Until then the API and
-  the suite need nothing else.
+- Docker with Compose, for Postgres (+pgvector), Temporal and the S3 store.
+  The suite still runs without them: database and storage tests skip.
 
 ### Setup
 
@@ -37,7 +37,14 @@ purpose, and each one's `__init__.py` says what belongs in it.
 uv sync
 uv run pre-commit install     # once, so the hooks run on every commit
 cp .env.example .env          # optional: every setting already has a default
+
+docker compose up -d                   # Postgres :5433, Temporal :7234 (UI :8234), S3 :8333
+uv run alembic upgrade head            # migrate the database
+uv run python -m scripts.init_storage  # create the bucket
 ```
+
+The plan and the order of work live in [docs/PLAN.md](docs/PLAN.md) and
+[docs/CHECKLIST.md](docs/CHECKLIST.md).
 
 Check it works:
 
