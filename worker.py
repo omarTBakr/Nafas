@@ -10,6 +10,7 @@ import asyncio
 from activities import ACTIVITIES
 from utils.create_worker import create_worker
 from utils.logger import get_logger, setup_logging
+from utils.tracing import configure_tracing
 from workflows import WORKFLOWS
 
 logger = get_logger(__name__)
@@ -30,6 +31,7 @@ async def run() -> None:
 
 def main() -> None:
     setup_logging()
+    configure_tracing()
     asyncio.run(run())
 
 
