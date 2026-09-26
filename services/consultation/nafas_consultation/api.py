@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from nafas_consultation import online_api
 from nafas_consultation.enums import DISCARDABLE, ConsultationStatus
 from nafas_consultation.events import get_events
-from nafas_consultation.exceptions import ConsultationNotFoundError, NotUnderCareError, WrongStateError
+from nafas_consultation.exceptions import ConsultationNotFoundError, JoinRefusedError, NotUnderCareError, WrongStateError
 from nafas_consultation.logic import consultations
 from nafas_consultation.logic.note import Note
 from nafas_consultation.models import Consultation
@@ -271,6 +271,11 @@ async def health() -> dict:
 @app.exception_handler(ConsultationNotFoundError)
 async def not_found(request: Request, exc: ConsultationNotFoundError) -> JSONResponse:
     return JSONResponse(status_code=404, content={"detail": "no such consultation"})
+
+
+@app.exception_handler(JoinRefusedError)
+async def join_refused(request: Request, exc: JoinRefusedError) -> JSONResponse:
+    return JSONResponse(status_code=409, content={"detail": str(exc), "reason": exc.reason})
 
 
 @app.exception_handler(WrongStateError)

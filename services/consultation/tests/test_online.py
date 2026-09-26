@@ -80,12 +80,13 @@ async def test_only_the_patient_and_doctor_join_and_only_around_the_visit(api, c
     assert patient.json()["token"] == f"token:{room}:patient:{clinic.patient_id}:patient"
     assert doctor.json()["token"].startswith(f"token:{room}:doctor:{clinic.doctor_id}")
     assert stranger.status_code == other_doctor.status_code == 404
-    assert early.status_code == 409 and "too_early" in early.json()["detail"]
-    assert not_online.status_code == 409 and "not_online" in not_online.json()["detail"]
+    assert early.status_code == 409 and early.json()["reason"] == "too_early"
+    assert not_online.status_code == 409 and not_online.json()["reason"] == "not_online"
 
     set_rooms(None)
     nafas_core.config._settings_instance = None
-    assert (await join(api, visit["appointment_id"], "patient", clinic.patient_id)).status_code == 503
+    off = await join(api, visit["appointment_id"], "patient", clinic.patient_id)
+    assert off.status_code == 409 and off.json()["reason"] == "online_visits_off"
 
 
 def hook(api, **event):

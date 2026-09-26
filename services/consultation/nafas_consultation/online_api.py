@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from nafas_consultation.enums import ConsultationStatus
-from nafas_consultation.exceptions import NotUnderCareError, WrongStateError
+from nafas_consultation.exceptions import JoinRefusedError, NotUnderCareError, WrongStateError
 from nafas_consultation.logic import consultations, online
 from nafas_consultation.rooms import Rooms, Track, get_rooms, parse_room, participant, room_name
 from nafas_core import audit
@@ -42,7 +42,7 @@ class RecordingIn(BaseModel):
 def _rooms() -> Rooms:
     rooms = get_rooms()
     if rooms is None:
-        raise HTTPException(status_code=503, detail="online visits are not set up here", headers={"X-Reason": "no_rooms"})
+        raise JoinRefusedError("online_visits_off")
     return rooms
 
 
@@ -60,7 +60,7 @@ async def _appointment(appointment_id: uuid.UUID, role: str, person_id: uuid.UUI
 def _joinable(appointment: dict) -> None:
     refusal = online.join_refusal(appointment, datetime.now(UTC))
     if refusal:
-        raise HTTPException(status_code=409, detail=f"this visit cannot be joined now ({refusal})", headers={"X-Reason": refusal})
+        raise JoinRefusedError(refusal)
 
 
 router = APIRouter(prefix="/internal/v1", dependencies=[Depends(require_internal_token)])
