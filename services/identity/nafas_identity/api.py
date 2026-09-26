@@ -10,6 +10,7 @@ from nafas_core.enums.identity import Language, UserRole
 from nafas_core.internal_api import require_internal_token
 from nafas_identity.exceptions import AccountExistsError, WeakPasswordError
 from nafas_identity.logic.accounts import AuthenticatedUser, authenticate, get_user, register_patient_account
+from nafas_identity.logic.directory import DoctorCard, ensure_care_link, list_doctors, list_specializations
 
 
 class Credentials(BaseModel):
@@ -31,6 +32,31 @@ class PatientSignUp(BaseModel):
     full_name: str
     preferred_language: Language = Language.ARABIC
     phone: str | None = None
+
+
+class DoctorOut(BaseModel):
+    doctor_id: uuid.UUID
+    full_name_en: str
+    full_name_ar: str
+    specialization_code: str
+    specialization_en: str
+    specialization_ar: str
+    languages: list[str]
+
+
+class SpecializationOut(BaseModel):
+    code: str
+    name_en: str
+    name_ar: str
+
+
+class CareLink(BaseModel):
+    doctor_id: uuid.UUID
+    patient_id: uuid.UUID
+
+
+def _doctor(card: DoctorCard) -> DoctorOut:
+    return DoctorOut(**card.__dict__)
 
 
 def _account(user: AuthenticatedUser) -> Account:
@@ -81,6 +107,35 @@ async def read_user(user_id: uuid.UUID) -> Account:
         raise HTTPException(status_code=404, detail="no such active account")
 
     return _account(user)
+
+
+@router.get("/specializations", response_model=list[SpecializationOut])
+async def specializations() -> list[SpecializationOut]:
+    async with session_scope() as session:
+        return [SpecializationOut(code=s.code, name_en=s.name_en, name_ar=s.name_ar) for s in await list_specializations(session)]
+
+
+@router.get("/doctors", response_model=list[DoctorOut])
+async def doctors(specialization: str | None = None) -> list[DoctorOut]:
+    async with session_scope() as session:
+        return [_doctor(card) for card in await list_doctors(session, specialization_code=specialization)]
+
+
+@router.get("/doctors/{doctor_id}", response_model=DoctorOut)
+async def doctor(doctor_id: uuid.UUID) -> DoctorOut:
+    async with session_scope() as session:
+        found = await list_doctors(session, doctor_id=doctor_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="no such doctor")
+
+    return _doctor(found[0])
+
+
+@router.post("/care-links", status_code=204)
+async def care_link(link: CareLink) -> None:
+    """Idempotent: the patient is under the doctor's care afterwards, whether or not they were before."""
+    async with session_scope(doctor_id=link.doctor_id) as session:
+        await ensure_care_link(session, link.doctor_id, link.patient_id)
 
 
 app = FastAPI(title="Nafas identity (internal)")

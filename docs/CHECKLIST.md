@@ -26,9 +26,9 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 
 **Phase 2: The web app, and booking in the UI** (patient portal, doctor schedule; decided 2026-09-26: web only, no bots for now)
 - [x] Patient accounts: a `patient` role, self sign-up in identity, `patients.user_id`; patient-scoped RLS (`nafas_current_patient()`, `session_scope(patient_id=...)`), and a narrow security-definer lookup for login
-- [ ] **(in progress)** Doctor directory: doctors with their specialization, from identity's internal API
-- [ ] Scheduling internal API: free slots, check an exact time, hold, confirm, cancel, a patient's and a doctor's appointments
-- [ ] Care link (`doctor_patients`) created by identity on a patient's first booking
+- [x] Doctor directory: doctors with their specialization, from identity's internal API
+- [ ] **(in progress)** Scheduling internal API: free slots, check an exact time, hold, confirm, cancel, a patient's and a doctor's appointments
+- [x] Care link (`doctor_patients`): identity's idempotent `POST /care-links`, called on every booking
 - [ ] Gateway: `/api/auth/register`, `/api/doctors`, `/api/doctors/{id}/slots`, `/api/appointments` (hold, confirm, cancel, mine), `/api/doctor/schedule`, with a role check on every route
 - [ ] `web/`: one React + Vite + TypeScript app, Arabic (RTL) and English; login and sign-up; patient portal (doctors → slot picker → confirm → my appointments); doctor portal (today and this week)
 - [ ] `web` in compose, and an end-to-end booking run through the UI
