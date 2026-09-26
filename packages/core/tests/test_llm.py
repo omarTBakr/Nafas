@@ -19,6 +19,22 @@ def claude_with(handler) -> AnthropicLLM:
     return AnthropicLLM(api_key="test", client=client)
 
 
+def test_a_workspace_id_is_sent_on_every_request():
+    llm = AnthropicLLM(api_key="test", workspace_id="wrkspc_123")
+
+    assert llm._client.default_headers["anthropic-workspace-id"] == "wrkspc_123"
+
+
+def test_no_workspace_header_without_a_workspace():
+    assert "anthropic-workspace-id" not in AnthropicLLM(api_key="test")._client.default_headers
+
+
+def test_a_failed_call_traces_no_output_instead_of_crashing():
+    from nafas_core.interfaces.llm.claude import trace_outputs
+
+    assert trace_outputs(None) == {}
+
+
 def message_body(stop_reason: str, text: str = "hi", stop_details: dict | None = None) -> dict:
     return {
         "id": "msg_1",

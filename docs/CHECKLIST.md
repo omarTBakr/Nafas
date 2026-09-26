@@ -1,6 +1,6 @@
 # Nafas — execution checklist
 
-The order of work for [PLAN.md](PLAN.md). Each item is ticked in the same commit that completes it; every phase ends with a green `uv run pytest`.
+The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item is marked **(in progress)** when work on it starts and ticked the moment it is done. Every phase ends with a green `make test`.
 
 **Phase 0: Foundations**
 - [x] Write `docs/PLAN.md` and `docs/CHECKLIST.md`
@@ -25,7 +25,7 @@ The order of work for [PLAN.md](PLAN.md). Each item is ticked in the same commit
 - [x] Doctor auth: gateway `/api/auth/login|logout|me` (signed httpOnly session, account re-checked every request) over identity's internal API; admin-created accounts only
 
 **Phase 2: The web app, and booking in the UI** (patient portal, doctor schedule; decided 2026-09-26: web only, no bots for now)
-- [ ] Patient accounts: a `patient` role, self sign-up in identity, `patients.user_id`; patient-scoped RLS (`nafas_current_patient()`, `session_scope(patient_id=...)`)
+- [ ] **(in progress)** Patient accounts: a `patient` role, self sign-up in identity, `patients.user_id`; patient-scoped RLS (`nafas_current_patient()`, `session_scope(patient_id=...)`)
 - [ ] Doctor directory: doctors with their specialization, from identity's internal API
 - [ ] Scheduling internal API: free slots, check an exact time, hold, confirm, cancel, a patient's and a doctor's appointments
 - [ ] Care link (`doctor_patients`) created by identity on a patient's first booking

@@ -14,7 +14,10 @@ def get_llm() -> LLM:
             case LLMProvider.ANTHROPIC:
                 from nafas_core.interfaces.llm.claude import AnthropicLLM
 
-                _llm = AnthropicLLM(api_key=settings.anthropic_api_key.get_secret_value())
+                _llm = AnthropicLLM(
+                    api_key=settings.anthropic_api_key.get_secret_value(),
+                    workspace_id=settings.anthropic_workspace_id,
+                )
 
     return _llm
 

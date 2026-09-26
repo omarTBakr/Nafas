@@ -10,7 +10,7 @@ from nafas_core.logger import get_logger
 logger = get_logger(__name__)
 
 
-def trace_outputs(message: Message) -> dict:
+def trace_outputs(message: Message | None) -> dict:
     """
     A Message as LangSmith wants an LLM run's outputs: token counts under
     `usage_metadata`, which is what its cost and token views read.
@@ -19,6 +19,10 @@ def trace_outputs(message: Message) -> dict:
     inside them, so they are added in; otherwise cached calls look cheaper
     than they were.
     """
+    if message is None:
+        # the call raised; the trace records the error, and there is no output
+        return {}
+
     outputs = message.model_dump(mode="json")
     usage = outputs.pop("usage", None) or {}
 
@@ -59,8 +63,10 @@ class AnthropicLLM:
     utils.tracing); with tracing off, `traceable` is a pass-through.
     """
 
-    def __init__(self, api_key: str, client: anthropic.AsyncAnthropic | None = None):
-        self._client = client or anthropic.AsyncAnthropic(api_key=api_key or None)
+    def __init__(self, api_key: str, workspace_id: str = "", client: anthropic.AsyncAnthropic | None = None):
+        # a key not scoped to one workspace must name the workspace on every request
+        headers = {"anthropic-workspace-id": workspace_id} if workspace_id else None
+        self._client = client or anthropic.AsyncAnthropic(api_key=api_key or None, default_headers=headers)
 
     async def create(self, **params: Any) -> Message:
         # ls_* metadata is how LangSmith knows the provider and model for pricing

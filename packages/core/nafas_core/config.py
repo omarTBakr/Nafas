@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     storage_provider: StorageProvider = Field(StorageProvider.S3, description="Object storage backend")
 
     anthropic_api_key: SecretStr = Field(SecretStr(""), description="Claude API key")
+    anthropic_workspace_id: str = Field(
+        "", description="Workspace to bill; required when the API key is not scoped to one workspace"
+    )
     llm_chat_model: str = Field("claude-sonnet-5", description="Model for patient and doctor chat")
     llm_classifier_model: str = Field("claude-haiku-4-5", description="Model for intent and safety classifiers")
     llm_summary_model: str = Field("claude-opus-5-5", description="Model for consultation summaries")
