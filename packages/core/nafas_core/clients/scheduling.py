@@ -56,6 +56,9 @@ class SchedulingClient(InternalClient):
     async def patient_appointments(self, patient_id: uuid.UUID) -> list[dict]:
         return (await self.request("GET", f"/internal/v1/patients/{patient_id}/appointments")).json()
 
+    async def doctor_patient_appointments(self, doctor_id: uuid.UUID, patient_id: uuid.UUID) -> list[dict]:
+        return (await self.request("GET", f"/internal/v1/doctors/{doctor_id}/patients/{patient_id}/appointments")).json()
+
     async def doctor_appointments(self, doctor_id: uuid.UUID, start: datetime, end: datetime) -> list[dict]:
         params = {"start": start.isoformat(), "end": end.isoformat()}
         return (await self.request("GET", f"/internal/v1/doctors/{doctor_id}/appointments", params=params)).json()

@@ -1,7 +1,7 @@
 """The identity service's internal API: reached by other services only, behind the internal token."""
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel
@@ -12,7 +12,7 @@ from nafas_core.db import session_scope
 from nafas_core.enums.dialect import SpokenDialect, VoiceGender
 from nafas_core.enums.identity import Language, UserRole
 from nafas_core.internal_api import require_internal_token
-from nafas_identity.enums import ConsentKind
+from nafas_identity.enums import CareStatus, ConsentKind
 from nafas_identity.exceptions import AccountExistsError, ConsentNotFoundError, WeakPasswordError
 from nafas_identity.logic import consents
 from nafas_identity.logic.accounts import AuthenticatedUser, authenticate, get_user, register_patient_account
@@ -25,7 +25,7 @@ from nafas_identity.logic.directory import (
     under_care,
 )
 from nafas_identity.logic.profile import PatientProfile, get_profile, update_profile
-from nafas_identity.models import Patient
+from nafas_identity.models import DoctorPatient, Patient
 
 
 class Credentials(BaseModel):
@@ -264,6 +264,52 @@ async def doctor(doctor_id: uuid.UUID) -> DoctorOut:
 class PatientName(BaseModel):
     patient_id: uuid.UUID
     full_name: str
+
+
+class PatientCard(BaseModel):
+    patient_id: uuid.UUID
+    full_name: str
+    date_of_birth: date | None
+    sex: str | None
+    phone: str | None
+    preferred_language: Language
+    first_seen_at: datetime
+
+
+@router.get("/doctors/{doctor_id}/roster", response_model=list[PatientCard])
+async def roster(doctor_id: uuid.UUID) -> list[PatientCard]:
+    """The patients under this doctor's care, newest to them first."""
+    async with session_scope(doctor_id=doctor_id) as session:
+        rows = (
+            await session.execute(
+                select(Patient, DoctorPatient.first_seen_at)
+                .join(DoctorPatient, DoctorPatient.patient_id == Patient.id)
+                .where(DoctorPatient.doctor_id == doctor_id, DoctorPatient.status == CareStatus.ACTIVE)
+                .order_by(DoctorPatient.first_seen_at.desc())
+            )
+        ).all()
+    if rows:
+        await audit.record(
+            service="identity",
+            actor=audit.Actor.DOCTOR,
+            actor_id=doctor_id,
+            action="read_roster",
+            resource_type="patient",
+            doctor_id=doctor_id,
+            detail={"count": len(rows)},
+        )
+    return [
+        PatientCard(
+            patient_id=p.id,
+            full_name=p.full_name,
+            date_of_birth=p.date_of_birth,
+            sex=p.sex.value if p.sex else None,
+            phone=p.phone,
+            preferred_language=p.preferred_language,
+            first_seen_at=first_seen,
+        )
+        for p, first_seen in rows
+    ]
 
 
 @router.get("/doctors/{doctor_id}/patients", response_model=list[PatientName])

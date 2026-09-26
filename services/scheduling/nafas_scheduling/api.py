@@ -14,7 +14,7 @@ from datetime import UTC, date, datetime
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import AwareDatetime, BaseModel
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 from nafas_core.db import session_scope
 from nafas_core.internal_api import require_internal_token
@@ -325,6 +325,20 @@ async def read_notification(patient_id: uuid.UUID, notification_id: uuid.UUID) -
 async def patient_appointments(patient_id: uuid.UUID) -> list[AppointmentOut]:
     async with session_scope(patient_id=patient_id) as session:
         return [_appointment(a) for a in await booking.patient_appointments(session)]
+
+
+@router.get("/doctors/{doctor_id}/patients/{patient_id}/appointments", response_model=list[AppointmentOut])
+async def doctor_patient_appointments(doctor_id: uuid.UUID, patient_id: uuid.UUID) -> list[AppointmentOut]:
+    """One patient's appointments with this doctor, every status, oldest first: for the doctor's timeline."""
+    async with session_scope(doctor_id=doctor_id) as session:
+        rows = (
+            await session.scalars(
+                select(Appointment)
+                .where(Appointment.doctor_id == doctor_id, Appointment.patient_id == patient_id)
+                .order_by(Appointment.starts_at)
+            )
+        ).all()
+    return [_appointment(a) for a in rows]
 
 
 @router.get("/doctors/{doctor_id}/appointments", response_model=list[AppointmentOut])

@@ -14,6 +14,7 @@ dependencies = [
     "nafas-scheduling",
     "nafas-conversation",
     "nafas-clinical-records",
+    "nafas-doctor-assistant",
 ]
 
 [tool.uv]
@@ -31,6 +32,7 @@ nafas-identity = { workspace = true }
 nafas-scheduling = { workspace = true }
 nafas-conversation = { workspace = true }
 nafas-clinical-records = { workspace = true }
+nafas-doctor-assistant = { workspace = true }
 
 [dependency-groups]
 dev = [

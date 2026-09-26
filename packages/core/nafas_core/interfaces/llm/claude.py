@@ -1,3 +1,4 @@
+from collections.abc import AsyncIterator
 from typing import Any
 
 import anthropic
@@ -5,6 +6,7 @@ from anthropic.types import Message
 from langsmith import traceable
 
 from nafas_core.exceptions.providers import LLMError, LLMRefusalError
+from nafas_core.interfaces.llm.base import StreamEvent
 from nafas_core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -82,8 +84,36 @@ class AnthropicLLM:
         except anthropic.APIConnectionError as exc:
             raise LLMError(f"could not reach Claude: {exc}") from exc
 
-        if response.stop_reason == "refusal":
-            category = response.stop_details.category if response.stop_details else None
-            raise LLMRefusalError(f"Claude declined the request (category {category})")
-
+        _refused(response)
         return response
+
+    async def stream(self, **params: Any) -> AsyncIterator[StreamEvent]:
+        """Text as Claude writes it, then the final message, traced as one LLM run like `create`."""
+        final: Message | None = None
+        try:
+            async with self._client.messages.stream(**params) as streamed:
+                async for text in streamed.text_stream:
+                    yield StreamEvent(text=text)
+                final = await streamed.get_final_message()
+        except anthropic.APIStatusError as exc:
+            logger.error("claude stream failed: %s (request %s)", exc.status_code, exc.request_id)
+            raise LLMError(f"Claude returned {exc.status_code}: {exc.message}") from exc
+        except anthropic.APIConnectionError as exc:
+            raise LLMError(f"could not reach Claude: {exc}") from exc
+        finally:
+            _trace_stream(params, final)
+
+        _refused(final)
+        yield StreamEvent(message=final)
+
+
+def _refused(response: Message) -> None:
+    if response.stop_reason == "refusal":
+        category = response.stop_details.category if response.stop_details else None
+        raise LLMRefusalError(f"Claude declined the request (category {category})")
+
+
+@traceable(run_type="llm", name="ChatAnthropic", process_outputs=trace_outputs)
+def _trace_stream(params: dict[str, Any], message: Message | None) -> Message | None:
+    """Records a finished stream as the LLM run it was: the request in, the final message out."""
+    return message

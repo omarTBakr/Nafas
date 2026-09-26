@@ -1,0 +1,22 @@
+[project]
+name = "nafas-doctor-assistant"
+version = "0.1.0"
+description = "The doctor's assistant: chat about their patients, streamed, with read-only tools over their records"
+license = "PolyForm-Noncommercial-1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
+    "nafas-core",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[tool.uv.sources]
+nafas-core = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""

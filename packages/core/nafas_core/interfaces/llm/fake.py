@@ -50,3 +50,14 @@ class FakeLLM:
             raise AssertionError(f"FakeLLM ran out of scripted responses at call {len(self.requests)}")
 
         return self._responses.pop(0)
+
+    async def stream(self, **params: Any):
+        """The next scripted response, its text in small pieces, then the message itself."""
+        from nafas_core.interfaces.llm.base import StreamEvent
+
+        message = await self.create(**params)
+        for block in message.content:
+            if block.type == "text":
+                for start in range(0, len(block.text), 8):
+                    yield StreamEvent(text=block.text[start : start + 8])
+        yield StreamEvent(message=message)

@@ -11,7 +11,19 @@ from nafas_core.exceptions.providers import ProviderError
 from nafas_core.logger import get_logger, setup_logging
 from nafas_core.tracing import configure_tracing
 from nafas_gateway.errors import Refusal
-from nafas_gateway.routes import auth, booking, chat, consents, directory, doctor, notifications, profile, records
+from nafas_gateway.routes import (
+    assistant,
+    auth,
+    booking,
+    chat,
+    consents,
+    dashboard,
+    directory,
+    doctor,
+    notifications,
+    profile,
+    records,
+)
 from nafas_gateway.sessions import signing_secret
 
 logger = get_logger(__name__)
@@ -30,6 +42,8 @@ app.include_router(chat.router)
 app.include_router(notifications.router)
 app.include_router(consents.router)
 app.include_router(records.router)
+app.include_router(dashboard.router)
+app.include_router(assistant.router)
 
 
 @app.exception_handler(UpstreamRefusal)

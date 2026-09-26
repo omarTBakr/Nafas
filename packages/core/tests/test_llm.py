@@ -124,3 +124,52 @@ async def test_calls_are_traced_as_llm_runs_with_usage(monkeypatch):
     assert posted["extra"]["metadata"]["ls_model_name"] == "claude-sonnet-5"
     assert posted["outputs"]["usage_metadata"]["input_tokens"] == 100
     assert posted["outputs"]["usage_metadata"]["total_tokens"] == 105
+
+
+def sse_stream(pieces: list[str]) -> bytes:
+    """A streamed reply as the Messages API sends it."""
+    start = {
+        "id": "msg_1",
+        "type": "message",
+        "role": "assistant",
+        "model": "claude-sonnet-5",
+        "content": [],
+        "stop_reason": None,
+        "stop_sequence": None,
+        "usage": {"input_tokens": 12, "output_tokens": 1},
+    }
+    end = {"stop_reason": "end_turn", "stop_sequence": None}
+    events = [
+        ("message_start", {"type": "message_start", "message": start}),
+        ("content_block_start", {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}}),
+        *[
+            ("content_block_delta", {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": piece}})
+            for piece in pieces
+        ],
+        ("content_block_stop", {"type": "content_block_stop", "index": 0}),
+        ("message_delta", {"type": "message_delta", "delta": end, "usage": {"output_tokens": 7}}),
+        ("message_stop", {"type": "message_stop"}),
+    ]
+    return "".join(f"event: {name}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n" for name, data in events).encode()
+
+
+async def test_a_streamed_reply_arrives_in_pieces_then_as_a_whole_message():
+    def handler(request):
+        assert json.loads(request.content)["stream"] is True
+        return httpx2.Response(200, content=sse_stream(["مرحبا ", "يا ", "دكتور"]), headers={"content-type": "text/event-stream"})
+
+    events = [e async for e in claude_with(handler).stream(model="claude-sonnet-5", max_tokens=100, messages=[])]
+
+    assert [e.text for e in events[:-1]] == ["مرحبا ", "يا ", "دكتور"]
+    final = events[-1].message
+    assert final.content[0].text == "مرحبا يا دكتور" and final.stop_reason == "end_turn"
+    assert (final.usage.input_tokens, final.usage.output_tokens) == (12, 7)
+
+
+async def test_a_stream_that_fails_becomes_an_llm_error():
+    def handler(request):
+        return httpx2.Response(529, json={"type": "error", "error": {"type": "overloaded_error", "message": "busy"}})
+
+    with pytest.raises(LLMError):
+        async for _ in claude_with(handler).stream(model="claude-sonnet-5", max_tokens=100, messages=[]):
+            pass

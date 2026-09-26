@@ -76,6 +76,7 @@ services:
       EMBEDDINGS_PROVIDER: self_hosted
       EMBEDDINGS_URL: http://embeddings:8430
       CLINICAL_URL: http://clinical-records:8050
+      DOCTOR_ASSISTANT_URL: http://doctor-assistant:8020
       IDENTITY_URL: http://identity:8010
       SCHEDULING_URL: http://scheduling:8030
       CONVERSATION_URL: http://conversation:8040
@@ -199,6 +200,21 @@ services:
       - "8440:8440"
     devices:
       - nvidia.com/gpu=all
+
+  doctor-assistant:
+    # the doctor's chat about their patients, streamed; owns no schema and no database login
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        PACKAGE: nafas-doctor-assistant
+        MODULE: nafas_doctor_assistant.main
+    image: nafas/doctor-assistant:dev
+    environment:
+      <<: *service-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports:
+      - "8020:8020"
 
   embeddings:
     # bge-m3 on the CPU: the GPU is spent on stt, the dialect-router and tts

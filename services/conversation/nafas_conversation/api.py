@@ -102,9 +102,14 @@ def _escalation(e, question: str) -> EscalationOut:
 
 
 @router.get("/doctors/{doctor_id}/escalations", response_model=list[EscalationOut])
-async def doctor_escalations(doctor_id: uuid.UUID, status: list[EscalationStatus] = Query(default=[EscalationStatus.OPEN])):
-    """The doctor's inbox: the questions waiting for them (or any statuses asked for), oldest first."""
+async def doctor_escalations(
+    doctor_id: uuid.UUID,
+    status: list[EscalationStatus] = Query(default=[EscalationStatus.OPEN]),
+    patient_id: uuid.UUID | None = None,
+):
+    """The doctor's inbox: the questions waiting for them (or any statuses asked for), oldest first; one patient's if named."""
     items = await escalations.inbox(doctor_id, tuple(status))
+    items = [i for i in items if patient_id is None or i.escalation.patient_id == patient_id]
     for item in items:
         await audit.record(
             service="conversation",
