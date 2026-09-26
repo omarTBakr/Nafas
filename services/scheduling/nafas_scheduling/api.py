@@ -323,6 +323,17 @@ async def read_notification(patient_id: uuid.UUID, notification_id: uuid.UUID) -
             raise HTTPException(status_code=404, detail="no such notification")
 
 
+@router.get("/appointments/{appointment_id}", response_model=AppointmentOut)
+async def appointment(
+    appointment_id: uuid.UUID, patient_id: uuid.UUID | None = None, doctor_id: uuid.UUID | None = None
+) -> AppointmentOut:
+    """One appointment, read as its patient or as its doctor: someone else's is not found."""
+    if (patient_id is None) == (doctor_id is None):
+        raise HTTPException(status_code=422, detail="read an appointment as its patient or as its doctor")
+    async with session_scope(patient_id=patient_id, doctor_id=doctor_id) as session:
+        return _appointment(await booking.find_visible_appointment(session, appointment_id))
+
+
 @router.get("/patients/{patient_id}/appointments", response_model=list[AppointmentOut])
 async def patient_appointments(patient_id: uuid.UUID) -> list[AppointmentOut]:
     async with session_scope(patient_id=patient_id) as session:

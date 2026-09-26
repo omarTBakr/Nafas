@@ -1173,6 +1173,35 @@ wheels = [
 ]
 
 [[package]]
+name = "livekit-api"
+version = "1.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "livekit-protocol" },
+    { name = "protobuf" },
+    { name = "pyjwt" },
+    { name = "types-protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/da/0d/ff9502faa5e9785563e9648313a030fab65ed7f6ff8cf52d7bc6c9e01c97/livekit_api-1.2.1.tar.gz", hash = "sha256:eee78dba493b736bc8422660debc7cf89340f1b80c63890a36a18d99c938045c", size = 21780, upload-time = "2026-08-27T14:06:57.419Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a1/c8/bc29cf16427fc446aa4487c552503cef42eebfcb920902bb54b7180e40d3/livekit_api-1.2.1-py3-none-any.whl", hash = "sha256:aa15b0a194c9e8167d4261bc61381682df23f98bc6d77760fcded93d2ce4b4ca", size = 27586, upload-time = "2026-08-27T14:06:56.286Z" },
+]
+
+[[package]]
+name = "livekit-protocol"
+version = "1.1.27"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "protobuf" },
+    { name = "types-protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/15/f3/5572f2b58f04534e22e266e113cb49b4f0b2a4e1d2abf385267cb51559ab/livekit_protocol-1.1.27.tar.gz", hash = "sha256:740a4c6e438da763d204f2a6b0fc8f7f33ca96e27b17ce9abc6557dbb0a28dbd", size = 124650, upload-time = "2026-09-16T12:43:25.761Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/04/12a047d5ec0ea5099426d071a0147118767cb231d270cb1d0bece266eb01/livekit_protocol-1.1.27-py3-none-any.whl", hash = "sha256:765bbe0c9c6b626519f6f5952793f81eaf3f5b8c9bd1e1b03994f3177774aa10", size = 151314, upload-time = "2026-09-16T12:43:24.327Z" },
+]
+
+[[package]]
 name = "mako"
 version = "1.4.3"
 source = { registry = "https://pypi.org/simple" }
@@ -1471,6 +1500,7 @@ source = { editable = "services/consultation" }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
+    { name = "livekit-api" },
     { name = "nafas-core" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -1479,6 +1509,7 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.141.1" },
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "livekit-api", specifier = ">=1.2.1" },
     { name = "nafas-core", editable = "packages/core" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.4" },
 ]

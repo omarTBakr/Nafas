@@ -92,9 +92,12 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [x] Recorded visits on the doctor's timeline and in the inbox ("notes to review", counted in the badge); the patient's "My records" page (shared entries and documents, which they can now open); the doctor assistant reads only approved entries, never drafts
 - [x] Browser check in Chromium against the real services (fake microphone, scripted STT and model): two parts, review with an edit, approval, the patient sees only the shared summary
 
-**After v1: Online sessions** (moved out of v1 on review, 2026-09-26: LiveKit is a lot of infrastructure for what the first clinics need)
-- [ ] LiveKit room per online appointment, with the link sent in the confirmation
-- [ ] Egress recording to S3 that triggers `ConsultationWorkflow`
+**Phase 8: Online sessions** (moved out of v1 on review, then built after Phase 9; design in PLAN.md §6c)
+- [ ] LiveKit room per online appointment, joined only by its patient and doctor within the visit's window, with the link sent in the confirmation and on the appointment
+- [ ] Recording with a fresh consent, one audio track per participant to storage (track egress), everyone told it is recording
+- [ ] Egress webhooks register each track's file; the last one starts `ConsultationWorkflow`, with the transcript labelled by speaker
+- [ ] The visit page in the web app (video, mute, leave; the doctor's record and stop), and Join buttons where online appointments are shown
+- [ ] LiveKit, Redis and egress under the `online` compose profile; a browser check with two participants
 
 **Phase 9: Hardening and launch** (the production-readiness gates in PLAN.md §6b)
 - [x] Reproducible config: Claude model IDs and prompt versions on every service's `/health` with the environment and commit (baked into each image), third-party and base images pinned by digest, the STT model pinned; bge-m3 still to pin (see Needs you)
