@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
-import type { Role } from "./api";
+import { api, type Role } from "./api";
 import { useAuth } from "./auth";
 import { useI18n } from "./i18n";
 import Schedule from "./pages/doctor/Schedule";
@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Appointments from "./pages/patient/Appointments";
 import Book from "./pages/patient/Book";
+import Notifications from "./pages/patient/Notifications";
 import ProfilePage from "./pages/patient/Profile";
 import Register from "./pages/Register";
 
@@ -24,10 +25,29 @@ function RequireRole({ role, children }: { role: Role; children: ReactNode }) {
   return <>{children}</>;
 }
 
+/** How many notices the patient has not dismissed, refreshed on each page change and every minute. */
+function useUnread(enabled: boolean): number {
+  const [count, setCount] = useState(0);
+  const location = useLocation();
+  useEffect(() => {
+    if (!enabled) return;
+    const load = () =>
+      api
+        .notifications(true)
+        .then((n) => setCount(n.length))
+        .catch(() => setCount(0));
+    load();
+    const timer = setInterval(load, 60_000);
+    return () => clearInterval(timer);
+  }, [enabled, location.pathname]);
+  return enabled ? count : 0;
+}
+
 function TopBar() {
   const { me, logout } = useAuth();
   const { t, lang, setLang } = useI18n();
   const navigate = useNavigate();
+  const unread = useUnread(me?.role === "patient");
 
   return (
     <header className="topbar">
@@ -49,6 +69,10 @@ function TopBar() {
               {me?.role === "patient" && (
                 <>
                   <NavLink to="/appointments">{t("myAppointments")}</NavLink>
+                  <NavLink to="/notifications" className="bell">
+                    {t("notifications")}
+                    {unread > 0 && <span className="count">{unread}</span>}
+                  </NavLink>
                   <NavLink to="/profile">{t("profile")}</NavLink>
                 </>
               )}
@@ -98,6 +122,14 @@ export default function App() {
             element={
               <RequireRole role="patient">
                 <Appointments />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/notifications"
+            element={
+              <RequireRole role="patient">
+                <Notifications />
               </RequireRole>
             }
           />

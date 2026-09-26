@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { api, ApiError, type Appointment, type BookingInfo, type Doctor, type Slot, type Unavailable } from "../../api";
 import { useI18n } from "../../i18n";
 import { clinicClock, clinicDay, clinicInstant, upcomingDates } from "../../time";
+import Chat from "./Chat";
 
 const DAYS_SHOWN = 14;
 
@@ -40,6 +41,7 @@ export default function Book() {
   const [hold, setHold] = useState<Appointment | null>(null);
   const [done, setDone] = useState<Appointment | null>(null);
   const [busy, setBusy] = useState(false);
+  const [tab, setTab] = useState<"slots" | "chat">("slots");
   const secondsLeft = useCountdown(hold?.hold_expires_at ?? null);
 
   useEffect(() => {
@@ -160,7 +162,18 @@ export default function Book() {
         </p>
       </header>
 
-      {hold ? (
+      <div className="tabs" role="tablist">
+        <button role="tab" aria-selected={tab === "slots"} className="tab" onClick={() => setTab("slots")}>
+          {t("tabSlots")}
+        </button>
+        <button role="tab" aria-selected={tab === "chat"} className="tab" onClick={() => setTab("chat")}>
+          {t("tabChat")}
+        </button>
+      </div>
+
+      {tab === "chat" ? (
+        <Chat doctorId={doctor.doctor_id} timezone={tz} onBookingChange={loadSlots} />
+      ) : hold ? (
         <section className="card stack" aria-live="polite">
           <h2>{t("holdTitle")}</h2>
           <p className="time">{when(hold)}</p>

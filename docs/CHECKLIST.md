@@ -37,7 +37,8 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [x] `conversation` service: conversations and messages tables; `PatientConversationWorkflow` per patient and doctor (update-with-start, continue_as_new), its worker in compose
 - [x] The booking tool loop on Claude: a versioned prompt; tools that only reach scheduling (`interpret_time` resolves and checks what the model extracted, then hold, confirm, cancel, my appointments), bound to one patient and doctor, times in clinic time; tested with a scripted model
 - [x] Intent routing: an emergency keyword gate (AR/EN, code only) before a Haiku classifier; booking, admin and small talk to the agent, emergencies and medical questions to fixed replies until phase 4
-- [ ] Chat panel in the patient portal with streamed replies; chat and slot picker share the same holds
+- [x] Chat panel in the patient portal; chat and slot picker share the same holds (a hold made in chat is confirmed on its card, in the picker or under my appointments); in-app notifications page with an unread count; verified in a real browser against the real services with a scripted model
+- [ ] Token-streamed replies: a reply is one workflow update and the agent calls tools before it answers, so streaming needs a side channel (SSE from the activity); replies arrive whole with a typing indicator until then
 - [x] `BookingWorkflow`: hold expiry and in-app reminders (T-24h, T-1h), completion or a doctor's no-show, notices when a doctor cancels; tests on the time-skipping server, or in seconds on a real Temporal where it cannot be fetched
 - [x] Patient dialect and voice: `dialect` (13 Lahgtna codes) and `voice` (male/female) on the patient, chosen at sign-up or on the profile page (`/api/me/profile`, patient scope)
 - [ ] The dialect-router suggests a default from a patient's first chat messages (with the conversation service)

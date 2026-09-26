@@ -167,3 +167,24 @@ textarea { min-height: 80px; resize: vertical; }
   .card { padding: 16px; }
   .nav { width: 100%; margin-inline-start: 0; }
 }
+
+/* tabs */
+.tabs { display: flex; gap: 4px; border-block-end: 1px solid var(--border); }
+.tab { background: none; color: var(--muted); border: 0; border-block-end: 2px solid transparent; border-radius: 0; padding: 8px 14px; }
+.tab[aria-selected="true"] { color: var(--primary); border-block-end-color: var(--primary); font-weight: 600; }
+
+/* chat */
+.chat .messages { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; padding-block: 4px; }
+.bubble-row { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.bubble-row.patient { align-items: flex-end; }
+.bubble { max-width: min(80%, 560px); padding: 8px 12px; border-radius: var(--radius); background: var(--surface-2); }
+.bubble p { margin: 0; white-space: pre-wrap; }
+.bubble.patient { background: var(--primary-soft); }
+.bubble.doctor { background: var(--ok-soft); }
+.bubble .who { display: block; }
+.action-card { max-width: min(80%, 420px); }
+.composer input { flex: 1 1 240px; }
+.notice.info { background: var(--surface-2); color: var(--muted); }
+.typing { margin: 0; }
+.bell { position: relative; }
+.bell .count { background: var(--danger); color: #fff; border-radius: 999px; padding: 0 6px; font-size: 0.75rem; margin-inline-start: 4px; }

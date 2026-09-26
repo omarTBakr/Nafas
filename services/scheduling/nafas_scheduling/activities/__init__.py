@@ -36,6 +36,7 @@ async def notify(request: NotificationRequest) -> None:
             notification_id=uuid.UUID(request.notification_id),
             appointment=appointment,
             kind=NotificationKind(request.kind),
+            timezone=await booking.timezone_of(session, appointment.doctor_id),
             minutes_before=request.minutes_before,
         )
 

@@ -68,6 +68,7 @@ async def test_the_workflows_notices_reach_only_their_patient(api, clinic):
 
     assert [(n["kind"], n["appointment_id"]) for n in mine] == [("confirmed", appointment["appointment_id"])]
     assert datetime.fromisoformat(mine[0]["details"]["start"]) == datetime.fromisoformat(appointment["start"])
+    assert mine[0]["details"]["timezone"] == "Africa/Cairo"
     assert theirs == []
 
     notice = mine[0]["notification_id"]

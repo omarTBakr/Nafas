@@ -31,3 +31,9 @@ async def schedule(start: AwareDatetime, end: AwareDatetime, doctor: Account = D
         "timezone": info["timezone"],
         "appointments": [a | {"patient_name": names.get(a["patient_id"])} for a in appointments],
     }
+
+
+@router.post("/appointments/{appointment_id}/no-show")
+async def no_show(appointment_id: uuid.UUID, doctor: Account = Depends(current_doctor)) -> dict:
+    """The patient did not come: only the appointment's own doctor, and only once it has started."""
+    return await get_scheduling().no_show(appointment_id, doctor.doctor_id)

@@ -17,6 +17,7 @@ async def notify(
     notification_id: uuid.UUID,
     appointment: Appointment,
     kind: NotificationKind,
+    timezone: str,
     minutes_before: int | None = None,
 ) -> None:
     """One notice about `appointment` to its patient; the same id twice (a retry) stores it once."""
@@ -29,7 +30,7 @@ async def notify(
             appointment_id=appointment.id,
             kind=kind,
             minutes_before=minutes_before,
-            details={"start": appointment.starts_at.isoformat(), "mode": appointment.mode.value},
+            details={"start": appointment.starts_at.isoformat(), "mode": appointment.mode.value, "timezone": timezone},
         )
         .on_conflict_do_nothing(index_elements=["id"])
     )

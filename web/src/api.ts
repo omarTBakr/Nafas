@@ -89,6 +89,46 @@ export interface Appointment {
   timezone?: string;
 }
 
+export type Intent = "booking" | "medical" | "admin" | "smalltalk" | "emergency" | "unclear";
+
+export interface ChatMessage {
+  message_id: string;
+  role: "patient" | "assistant" | "doctor";
+  modality: "text" | "voice";
+  content: string;
+  audio_key: string | null;
+  intent: Intent | null;
+  created_at: string;
+}
+
+export interface ChatAction {
+  type: "hold" | "confirmed" | "cancelled";
+  appointment: Appointment;
+}
+
+export interface ChatReply {
+  conversation_id: string;
+  message_id: string;
+  text: string;
+  actions: ChatAction[];
+  intent: Intent | null;
+  patient_text: string;
+  audio_key: string | null;
+}
+
+export type NotificationKind = "confirmed" | "hold_expired" | "reminder" | "cancelled_by_doctor";
+
+export interface AppNotification {
+  notification_id: string;
+  appointment_id: string;
+  doctor_id: string;
+  kind: NotificationKind;
+  minutes_before: number | null;
+  details: { start: string; mode: string; timezone: string };
+  read_at: string | null;
+  created_at: string;
+}
+
 export interface Schedule {
   timezone: string;
   appointments: Appointment[];
@@ -176,6 +216,15 @@ export const api = {
   confirm: (id: string) => call<Appointment>("POST", `/api/appointments/${id}/confirm`),
   cancel: (id: string) => call<Appointment>("POST", `/api/appointments/${id}/cancel`),
   mine: () => call<Appointment[]>("GET", "/api/appointments/mine"),
+
+  chatThread: (doctorId: string) => call<ChatMessage[]>("GET", `/api/chat/${doctorId}/messages`),
+  chatSend: (doctorId: string, text: string) => call<ChatReply>("POST", `/api/chat/${doctorId}/messages`, { text }),
+
+  notifications: (unreadOnly = false) =>
+    call<AppNotification[]>("GET", `/api/notifications?${query({ unread_only: String(unreadOnly) })}`),
+  readNotification: (id: string) => call<void>("POST", `/api/notifications/${id}/read`),
+
+  noShow: (appointmentId: string) => call<Appointment>("POST", `/api/doctor/appointments/${appointmentId}/no-show`),
 
   schedule: (start: Date, end: Date) =>
     call<Schedule>("GET", `/api/doctor/schedule?${query({ start: start.toISOString(), end: end.toISOString() })}`),

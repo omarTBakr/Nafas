@@ -30,6 +30,11 @@ export default function Schedule() {
     load();
   }
 
+  async function noShow(a: Appointment) {
+    await api.noShow(a.appointment_id).catch(() => undefined);
+    load();
+  }
+
   if (failed) return <p className="notice error">{t("error")}</p>;
   if (!data) return <p className="muted">{t("loading")}</p>;
 
@@ -76,6 +81,11 @@ export default function Schedule() {
                   {a.status === "confirmed" && new Date(a.start).getTime() > Date.now() && (
                     <button className="danger" onClick={() => cancel(a)}>
                       {t("cancel")}
+                    </button>
+                  )}
+                  {(a.status === "confirmed" || a.status === "completed") && new Date(a.start).getTime() <= Date.now() && (
+                    <button className="secondary" onClick={() => noShow(a)}>
+                      {t("markNoShow")}
                     </button>
                   )}
                 </div>
