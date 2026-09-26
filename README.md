@@ -34,6 +34,7 @@ workspace and coordinate through Temporal.
 
 - Python 3.12 (pinned in `.python-version`)
 - [uv](https://docs.astral.sh/uv/)
+- Node 22, for the web app in `web/` (`npm ci` there once).
 - Docker with Compose, on the **native engine** (not Docker Desktop), plus the
   NVIDIA container toolkit for the GPU services. The `Makefile` pins the
   `default` context, and `make gpu-check` proves a container can see the GPU.
@@ -78,8 +79,10 @@ they say.
 
 | Service | Where | What |
 | --- | --- | --- |
-| gateway | :8000 | the dashboard's HTTP edge: `/api/auth/login`, `/logout`, `/me`; `GET /health` |
-| identity | :8010 | internal API (behind `X-Internal-Token`): credential checks and accounts |
+| web | :8088 | **the app**: patient portal and doctor portal (nginx; `make web-dev` for hot reload on :5173) |
+| gateway | :8000 | the web app's API: auth and sign-up, the doctor directory, booking, the doctor's schedule |
+| identity | :8010 | internal API (behind `X-Internal-Token`): accounts, sign-up, the doctor directory, care links |
+| scheduling | :8030 | internal API (behind `X-Internal-Token`): slots, exact-minute checks, holds, confirm, cancel |
 | dialect-router | :8410 | Arabic dialect identification on the GPU; `POST /v1/classify`, `/health`, `/metrics` |
 
 ### One service on the host
@@ -100,6 +103,7 @@ packages/core/         nafas_core: settings, logging, LangSmith tracing, db, Tem
 services/gateway/      nafas_gateway: the dashboard's HTTP edge (login, sessions)
 services/identity/     nafas_identity: accounts, doctors, patients, consents
 services/scheduling/   nafas_scheduling: hours and appointments, to the minute
+web/                   the React app: patient and doctor portals, Arabic (RTL) and English
 services/dialect_router/   GPU inference service, outside the workspace
 alembic/               one migration history for every service's schema
 docker/                the shared Dockerfile for workspace services

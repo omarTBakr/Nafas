@@ -85,8 +85,12 @@ async def cancel(appointment_id: uuid.UUID, account: Account = Depends(current_a
 
 @router.get("/appointments/mine")
 async def my_appointments(patient: Account = Depends(current_patient)) -> list[dict]:
-    """The patient's appointments, each with its doctor's card for display."""
+    """The patient's appointments, each with its doctor's card and clinic time zone for display."""
     appointments = await get_scheduling().patient_appointments(patient.patient_id)
     doctors = {d["doctor_id"]: d for d in await get_identity().doctors()}
+    zones = {
+        doctor_id: (await get_scheduling().booking_info(uuid.UUID(doctor_id)))["timezone"]
+        for doctor_id in {a["doctor_id"] for a in appointments}
+    }
 
-    return [a | {"doctor": doctors.get(a["doctor_id"])} for a in appointments]
+    return [a | {"doctor": doctors.get(a["doctor_id"]), "timezone": zones[a["doctor_id"]]} for a in appointments]

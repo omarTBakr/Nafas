@@ -30,8 +30,8 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [x] Scheduling internal API: free slots, check an exact time (with the reason and nearest alternatives), hold, confirm, cancel, a patient's and a doctor's appointments; patient actions looked up in the patient's own scope
 - [x] Care link (`doctor_patients`): identity's idempotent `POST /care-links`, called on every booking
 - [x] Gateway: `/api/auth/register`, `/api/doctors`, `/api/doctors/{id}/slots|check`, `/api/appointments` (hold, confirm, cancel, mine), `/api/doctor/schedule`, with a role check on every route; refusals relayed with their reason; an end-to-end test over all three services
-- [ ] **(in progress)** `web/`: one React + Vite + TypeScript app, Arabic (RTL) and English; login and sign-up; patient portal (doctors → slot picker → confirm → my appointments); doctor portal (today and this week)
-- [ ] `web` in compose, and an end-to-end booking run through the UI
+- [x] `web/`: one React + Vite + TypeScript app, Arabic (RTL) and English; login and sign-up; patient portal (doctors → day and slot picker or an exact minute → hold with countdown → confirm → my appointments); doctor portal (today and this week); clinic-time helpers tested across DST
+- [x] `web` in compose (nginx on :8088, proxying `/api`), CI job (typecheck, tests, build), and an end-to-end booking run through the UI in a real browser
 
 **Phase 3: Booking by AI chat in the UI, text and voice** (creates `conversation`)
 - [ ] `conversation` service: conversations and messages tables; `PatientConversationWorkflow` per patient and doctor (update-with-start, continue_as_new)

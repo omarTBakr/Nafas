@@ -5,7 +5,7 @@ export DOCKER_CONTEXT ?= default
 
 COMPOSE := docker compose
 
-.PHONY: up up-cpu down ps logs build db-roles migrate seed storage test test-gpu-services gpu-check
+.PHONY: up up-cpu down ps logs build db-roles migrate seed storage test test-web web-dev test-gpu-services gpu-check
 
 up:  ## the whole stack, GPU services on the GPU
 	$(COMPOSE) up -d --build
@@ -39,7 +39,14 @@ storage:  ## create the S3 bucket
 
 test:  ## the workspace suite, then each GPU service's own suite
 	uv run pytest
+	$(MAKE) test-web
 	$(MAKE) test-gpu-services
+
+test-web:
+	cd web && npm test && npm run typecheck
+
+web-dev:  ## the web app with hot reload on :5173, proxying /api to the gateway
+	cd web && npm run dev
 
 test-gpu-services:
 	cd services/dialect_router && uv run pytest

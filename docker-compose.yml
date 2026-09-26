@@ -116,6 +116,16 @@ services:
       postgres:
         condition: service_healthy
 
+  web:
+    # the built app behind nginx; for development with hot reload, run
+    # `npm run dev` in web/ instead (port 5173, proxying /api the same way)
+    build: ./web
+    image: nafas/web:dev
+    ports:
+      - "8088:80"
+    depends_on:
+      - gateway
+
   dialect-router:
     # GPU: needs the NVIDIA container toolkit's CDI devices, which the native
     # engine has and Docker Desktop does not. Without a GPU, `make up-cpu`.
