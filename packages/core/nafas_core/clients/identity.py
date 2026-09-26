@@ -89,6 +89,12 @@ class IdentityClient(InternalClient):
     async def may_chat(self, patient_id: uuid.UUID, doctor_id: uuid.UUID) -> bool:
         return (await self.request("GET", f"/internal/v1/patients/{patient_id}/may-chat/{doctor_id}")).json()["allowed"]
 
+    async def doctor_scope(self, doctor_id: uuid.UUID) -> dict:
+        return (await self.request("GET", f"/internal/v1/doctors/{doctor_id}/scope")).json()
+
+    async def under_care(self, patient_id: uuid.UUID, doctor_id: uuid.UUID) -> bool:
+        return (await self.request("GET", f"/internal/v1/patients/{patient_id}/care/{doctor_id}")).json()["active"]
+
     async def ensure_care_link(self, doctor_id: uuid.UUID, patient_id: uuid.UUID) -> None:
         await self.request("POST", "/internal/v1/care-links", json={"doctor_id": str(doctor_id), "patient_id": str(patient_id)})
 

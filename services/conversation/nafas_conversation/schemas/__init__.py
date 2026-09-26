@@ -16,6 +16,9 @@ __all__ = [
     "ChatReply",
     "ConversationStart",
     "DialectRequest",
+    "EscalationNotice",
+    "EscalationStart",
+    "OpenEscalation",
     "PatientMessage",
     "SpeakRequest",
     "StoredMessage",
@@ -52,6 +55,7 @@ class StoredReply:
     # the patient message this answers, which gets the same intent
     answers_message_id: str | None = None
     audio_key: str | None = None
+    safety: dict | None = None
 
 
 @dataclass
@@ -70,6 +74,9 @@ class TurnResult:
     tokens_out: int = 0
     actions: list[dict] = field(default_factory=list)
     intent: str | None = None
+    # set when the question goes to the doctor
+    escalation: str | None = None
+    safety: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -92,3 +99,40 @@ class SpeakRequest:
     patient_id: str
     reply_id: str
     text: str
+
+
+ESCALATION_WORKFLOW = "EscalationWorkflow"
+DOCTOR_REPLIED_SIGNAL = "doctor_replied"
+
+
+def escalation_workflow_id(escalation_id: str) -> str:
+    return f"escalation-{escalation_id}"
+
+
+@dataclass
+class EscalationStart:
+    escalation_id: str
+    patient_id: str
+    doctor_id: str
+    # the patient hears "not answered yet" after this long, and the question expires after the second
+    nudge_after_seconds: int = 24 * 3600
+    expire_after_seconds: int = 72 * 3600
+
+
+@dataclass
+class OpenEscalation:
+    escalation_id: str
+    patient_id: str
+    doctor_id: str
+    conversation_id: str
+    message_id: str
+    reason: str
+
+
+@dataclass
+class EscalationNotice:
+    escalation_id: str
+    patient_id: str
+    doctor_id: str
+    message_id: str
+    expire: bool = False

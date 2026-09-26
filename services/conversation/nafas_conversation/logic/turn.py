@@ -8,13 +8,15 @@ questions get a fixed, safe reply until the gated medical pipeline exists
 """
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from nafas_conversation.enums import Intent
+from nafas_conversation.enums import EscalationReason, Intent
 from nafas_conversation.logic.agent import AgentReply, run_booking_turn
+from nafas_conversation.logic.context import PatientContext
 from nafas_conversation.logic.intent import classify_intent, looks_like_emergency
+from nafas_conversation.logic.medical import answer_medical
 from nafas_conversation.logic.tools import SchedulingTools
 from nafas_conversation.prompts import booking, replies
 from nafas_core.clients.identity import IdentityClient
@@ -38,6 +40,9 @@ class Models:
 class Turn:
     reply: AgentReply
     intent: Intent
+    # set when the question goes to the doctor: the workflow opens the escalation
+    escalation: EscalationReason | None = None
+    safety: dict = field(default_factory=dict)
 
 
 def booking_system_prompt(doctor: dict, profile: dict, clinic_now: datetime) -> str:
@@ -91,6 +96,7 @@ async def answer_turn(
     history: list[dict],
     models: Models,
     now: datetime,
+    context: PatientContext | None = None,
 ) -> Turn:
     """
     The answer to the last patient message in `history`, and what it was for.
@@ -116,7 +122,13 @@ async def answer_turn(
             language = (await identity.profile(patient_id))["preferred_language"]
         except Exception:
             logger.exception("profile lookup failed during an emergency reply; answering in Arabic")
-        return Turn(fixed(replies.pick(replies.EMERGENCY, language)), Intent.EMERGENCY)
+        # the doctor hears of it too, in their inbox
+        return Turn(
+            fixed(replies.pick(replies.EMERGENCY, language)),
+            Intent.EMERGENCY,
+            EscalationReason.EMERGENCY,
+            {"emergency": "keywords"},
+        )
 
     apology, intent = booking.APOLOGIES["ar"], Intent.UNCLEAR
     try:
@@ -127,24 +139,43 @@ async def answer_turn(
         # a classifier failure falls back to the booking assistant, which
         # itself declines medical questions and points emergencies to 123
         intent = await classify_intent(llm, models.classifier, history) or Intent.BOOKING
-        match intent:
-            case Intent.EMERGENCY:
-                return Turn(fixed(replies.pick(replies.EMERGENCY, language)), intent)
-            case Intent.MEDICAL:
-                return Turn(fixed(replies.pick(replies.MEDICAL_NOT_YET, language)), intent)
-            case _:
-                reply = await answer_booking(
-                    llm,
-                    identity,
-                    scheduling,
-                    patient_id=patient_id,
-                    doctor_id=doctor_id,
-                    profile=profile,
-                    history=history,
-                    model=models.chat,
-                    now=now,
-                )
-                return Turn(reply, intent)
+        if intent is Intent.EMERGENCY:
+            return Turn(
+                fixed(replies.pick(replies.EMERGENCY, language)),
+                intent,
+                EscalationReason.EMERGENCY,
+                {"emergency": "classifier"},
+            )
+        if intent is Intent.MEDICAL:
+            outcome = await answer_medical(
+                llm,
+                identity,
+                scheduling,
+                patient_id=patient_id,
+                doctor_id=doctor_id,
+                profile=profile,
+                history=history,
+                chat_model=models.chat,
+                classifier_model=models.classifier,
+                context=context,
+            )
+            if not outcome.not_medical:
+                return Turn(outcome.reply, intent, outcome.escalation, outcome.safety)
+            # the scope gate read it as not medical after all: the booking assistant answers
+            intent = Intent.ADMIN
+
+        reply = await answer_booking(
+            llm,
+            identity,
+            scheduling,
+            patient_id=patient_id,
+            doctor_id=doctor_id,
+            profile=profile,
+            history=history,
+            model=models.chat,
+            now=now,
+        )
+        return Turn(reply, intent)
     except Exception:
         logger.exception("turn failed for patient %s with doctor %s", patient_id, doctor_id)
         return Turn(AgentReply(apology, models.chat, booking.PROMPT_VERSION), intent)

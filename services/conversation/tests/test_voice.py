@@ -37,6 +37,11 @@ class Directory:
         return {"timezone": "Africa/Cairo"}
 
 
+class MedicalDirectory(Directory):
+    async def under_care(self, patient_id, doctor_id):
+        return False
+
+
 def classified(intent: str):
     return tool_use_message(intent_prompt.TOOL["name"], {"intent": intent})
 
@@ -89,9 +94,10 @@ async def test_a_voice_note_is_transcribed_answered_and_answered_aloud(parties, 
 async def test_medical_answers_are_never_spoken(parties, temporal, task_queue):
     vp = providers("هو الدوا ده ليه آثار جانبية؟")
 
-    reply = await voice_turn(parties, temporal, task_queue, FakeLLM([classified("medical")]), vp)
+    reply = await voice_turn(parties, temporal, task_queue, FakeLLM([classified("medical")]), vp, MedicalDirectory())
 
-    assert reply.text == replies.MEDICAL_NOT_YET["ar"]
+    # a patient with no visit yet is told to book first, in text only
+    assert reply.intent == "medical" and reply.text == replies.NEEDS_VISIT["ar"]
     assert reply.audio_key is None and vp.tts.calls == []
 
 

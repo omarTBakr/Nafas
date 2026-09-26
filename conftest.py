@@ -71,6 +71,25 @@ def booking_events():
     events.set_events(None)
 
 
+class RecordingEscalationEvents:
+    def __init__(self):
+        self.answered_ids: list[str] = []
+
+    async def answered(self, escalation):
+        self.answered_ids.append(str(escalation.id))
+
+
+@pytest.fixture(autouse=True)
+def escalation_events():
+    """No test signals an escalation's workflow through the conversation API by accident."""
+    from nafas_conversation import events
+
+    recorder = RecordingEscalationEvents()
+    events.set_events(recorder)
+    yield recorder
+    events.set_events(None)
+
+
 # --- temporal -------------------------------------------------------------
 
 

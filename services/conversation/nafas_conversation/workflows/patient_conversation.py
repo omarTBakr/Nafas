@@ -19,6 +19,7 @@ from datetime import timedelta
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError
+from temporalio.workflow import ParentClosePolicy
 
 with workflow.unsafe.imports_passed_through():
     from nafas_conversation.activities import ConversationActivities
@@ -26,13 +27,17 @@ with workflow.unsafe.imports_passed_through():
         ChatReply,
         ConversationStart,
         DialectRequest,
+        EscalationStart,
+        OpenEscalation,
         PatientMessage,
         SpeakRequest,
         StoredMessage,
         StoredReply,
         TranscribeRequest,
         TurnRequest,
+        escalation_workflow_id,
     )
+    from nafas_conversation.workflows.escalation import EscalationWorkflow
     from nafas_core.clients import conversation
 
 IDLE_TIMEOUT = timedelta(days=7)
@@ -141,9 +146,13 @@ class PatientConversationWorkflow:
                     intent=result.intent,
                     answers_message_id=message_id,
                     audio_key=audio_key,
+                    safety=result.safety or None,
                 ),
                 **STORE,
             )
+            # a gate sent the question to the doctor: it waits for them in its own workflow
+            if result.escalation and workflow.patched("escalations"):
+                await self._escalate(result.escalation, message_id)
             if tagging is not None:
                 try:
                     await tagging
@@ -162,6 +171,23 @@ class PatientConversationWorkflow:
                 audio_key=audio_key,
                 patient_message_id=message_id,
             )
+
+    async def _escalate(self, reason: str, message_id: str) -> None:
+        escalation_id = str(workflow.uuid4())
+        await workflow.execute_activity_method(
+            ConversationActivities.open_escalation,
+            OpenEscalation(
+                escalation_id, self._start.patient_id, self._start.doctor_id, self._conversation_id, message_id, reason
+            ),
+            **STORE,
+        )
+        # abandoned, not cancelled, when this run continues as new: the question keeps waiting
+        await workflow.start_child_workflow(
+            EscalationWorkflow.run,
+            EscalationStart(escalation_id, self._start.patient_id, self._start.doctor_id),
+            id=escalation_workflow_id(escalation_id),
+            parent_close_policy=ParentClosePolicy.ABANDON,
+        )
 
     @send_message.validator
     def _check_message(self, message: PatientMessage) -> None:

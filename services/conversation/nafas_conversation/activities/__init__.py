@@ -10,19 +10,24 @@ from datetime import UTC, datetime
 
 from temporalio import activity
 
-from nafas_conversation.enums import Intent, Modality
-from nafas_conversation.logic import messages, voice
+from nafas_conversation.enums import EscalationReason, Intent, Modality
+from nafas_conversation.logic import escalations, messages, voice
+from nafas_conversation.logic.medical import doctor_name
 from nafas_conversation.logic.turn import Models, answer_turn
 from nafas_conversation.logic.voice import VoiceProviders
+from nafas_conversation.prompts import replies
 from nafas_conversation.schemas import (
     ConversationStart,
     DialectRequest,
+    EscalationNotice,
+    OpenEscalation,
     SpeakRequest,
     StoredMessage,
     StoredReply,
     TranscribeRequest,
     TurnRequest,
     TurnResult,
+    escalation_workflow_id,
 )
 from nafas_core import audit
 from nafas_core.clients.identity import IdentityClient
@@ -95,7 +100,15 @@ class ConversationActivities:
         )
         reply = turn.reply
         return TurnResult(
-            reply.text, reply.model, reply.prompt_version, reply.tokens_in, reply.tokens_out, reply.actions, turn.intent.value
+            reply.text,
+            reply.model,
+            reply.prompt_version,
+            reply.tokens_in,
+            reply.tokens_out,
+            reply.actions,
+            turn.intent.value,
+            escalation=turn.escalation.value if turn.escalation else None,
+            safety=turn.safety,
         )
 
     @activity.defn(name="conversation.save_reply")
@@ -112,6 +125,33 @@ class ConversationActivities:
             intent=Intent(reply.intent) if reply.intent else None,
             answers_message_id=uuid.UUID(reply.answers_message_id) if reply.answers_message_id else None,
             audio_key=reply.audio_key,
+            safety=reply.safety,
+        )
+
+    @activity.defn(name="conversation.open_escalation")
+    async def open_escalation(self, request: OpenEscalation) -> None:
+        await escalations.open_escalation(
+            escalation_id=uuid.UUID(request.escalation_id),
+            patient_id=uuid.UUID(request.patient_id),
+            doctor_id=uuid.UUID(request.doctor_id),
+            conversation_id=uuid.UUID(request.conversation_id),
+            message_id=uuid.UUID(request.message_id),
+            reason=EscalationReason(request.reason),
+            workflow_id=escalation_workflow_id(request.escalation_id),
+        )
+
+    @activity.defn(name="conversation.tell_patient_about_escalation")
+    async def tell_patient_about_escalation(self, notice: EscalationNotice) -> bool:
+        """The nudge, or the expiry, in the patient's language; False once the doctor has answered."""
+        patient_id = uuid.UUID(notice.patient_id)
+        if await escalations.still_open(patient_id, uuid.UUID(notice.escalation_id)) is None:
+            return False
+        language = (await self._identity.profile(patient_id))["preferred_language"]
+        doctor = await self._identity.doctor(uuid.UUID(notice.doctor_id))
+        words = replies.ESCALATION_EXPIRED if notice.expire else replies.ESCALATION_NUDGE
+        text = replies.pick(words, language).format(doctor=doctor_name(doctor, language))
+        return await escalations.tell_patient(
+            patient_id, uuid.UUID(notice.escalation_id), text, expire=notice.expire, message_id=uuid.UUID(notice.message_id)
         )
 
     @activity.defn(name="conversation.transcribe")
@@ -122,6 +162,9 @@ class ConversationActivities:
 
     @activity.defn(name="conversation.tag_dialect")
     async def tag_dialect(self, request: DialectRequest) -> str | None:
+        if self._voice is None:
+            # a worker without the dialect-router: messages stay untagged
+            return None
         return await voice.tag_dialect(
             self._voice_providers(), uuid.UUID(request.patient_id), uuid.UUID(request.message_id), request.text
         )
@@ -146,4 +189,6 @@ class ConversationActivities:
             self.transcribe,
             self.tag_dialect,
             self.speak_reply,
+            self.open_escalation,
+            self.tell_patient_about_escalation,
         ]

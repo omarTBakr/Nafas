@@ -16,7 +16,14 @@ from nafas_identity.enums import ConsentKind
 from nafas_identity.exceptions import AccountExistsError, ConsentNotFoundError, WeakPasswordError
 from nafas_identity.logic import consents
 from nafas_identity.logic.accounts import AuthenticatedUser, authenticate, get_user, register_patient_account
-from nafas_identity.logic.directory import DoctorCard, ensure_care_link, list_doctors, list_specializations
+from nafas_identity.logic.directory import (
+    DoctorCard,
+    doctor_scope,
+    ensure_care_link,
+    list_doctors,
+    list_specializations,
+    under_care,
+)
 from nafas_identity.logic.profile import PatientProfile, get_profile, update_profile
 from nafas_identity.models import Patient
 
@@ -276,6 +283,39 @@ async def patient_names(doctor_id: uuid.UUID, ids: list[uuid.UUID] = Query(defau
             detail={"patient_ids": [str(pid) for pid, _ in rows]},
         )
     return [PatientName(patient_id=pid, full_name=name) for pid, name in rows]
+
+
+class ScopeOut(BaseModel):
+    code: str
+    name_en: str
+    name_ar: str
+    scope_description: str
+    in_scope_topics: list[str]
+    always_escalate: list[str]
+
+
+@router.get("/doctors/{doctor_id}/scope", response_model=ScopeOut)
+async def scope_of(doctor_id: uuid.UUID) -> ScopeOut:
+    """What the doctor's specialization covers, and what always goes to the doctor: read by the safety gates."""
+    async with session_scope() as session:
+        spec = await doctor_scope(session, doctor_id)
+    if spec is None:
+        raise HTTPException(status_code=404, detail="no such doctor")
+    return ScopeOut(
+        code=spec.code,
+        name_en=spec.name_en,
+        name_ar=spec.name_ar,
+        scope_description=spec.scope_description,
+        in_scope_topics=list(spec.in_scope_topics),
+        always_escalate=list(spec.always_escalate),
+    )
+
+
+@router.get("/patients/{patient_id}/care/{doctor_id}")
+async def care(patient_id: uuid.UUID, doctor_id: uuid.UUID) -> dict:
+    """Whether the patient is under this doctor's care now."""
+    async with session_scope(patient_id=patient_id) as session:
+        return {"active": await under_care(session, doctor_id, patient_id)}
 
 
 @router.post("/care-links", status_code=204)

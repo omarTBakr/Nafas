@@ -104,6 +104,14 @@ class ConversationClient(InternalClient):
         )
         return response.json()
 
+    async def escalations(self, doctor_id: uuid.UUID, statuses: list[str] | None = None) -> list[dict]:
+        params = [("status", s) for s in (statuses or ["open"])]
+        return (await self.request("GET", f"/internal/v1/doctors/{doctor_id}/escalations", params=params)).json()
+
+    async def reply_to_escalation(self, doctor_id: uuid.UUID, escalation_id: uuid.UUID, reply: str) -> dict:
+        path = f"/internal/v1/doctors/{doctor_id}/escalations/{escalation_id}/reply"
+        return (await self.request("POST", path, json={"reply": reply})).json()
+
     async def dialect_suggestion(self, patient_id: uuid.UUID) -> dict:
         return (await self.request("GET", f"/internal/v1/patients/{patient_id}/dialect-suggestion")).json()
 

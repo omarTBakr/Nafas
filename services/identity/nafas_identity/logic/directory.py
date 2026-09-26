@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from nafas_identity.enums import CareStatus
 from nafas_identity.models import Doctor, DoctorPatient, Specialization, User
 
 
@@ -63,3 +64,18 @@ async def ensure_care_link(session: AsyncSession, doctor_id: uuid.UUID, patient_
     doctor create a link to themself. Idempotent, so every booking may call it.
     """
     await session.execute(insert(DoctorPatient).values(doctor_id=doctor_id, patient_id=patient_id).on_conflict_do_nothing())
+
+
+async def under_care(session: AsyncSession, doctor_id: uuid.UUID, patient_id: uuid.UUID) -> bool:
+    """An active care link between them; read in the patient's scope, where their own links are visible."""
+    status = await session.scalar(
+        select(DoctorPatient.status).where(DoctorPatient.doctor_id == doctor_id, DoctorPatient.patient_id == patient_id)
+    )
+    return status is CareStatus.ACTIVE
+
+
+async def doctor_scope(session: AsyncSession, doctor_id: uuid.UUID) -> Specialization | None:
+    """The specialization a doctor practises, with the boundary the scope gate reads."""
+    return await session.scalar(
+        select(Specialization).join(Doctor, Doctor.specialization_id == Specialization.id).where(Doctor.id == doctor_id)
+    )

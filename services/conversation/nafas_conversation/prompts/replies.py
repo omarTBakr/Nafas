@@ -18,21 +18,39 @@ EMERGENCY = {
     ),
 }
 
-MEDICAL_NOT_YET = {
-    "ar": (
-        "أنا مساعد آلي وبساعد في المواعيد بس دلوقتي، ومقدرش أجاوب على أسئلة طبية. "
-        "اسأل الدكتور في الزيارة، ولو حاسس إن الموضوع مستعجل روح أقرب طوارئ."
-    ),
-    "en": (
-        "I am an AI assistant and for now I can only help with appointments, not medical questions. "
-        "Please ask the doctor at your visit, and if it feels urgent, go to the nearest emergency room."
-    ),
-}
-
-
 NOT_HEARD = {
     "ar": "معلش، مقدرتش أسمع الرسالة الصوتية كويس. ممكن تسجلها تاني أو تكتبها؟",
     "en": "Sorry, I could not make out that voice note. Could you record it again, or type it?",
+}
+
+
+ESCALATED = {
+    "ar": (
+        "سؤالك محتاج رد {doctor} شخصيًا، فبعتّه له. هتلاقي رده هنا في المحادثة. "
+        "لو حاسس إن الموضوع مستعجل، روح أقرب طوارئ أو اتصل بـ ١٢٣."
+    ),
+    "en": (
+        "Your question needs {doctor} personally, so I have sent it to them. You will find their answer here in "
+        "this chat. If it feels urgent, go to the nearest emergency room or call 123."
+    ),
+}
+
+NEEDS_VISIT = {
+    "ar": "أقدر أساعد في الأسئلة الطبية العامة بعد ما يكون عندك موعد مؤكد مع الدكتور. تحب أحجزلك موعد؟",
+    "en": "I can help with general medical questions once you have a confirmed appointment with the doctor. Shall I book one?",
+}
+
+ESCALATION_NUDGE = {
+    "ar": "{doctor} لسه ما ردش على سؤالك. لو حاسس إن الموضوع مستعجل، روح أقرب طوارئ أو اتصل بـ ١٢٣.",
+    "en": "{doctor} has not answered your question yet. If it feels urgent, go to the nearest emergency room or call 123.",
+}
+
+ESCALATION_EXPIRED = {
+    "ar": "للأسف {doctor} ما لحقش يرد على سؤالك. ممكن تحجز موعد وتسأله في الزيارة، ولو مستعجل روح الطوارئ.",
+    "en": (
+        "Sorry, {doctor} could not answer your question in time. You could book a visit and ask there; "
+        "if it is urgent, go to the emergency room."
+    ),
 }
 
 

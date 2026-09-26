@@ -69,6 +69,7 @@ async def add_assistant_message(
     intent: Intent | None = None,
     answers_message_id: uuid.UUID | None = None,
     audio_key: str | None = None,
+    safety: dict | None = None,
 ) -> None:
     """The reply, and the intent it was answered under on the message it answers."""
     await add_message(
@@ -84,6 +85,7 @@ async def add_assistant_message(
         tokens_out=tokens_out,
         audio_key=audio_key,
         modality=Modality.VOICE if audio_key else Modality.TEXT,
+        safety=safety,
     )
     if intent is not None and answers_message_id is not None:
         async with session_scope(patient_id=patient_id) as session:

@@ -10,7 +10,7 @@ from temporalio.worker import Worker
 
 from nafas_conversation.activities import ConversationActivities
 from nafas_conversation.client import send_patient_message
-from nafas_conversation.enums import Intent, MessageRole
+from nafas_conversation.enums import EscalationReason, Intent, MessageRole
 from nafas_conversation.logic import messages
 from nafas_conversation.logic.turn import FIXED, Models, answer_turn
 from nafas_conversation.prompts import intent as intent_prompt
@@ -118,6 +118,8 @@ async def test_emergency_words_get_the_fixed_reply_without_any_model(text):
     assert llm.requests == []
     assert result.intent is Intent.EMERGENCY
     assert result.reply.text == replies.EMERGENCY["ar"] and result.reply.model == FIXED
+    # and the doctor hears of it
+    assert result.escalation is EscalationReason.EMERGENCY
 
 
 async def test_an_emergency_the_keywords_miss_is_caught_by_the_classifier():
@@ -126,15 +128,6 @@ async def test_an_emergency_the_keywords_miss_is_caught_by_the_classifier():
     )
 
     assert result.intent is Intent.EMERGENCY and result.reply.text == replies.EMERGENCY["en"]
-
-
-async def test_medical_questions_get_the_safe_reply_until_phase_4():
-    llm = FakeLLM([classified("medical")])
-
-    result = await turn(llm, "هو الأسبرين كويس للضغط؟")
-
-    assert len(llm.requests) == 1
-    assert result.intent is Intent.MEDICAL and result.reply.text == replies.MEDICAL_NOT_YET["ar"]
 
 
 async def test_a_classifier_failure_falls_back_to_the_booking_assistant():
