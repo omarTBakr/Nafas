@@ -117,6 +117,29 @@ services:
       postgres:
         condition: service_healthy
 
+  conversation:
+    # a Temporal worker, no port: messages reach it as updates on its
+    # PatientConversationWorkflow
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        PACKAGE: nafas-conversation
+        MODULE: nafas_conversation.worker
+    image: nafas/conversation:dev
+    environment:
+      <<: *service-env
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      identity:
+        condition: service_started
+      scheduling:
+        condition: service_started
+
   web:
     # the built app behind nginx; for development with hot reload, run
     # `npm run dev` in web/ instead (port 5173, proxying /api the same way)

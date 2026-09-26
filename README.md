@@ -103,6 +103,7 @@ packages/core/         nafas_core: settings, logging, LangSmith tracing, db, Tem
 services/gateway/      nafas_gateway: the dashboard's HTTP edge (login, sessions)
 services/identity/     nafas_identity: accounts, doctors, patients, consents
 services/scheduling/   nafas_scheduling: hours and appointments, to the minute
+services/conversation/ nafas_conversation: the patient's assistant chat (a Temporal worker)
 web/                   the React app: patient and doctor portals, Arabic (RTL) and English
 services/dialect_router/   GPU inference service, outside the workspace
 alembic/               one migration history for every service's schema

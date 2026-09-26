@@ -54,6 +54,13 @@ DIALECT_NAMES = {
 }
 
 
+# what the patient reads when a turn fails; not shown to the model, so not versioned with it
+APOLOGIES = {
+    "ar": "معلش، حصلت مشكلة عندي. جرب تبعت رسالتك تاني بعد شوية.",
+    "en": "Sorry, something went wrong on my side. Please send your message again in a moment.",
+}
+
+
 def language_instruction(preferred_language: str, dialect: str | None) -> str:
     if preferred_language == "en":
         return "Reply in English, unless the patient writes to you in Arabic; then reply in their Arabic."
