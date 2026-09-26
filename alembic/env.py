@@ -27,6 +27,7 @@ from nafas_core.db.base import Base
 MODEL_MODULES: list[str] = [
     "nafas_identity.models",
     "nafas_scheduling.models",
+    "nafas_conversation.models",
 ]
 
 for module in MODEL_MODULES:

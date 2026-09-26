@@ -6,7 +6,8 @@ class LLMProvider(StrEnum):
 
 
 class STTProvider(StrEnum):
-    # the hosted vendors join after the Arabic dialect spike (docs/CHECKLIST.md, phase 0)
+    # the stt GPU service (services/stt): the Arabic-dialect Whisper, decided 2026-09-26
+    SELF_HOSTED = "self_hosted"
     NONE = ""
 
 

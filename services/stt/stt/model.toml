@@ -1,0 +1,12 @@
+# The model this service serves, pinned. Changing any line here is a model
+# change: it goes through the eval gate and promotion (docs/PLAN.md §6b).
+
+model_id = "oddadmix/whisper-large-v3-turbo-arabic-dialectal-v2"
+model_revision = "b12b09bc6601f2116410ccc9716596de0301c24a"
+model_dir = "/models/stt"
+
+# a voice note, not a consultation: longer recordings are refused
+max_seconds = 180
+max_bytes = 15_000_000
+# Whisper hears 30-second windows; longer audio is transcribed in chunks
+chunk_seconds = 30

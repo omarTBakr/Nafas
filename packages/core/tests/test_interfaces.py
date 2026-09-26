@@ -37,8 +37,9 @@ async def test_fake_stt_records_the_request():
     assert stt.calls[0]["language_hint"] == "ar"
 
 
-def test_unconfigured_providers_fail_by_name():
-    """An STT or embeddings call before a vendor is chosen must say so, not fail obscurely."""
+def test_unconfigured_providers_fail_by_name(monkeypatch):
+    """A call to a backend nobody chose must say so, not fail obscurely."""
+    monkeypatch.setenv("STT_PROVIDER", "")
     with pytest.raises(MissingSettingError, match="STT_PROVIDER"):
         get_stt()
     with pytest.raises(MissingSettingError, match="EMBEDDINGS_PROVIDER"):

@@ -3,3 +3,5 @@
 services:
   dialect-router:
     devices: !reset []
+  stt:
+    devices: !reset []

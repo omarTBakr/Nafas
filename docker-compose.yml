@@ -71,6 +71,7 @@ services:
       TEMPORAL_HOST: temporal:7233
       S3_ENDPOINT_URL: http://s3:8333
       DIALECT_ROUTER_URL: http://dialect-router:8410
+      STT_URL: http://stt:8420
       IDENTITY_URL: http://identity:8010
       SCHEDULING_URL: http://scheduling:8030
       # laptop only; production injects a real secret
@@ -133,6 +134,15 @@ services:
     image: nafas/dialect-router:dev
     ports:
       - "8410:8410"
+    devices:
+      - nvidia.com/gpu=all
+
+  stt:
+    # GPU, like the dialect-router; `make up-cpu` runs it on the CPU instead
+    build: ./services/stt
+    image: nafas/stt:dev
+    ports:
+      - "8420:8420"
     devices:
       - nvidia.com/gpu=all
 

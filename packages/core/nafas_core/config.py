@@ -38,7 +38,8 @@ class Settings(BaseSettings):
     s3_bucket: str = Field("nafas", description="Bucket holding recordings, voice notes and documents")
 
     llm_provider: LLMProvider = Field(LLMProvider.ANTHROPIC, description="Which language model backend to use")
-    stt_provider: STTProvider = Field(STTProvider.NONE, description="Speech-to-text backend; chosen after the dialect spike")
+    stt_provider: STTProvider = Field(STTProvider.SELF_HOSTED, description="Speech-to-text backend")
+    stt_url: str = Field("http://localhost:8420", description="Base URL of the stt service")
     embeddings_provider: EmbeddingsProvider = Field(EmbeddingsProvider.NONE, description="Embeddings backend")
     storage_provider: StorageProvider = Field(StorageProvider.S3, description="Object storage backend")
 

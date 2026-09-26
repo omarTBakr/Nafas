@@ -34,7 +34,7 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [x] `web` in compose (nginx on :8088, proxying `/api`), CI job (typecheck, tests, build), and an end-to-end booking run through the UI in a real browser
 
 **Phase 3: Booking by AI chat in the UI, text and voice** (creates `conversation`)
-- [ ] `conversation` service: conversations and messages tables; `PatientConversationWorkflow` per patient and doctor (update-with-start, continue_as_new)
+- [ ] **(in progress)** `conversation` service: conversations and messages tables; `PatientConversationWorkflow` per patient and doctor (update-with-start, continue_as_new)
 - [ ] Intent classifier; the booking tool loop on Claude (extract a `TimeExpression`, then find, check, hold, confirm, cancel through scheduling)
 - [ ] Chat panel in the patient portal with streamed replies; chat and slot picker share the same holds
 - [ ] `BookingWorkflow`: hold expiry and in-app reminders (T-24h, T-1h); Temporal time-skipping tests

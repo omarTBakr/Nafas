@@ -1,4 +1,5 @@
 from nafas_core.config import get_setting
+from nafas_core.enums.providers import STTProvider
 from nafas_core.exceptions.config import MissingSettingError
 from nafas_core.interfaces.stt.base import STT
 
@@ -9,9 +10,14 @@ def get_stt() -> STT:
     """The process-wide STT for STT_PROVIDER."""
     global _stt
     if _stt is None:
-        provider = get_setting().stt_provider
-        # every real provider is a case here; none is wired until the spike picks one
-        raise MissingSettingError(f"STT_PROVIDER {provider!r} has no implementation yet; pick one after the dialect spike")
+        settings = get_setting()
+        match settings.stt_provider:
+            case STTProvider.SELF_HOSTED:
+                from nafas_core.interfaces.stt.http import HttpSTT
+
+                _stt = HttpSTT(settings.stt_url)
+            case _:
+                raise MissingSettingError("STT_PROVIDER is not set; voice input needs a speech-to-text backend")
 
     return _stt
 

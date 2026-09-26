@@ -1,0 +1,48 @@
+[project]
+name = "nafas-stt"
+version = "0.1.0"
+description = "Arabic-dialect speech-to-text as a GPU service (whisper-large-v3-turbo, 13 dialects)"
+license = "PolyForm-Noncommercial-1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "numpy>=2.0",
+    "prometheus-client>=0.23",
+    "pydantic-settings>=2.0",
+    "python-multipart>=0.0.32",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[project.optional-dependencies]
+# the model runtime; the image installs it, the unit tests do not need it
+model = [
+    "accelerate>=1.10",
+    "torch>=2.8",
+    "transformers>=4.56",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13",
+    "pytest>=9.1.1",
+]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu128" }]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+module-name = "stt"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

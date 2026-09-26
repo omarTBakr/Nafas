@@ -1,7 +1,7 @@
 """The speech-to-text port: voice notes, and diarized consultation recordings.
 
-No hosted provider is wired yet; the vendor is chosen by the Arabic dialect
-spike (docs/CHECKLIST.md, phase 0) and lands here as one more module.
+The implementation is the stt GPU service (services/stt), reached over HTTP;
+a hosted vendor would be one more module and a factory case.
 """
 
 from nafas_core.interfaces.stt.base import STT, Segment, Transcript

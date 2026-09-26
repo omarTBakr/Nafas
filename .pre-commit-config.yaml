@@ -42,6 +42,13 @@ repos:
         pass_filenames: false
         files: ^services/dialect_router/
 
+      - id: pytest-stt
+        name: pytest (stt)
+        entry: bash -c 'cd services/stt && uv run pytest'
+        language: system
+        pass_filenames: false
+        files: ^services/stt/
+
       # a hand-maintained table of contents drifts; this one is generated
       - id: readme-contents
         name: README contents are up to date
