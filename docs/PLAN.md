@@ -98,7 +98,7 @@ All times are `timestamptz` in UTC. Each doctor has an IANA `timezone` used for 
 |---|---|
 | `users` | id, email (unique), password_hash, role enum(doctor, admin, staff), is_active, last_login_at |
 | `specializations` | id, code (unique, e.g. `cardiology`), name_en, name_ar, `scope_description` (text given to the scope classifier), `in_scope_topics` jsonb, `always_escalate` jsonb (topics that must go to the doctor) |
-| `doctors` | id, user_id → users, full_name_en/ar, specialization_id → specializations, timezone, default_slot_minutes, buffer_minutes, languages text[], booking_horizon_days, min_notice_minutes, telegram_bot_username (optional per-doctor bot) |
+| `doctors` | id, user_id → users, full_name_en/ar, specialization_id → specializations, languages text[]. Booking settings live in the scheduling service (below) |
 | `patients` | id, full_name, date_of_birth, sex, phone, email, preferred_language enum(ar, en), created_at |
 | `patient_channels` | id, patient_id, channel enum(telegram, email, whatsapp), external_id, verified_at. Unique on (channel, external_id) |
 | `doctor_patients` | doctor_id, patient_id, status enum(active, archived), first_seen_at. **This is the access-control boundary for every clinical query** |
@@ -107,6 +107,7 @@ All times are `timestamptz` in UTC. Each doctor has an IANA `timezone` used for 
 **Scheduling**
 | Table | Key columns |
 |---|---|
+| `booking_settings` | doctor_id (PK), timezone, slot_minutes, buffer_minutes, min_notice_minutes, horizon_days, hold_minutes. No row means the doctor is not bookable yet |
 | `availability_rules` | id, doctor_id, weekday 0-6, start_local time, end_local time, slot_minutes (nullable → doctor default), mode enum(in_person, online, both), effective_from/to |
 | `time_off` | id, doctor_id, `during tstzrange`, reason |
 | `appointments` | id, doctor_id, patient_id, starts_at, ends_at, `during tstzrange GENERATED`, status enum(held, confirmed, cancelled, completed, no_show), mode, hold_expires_at, meeting_url, reason_for_visit, booking_workflow_id, created_via channel. **`EXCLUDE USING gist (doctor_id WITH =, during WITH &&) WHERE (status IN ('held','confirmed'))`**. Requires the `btree_gist` extension |
@@ -155,7 +156,11 @@ The Temporal conventions come from the existing README and `workflows/__init__.p
    - `hold_slot(start)`
    - `confirm_hold`, `cancel`, `reschedule`
 
-   `utils/scheduling.py` handles relative Arabic and English times ("بكرة بعد العصر", "next Tuesday 5:40") in the doctor's timezone. It is pure code and unit-tested. Holds are inserted as `held` rows, so the exclusion constraint settles any race. **`BookingWorkflow`** takes over from there:
+   Relative Arabic and English times ("بكرة بعد العصر", "next Tuesday 5:40") are handled in two steps:
+   - The LLM only *extracts* a structured `TimeExpression`: a day reference, an hour and minute, am/pm, and a period such as asr.
+   - `nafas_scheduling.logic.time_expressions.resolve` then does the date arithmetic in the doctor's timezone. It is pure code and unit-tested.
+   - An hour without am/pm that nothing settles gives both candidates. The one inside the doctor's hours wins, or the agent asks. Nothing is guessed.
+   - A patient may book any whole minute inside the doctor's hours (17:40, not just the grid). The grid only drives suggestions. Holds are inserted as `held` rows, so the exclusion constraint settles any race. **`BookingWorkflow`** takes over from there:
    - It waits for a `confirm` signal. The hold expires after 10 minutes, which releases the slot.
    - Once confirmed, it sends a confirmation (plus an `.ics` file for email).
    - It fires reminder timers at T-24h and T-1h.

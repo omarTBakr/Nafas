@@ -26,6 +26,7 @@ from nafas_core.db.base import Base
 # added here in the same commit that creates the service.
 MODEL_MODULES: list[str] = [
     "nafas_identity.models",
+    "nafas_scheduling.models",
 ]
 
 for module in MODEL_MODULES:

@@ -107,17 +107,8 @@ def upgrade() -> None:
         sa.Column("full_name_en", sa.Text(), nullable=False),
         sa.Column("full_name_ar", sa.Text(), nullable=False),
         sa.Column("specialization_id", sa.UUID(), nullable=False),
-        sa.Column("timezone", sa.String(length=64), server_default="Africa/Cairo", nullable=False),
-        sa.Column("default_slot_minutes", sa.Integer(), server_default=sa.text("20"), nullable=False),
-        sa.Column("buffer_minutes", sa.Integer(), server_default=sa.text("0"), nullable=False),
         sa.Column("languages", sa.ARRAY(sa.String(length=8)), server_default=sa.text("ARRAY['ar']::varchar[]"), nullable=False),
-        sa.Column("booking_horizon_days", sa.Integer(), server_default=sa.text("60"), nullable=False),
-        sa.Column("min_notice_minutes", sa.Integer(), server_default=sa.text("60"), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.CheckConstraint("booking_horizon_days > 0", name=op.f("ck_doctors_horizon_positive")),
-        sa.CheckConstraint("buffer_minutes >= 0", name=op.f("ck_doctors_buffer_not_negative")),
-        sa.CheckConstraint("default_slot_minutes > 0", name=op.f("ck_doctors_slot_positive")),
-        sa.CheckConstraint("min_notice_minutes >= 0", name=op.f("ck_doctors_notice_not_negative")),
         sa.ForeignKeyConstraint(
             ["specialization_id"], ["identity.specializations.id"], name=op.f("fk_doctors_specialization_id_specializations")
         ),

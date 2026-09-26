@@ -1,13 +1,11 @@
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from nafas_core.enums.identity import UserRole
-from nafas_core.exceptions.config import InvalidSettingError
 from nafas_identity.exceptions import AccountExistsError, UnknownSpecializationError
 from nafas_identity.logic.passwords import DUMMY_HASH, hash_password, needs_rehash, verify_password
 from nafas_identity.models import Doctor, Specialization, User
@@ -34,14 +32,13 @@ async def create_doctor_account(
     full_name_en: str,
     full_name_ar: str,
     specialization_code: str,
-    timezone: str = "Africa/Cairo",
-    default_slot_minutes: int = 20,
 ) -> Doctor:
     """
     A dashboard account and the doctor behind it, created together.
 
     Accounts are made by an admin (the CLI), never by sign-up: a doctor on
-    Nafas is someone the operator has checked.
+    Nafas is someone the operator has checked. They take bookings once the
+    scheduling service has their hours (`nafas_scheduling.cli`).
     """
     if await _email_taken(session, email):
         raise AccountExistsError(f"an account for {email} already exists")
@@ -49,11 +46,6 @@ async def create_doctor_account(
     specialization_id = await session.scalar(select(Specialization.id).where(Specialization.code == specialization_code))
     if specialization_id is None:
         raise UnknownSpecializationError(f"no specialization {specialization_code!r}")
-
-    try:
-        ZoneInfo(timezone)
-    except ZoneInfoNotFoundError as exc:
-        raise InvalidSettingError(f"{timezone!r} is not an IANA time zone") from exc
 
     user = User(email=email, password_hash=hash_password(password), role=UserRole.DOCTOR)
     session.add(user)
@@ -64,8 +56,6 @@ async def create_doctor_account(
         full_name_en=full_name_en,
         full_name_ar=full_name_ar,
         specialization_id=specialization_id,
-        timezone=timezone,
-        default_slot_minutes=default_slot_minutes,
     )
     session.add(doctor)
     await session.flush()

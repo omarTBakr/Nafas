@@ -5,7 +5,6 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     ARRAY,
-    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -83,29 +82,22 @@ class Specialization(Base):
 
 
 class Doctor(Base):
+    """
+    A doctor's identity and profile. How they take bookings (hours, time zone,
+    slot length) belongs to the scheduling service, in scheduling.booking_settings.
+    """
+
     __tablename__ = "doctors"
-    __table_args__ = (
-        CheckConstraint("default_slot_minutes > 0", name="slot_positive"),
-        CheckConstraint("buffer_minutes >= 0", name="buffer_not_negative"),
-        CheckConstraint("booking_horizon_days > 0", name="horizon_positive"),
-        CheckConstraint("min_notice_minutes >= 0", name="notice_not_negative"),
-        {"schema": SCHEMA},
-    )
+    __table_args__ = {"schema": SCHEMA}
 
     id: Mapped[uuid.UUID] = _id()
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(f"{SCHEMA}.users.id"), unique=True)
     full_name_en: Mapped[str] = mapped_column(Text)
     full_name_ar: Mapped[str] = mapped_column(Text)
     specialization_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(f"{SCHEMA}.specializations.id"))
-    # IANA name; every "tomorrow at 5" is read in this zone
-    timezone: Mapped[str] = mapped_column(String(64), default="Africa/Cairo", server_default="Africa/Cairo")
-    default_slot_minutes: Mapped[int] = mapped_column(default=20, server_default=text("20"))
-    buffer_minutes: Mapped[int] = mapped_column(default=0, server_default=text("0"))
     languages: Mapped[list[str]] = mapped_column(
         ARRAY(String(8)), default=lambda: ["ar"], server_default=text("ARRAY['ar']::varchar[]")
     )
-    booking_horizon_days: Mapped[int] = mapped_column(default=60, server_default=text("60"))
-    min_notice_minutes: Mapped[int] = mapped_column(default=60, server_default=text("60"))
     created_at: Mapped[datetime] = _created_at()
 
 

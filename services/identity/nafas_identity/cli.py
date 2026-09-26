@@ -34,10 +34,9 @@ async def create_doctor(args: argparse.Namespace) -> None:
             full_name_en=args.name_en,
             full_name_ar=args.name_ar,
             specialization_code=args.specialization,
-            timezone=args.timezone,
-            default_slot_minutes=args.slot_minutes,
         )
     print(f"doctor {doctor.id} created for {args.email}")
+    print("next: give them booking hours with `python -m nafas_scheduling.cli`")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -51,8 +50,6 @@ def main(argv: list[str] | None = None) -> int:
     doctor.add_argument("--name-en", required=True)
     doctor.add_argument("--name-ar", required=True)
     doctor.add_argument("--specialization", required=True, choices=[s.code for s in SPECIALIZATIONS])
-    doctor.add_argument("--timezone", default="Africa/Cairo")
-    doctor.add_argument("--slot-minutes", type=int, default=20)
     # for scripts; interactively, leave it out and type it at the prompt
     doctor.add_argument("--password")
 

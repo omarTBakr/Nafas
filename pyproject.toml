@@ -11,6 +11,7 @@ dependencies = [
     "nafas-core",
     "nafas-gateway",
     "nafas-identity",
+    "nafas-scheduling",
 ]
 
 [tool.uv]
@@ -25,6 +26,7 @@ exclude = ["services/dialect_router"]
 nafas-core = { workspace = true }
 nafas-gateway = { workspace = true }
 nafas-identity = { workspace = true }
+nafas-scheduling = { workspace = true }
 
 [dependency-groups]
 dev = [

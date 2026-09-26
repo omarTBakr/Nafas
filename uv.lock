@@ -12,6 +12,7 @@ members = [
     "nafas-core",
     "nafas-gateway",
     "nafas-identity",
+    "nafas-scheduling",
 ]
 
 [[package]]
@@ -1401,6 +1402,7 @@ dependencies = [
     { name = "nafas-core" },
     { name = "nafas-gateway" },
     { name = "nafas-identity" },
+    { name = "nafas-scheduling" },
 ]
 
 [package.dev-dependencies]
@@ -1417,6 +1419,7 @@ requires-dist = [
     { name = "nafas-core", editable = "packages/core" },
     { name = "nafas-gateway", editable = "services/gateway" },
     { name = "nafas-identity", editable = "services/identity" },
+    { name = "nafas-scheduling", editable = "services/scheduling" },
 ]
 
 [package.metadata.requires-dev]
@@ -1504,6 +1507,17 @@ requires-dist = [
     { name = "nafas-core", editable = "packages/core" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.4" },
 ]
+
+[[package]]
+name = "nafas-scheduling"
+version = "0.1.0"
+source = { editable = "services/scheduling" }
+dependencies = [
+    { name = "nafas-core" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "nafas-core", editable = "packages/core" }]
 
 [[package]]
 name = "nexus-rpc"

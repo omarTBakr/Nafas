@@ -18,9 +18,10 @@ The order of work for [PLAN.md](PLAN.md). Each item is ticked in the same commit
 **Phase 1: Doctors, specializations and scheduling core** (creates the `identity` and `scheduling` services)
 - [x] Database roles: services connect as `nafas_service` (not the owner), so row-level security applies; `nafas_current_doctor()` for policies
 - [x] `identity` service: migration for users, specializations, doctors, patients, patient_channels, doctor_patients, consents with RLS; isolation tests
-- [ ] `scheduling` service: migration for availability_rules, time_off, appointments (with the exclusion constraint), with RLS
+- [x] `scheduling` service: migration for booking_settings, availability_rules, time_off, appointments (exclusion constraint, whole-minute check), with RLS
 - [x] Seed specializations (AR/EN names, scope descriptions, always-escalate topics); doctors created by `nafas_identity.cli create-doctor`
-- [ ] `utils/scheduling.py`: slot generation, holds and confirm, timezone handling, natural-time parsing; unit tests including DST, overlap races and minute precision
+- [x] Scheduling logic: slot generation, minute-exact checks with reasons, suggestions, hold/confirm/cancel, lapsed holds, `TimeExpression` resolution (the LLM extracts, code resolves); tests for DST, a real concurrent race, and minute precision
+- [x] `nafas_scheduling.cli set-hours` / `time-off` for admins
 - [ ] Doctor auth routes (login/logout/me) and admin-created doctor accounts
 
 **Phase 2: Telegram and booking by text** (creates `channels` and `conversation`)
