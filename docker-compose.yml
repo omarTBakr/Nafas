@@ -75,6 +75,8 @@ services:
       # laptop only; production injects a real secret
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token}
       JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-me-in-any-real-deployment}
+      # plain http on a laptop
+      SESSION_COOKIE_SECURE: "false"
     ports:
       - "8000:8000"
     depends_on:

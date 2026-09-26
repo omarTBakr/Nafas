@@ -74,6 +74,7 @@ class Settings(BaseSettings):
 
     jwt_secret: SecretStr = Field(SecretStr(""), description="Signs doctor dashboard sessions; required before auth runs")
     jwt_ttl_minutes: int = Field(720, description="Lifetime of a dashboard session")
+    session_cookie_secure: bool = Field(True, description="Send the session cookie over HTTPS only (browsers exempt localhost)")
 
     log_level: str = Field("INFO", description="Root log level: DEBUG, INFO, WARNING, ERROR")
 

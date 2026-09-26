@@ -15,12 +15,18 @@ INTERNAL_TOKEN_HEADER = "X-Internal-Token"
 
 
 async def require_internal_token(x_internal_token: str | None = Header(default=None)) -> None:
-    """A FastAPI dependency: 401 unless the header matches INTERNAL_API_TOKEN, which must be set."""
+    """
+    A FastAPI dependency: 403 unless the header matches INTERNAL_API_TOKEN, which must be set.
+
+    403, not 401: internal APIs use 401 for the caller's *users* (bad
+    credentials), and a caller must be able to tell that apart from being
+    misconfigured itself.
+    """
     expected = get_setting().internal_api_token.get_secret_value()
 
     # an unset token refuses everything rather than accepting everything
     if not expected or not x_internal_token or not hmac.compare_digest(x_internal_token, expected):
-        raise HTTPException(status_code=401, detail="internal token missing or wrong")
+        raise HTTPException(status_code=403, detail="internal token missing or wrong")
 
 
 def internal_headers() -> dict[str, str]:

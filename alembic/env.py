@@ -48,9 +48,23 @@ def include_name(name, type_, parent_names) -> bool:
     return True
 
 
+def include_object(obj, name, type_, reflected, compare_to) -> bool:
+    """
+    Leave foreign keys into another service's schema out of the comparison.
+
+    Services declare them in their migrations but not on their ORM models, so
+    that no service needs another's code to run (see nafas_scheduling.models);
+    compared, every one would look like something to drop.
+    """
+    if type_ == "foreign_key_constraint":
+        return obj.referred_table.schema == obj.table.schema
+
+    return True
+
+
 # every service keeps its tables in a schema of its own, which autogenerate
 # only looks at when asked
-COMPARE_OPTIONS = {"include_schemas": True, "include_name": include_name}
+COMPARE_OPTIONS = {"include_schemas": True, "include_name": include_name, "include_object": include_object}
 
 
 def database_url() -> str:

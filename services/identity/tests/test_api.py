@@ -23,7 +23,7 @@ async def client(monkeypatch):
 async def test_the_internal_api_refuses_calls_without_the_token(client):
     response = await client.post("/internal/v1/auth/verify", json={"email": "a@b.c", "password": "x"})
 
-    assert response.status_code == 401
+    assert response.status_code == 403
 
 
 async def test_an_unset_token_refuses_everything(client, monkeypatch):
@@ -34,7 +34,7 @@ async def test_an_unset_token_refuses_everything(client, monkeypatch):
         "/internal/v1/auth/verify", json={"email": "a@b.c", "password": "x"}, headers={"X-Internal-Token": ""}
     )
 
-    assert response.status_code == 401
+    assert response.status_code == 403
 
 
 async def test_verify_returns_the_account(two_doctors, client):

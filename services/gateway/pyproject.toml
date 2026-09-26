@@ -5,8 +5,8 @@ description = "The HTTP edge of the Nafas doctor dashboard"
 license = "PolyForm-Noncommercial-1.0.0"
 requires-python = ">=3.12"
 dependencies = [
-    "argon2-cffi>=25.1.0",
     "fastapi>=0.141.1",
+    "httpx>=0.28.1",
     "nafas-core",
     "pyjwt>=2.15.0",
     "python-multipart>=0.0.32",

@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, date, datetime, time
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, SmallInteger, String, Text, Time, func, text
+from sqlalchemy import CheckConstraint, Date, DateTime, Index, SmallInteger, String, Text, Time, func, text
 from sqlalchemy.dialects.postgresql import ENUM, UUID, ExcludeConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,9 +21,15 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
+# References into identity (doctor_id, patient_id) are foreign keys in the
+# database — the migration creates them, and alembic/env.py leaves them out of
+# comparison — but plain columns here. An ORM ForeignKey would make this
+# service load identity's models just to flush, and a service must run on its
+# own code alone (PLAN §4).
+
+
 def _doctor_id(**kwargs) -> Mapped[uuid.UUID]:
-    # the one kind of cross-service reference the plan allows (PLAN §4)
-    return mapped_column(ForeignKey("identity.doctors.id"), **kwargs)
+    return mapped_column(UUID(as_uuid=True), **kwargs)
 
 
 class BookingSettings(Base):
@@ -110,7 +116,7 @@ class Appointment(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     doctor_id: Mapped[uuid.UUID] = _doctor_id()
-    patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("identity.patients.id"), index=True)
+    patient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
     starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ends_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     status: Mapped[AppointmentStatus] = mapped_column(_enum(AppointmentStatus, "appointment_status"))

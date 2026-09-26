@@ -48,7 +48,17 @@ cp .env.example .env          # optional: every setting already has a default
 
 make up                       # Postgres :5433, Temporal :7234 (UI :8234), S3 :8333, services
 make migrate                  # apply database migrations
+make seed                     # the specializations
 make storage                  # create the bucket
+```
+
+A doctor to log in as, with hours to book:
+
+```bash
+uv run python -m nafas_identity.cli create-doctor --email dr@example.com \
+  --name-en "Dr Example" --name-ar "د. مثال" --specialization cardiology
+uv run python -m nafas_scheduling.cli set-hours --doctor-id <printed id> \
+  --hours wed=17:00-21:00 --hours sat=10:00-14:00/in_person
 ```
 
 Check it works:
@@ -68,7 +78,8 @@ they say.
 
 | Service | Where | What |
 | --- | --- | --- |
-| gateway | :8000 | the dashboard's HTTP edge; `GET /health` |
+| gateway | :8000 | the dashboard's HTTP edge: `/api/auth/login`, `/logout`, `/me`; `GET /health` |
+| identity | :8010 | internal API (behind `X-Internal-Token`): credential checks and accounts |
 | dialect-router | :8410 | Arabic dialect identification on the GPU; `POST /v1/classify`, `/health`, `/metrics` |
 
 ### One service on the host
@@ -86,7 +97,9 @@ uv run python -m nafas_gateway.main
 ```
 packages/core/         nafas_core: settings, logging, LangSmith tracing, db, Temporal,
                        provider interfaces, shared enums and exceptions
-services/gateway/      nafas_gateway: the dashboard's HTTP edge
+services/gateway/      nafas_gateway: the dashboard's HTTP edge (login, sessions)
+services/identity/     nafas_identity: accounts, doctors, patients, consents
+services/scheduling/   nafas_scheduling: hours and appointments, to the minute
 services/dialect_router/   GPU inference service, outside the workspace
 alembic/               one migration history for every service's schema
 docker/                the shared Dockerfile for workspace services
@@ -95,6 +108,7 @@ docker/                the shared Dockerfile for workspace services
 The service map and its rules are in [docs/PLAN.md §4](docs/PLAN.md). In short:
 - A service owns one Postgres schema and one Temporal task queue (`nafas_core.temporal.TaskQueue`).
 - It reaches anything else only by calling the service that owns it.
+- Foreign keys into another service's schema live in the migrations, never on ORM models, so a service runs on its own code alone.
 
 GPU services such as `dialect_router` sit outside the workspace, with their own
 lockfile (CUDA-pinned PyTorch) and their own Dockerfile.

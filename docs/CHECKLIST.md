@@ -22,7 +22,7 @@ The order of work for [PLAN.md](PLAN.md). Each item is ticked in the same commit
 - [x] Seed specializations (AR/EN names, scope descriptions, always-escalate topics); doctors created by `nafas_identity.cli create-doctor`
 - [x] Scheduling logic: slot generation, minute-exact checks with reasons, suggestions, hold/confirm/cancel, lapsed holds, `TimeExpression` resolution (the LLM extracts, code resolves); tests for DST, a real concurrent race, and minute precision
 - [x] `nafas_scheduling.cli set-hours` / `time-off` for admins
-- [ ] Doctor auth routes (login/logout/me) and admin-created doctor accounts
+- [x] Doctor auth: gateway `/api/auth/login|logout|me` (signed httpOnly session, account re-checked every request) over identity's internal API; admin-created accounts only
 
 **Phase 2: Telegram and booking by text** (creates `channels` and `conversation`)
 - [ ] Telegram adapter (webhook, secret-token check) and the `/telegram/webhook` route
