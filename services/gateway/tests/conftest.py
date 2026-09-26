@@ -28,6 +28,7 @@ from nafas_core.interfaces.storage.fake import InMemoryStorage
 from nafas_doctor_assistant.api import app as assistant_app
 from nafas_gateway.limits import limiter
 from nafas_gateway.main import app as gateway
+from nafas_gateway.sessions import accounts
 from nafas_identity.api import app as identity_app
 from nafas_identity.logic.accounts import create_doctor_account
 from nafas_identity.logic.seed import seed_specializations
@@ -101,10 +102,12 @@ def storage():
 
 @pytest.fixture(autouse=True)
 def fresh_limits():
-    """Every test starts with empty rate-limit windows."""
+    """Every test starts with empty rate-limit windows and no remembered accounts."""
     limiter.reset()
+    accounts.clear()
     yield
     limiter.reset()
+    accounts.clear()
 
 
 def browser() -> httpx.AsyncClient:

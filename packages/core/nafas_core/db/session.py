@@ -20,8 +20,17 @@ def get_engine() -> AsyncEngine:
     global _engine
     if _engine is None:
         # pre_ping: a pooled connection dropped by a Postgres restart is
-        # replaced quietly instead of failing the next request
-        _engine = create_async_engine(get_setting().database_url, pool_pre_ping=True)
+        # replaced quietly instead of failing the next request. The pool is
+        # sized so that busy periods reuse connections: one past the pool is
+        # opened and closed per checkout, and opening costs a TLS handshake
+        # and a SCRAM exchange (found by the load test, docs/operations/capacity.md)
+        settings = get_setting()
+        _engine = create_async_engine(
+            settings.database_url,
+            pool_pre_ping=True,
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_max_overflow,
+        )
 
     return _engine
 

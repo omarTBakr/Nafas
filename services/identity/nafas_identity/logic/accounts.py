@@ -11,7 +11,12 @@ from nafas_core.enums.identity import Language, UserRole
 from nafas_identity.enums import ConsentKind
 from nafas_identity.exceptions import AccountExistsError, UnknownSpecializationError
 from nafas_identity.logic import consents
-from nafas_identity.logic.passwords import DUMMY_HASH, hash_password, needs_rehash, verify_password
+from nafas_identity.logic.passwords import (
+    DUMMY_HASH,
+    hash_password_off_loop,
+    needs_rehash,
+    verify_password_off_loop,
+)
 from nafas_identity.models import Doctor, Patient, Specialization, User
 
 
@@ -53,7 +58,7 @@ async def create_doctor_account(
     if specialization_id is None:
         raise UnknownSpecializationError(f"no specialization {specialization_code!r}")
 
-    user = User(email=email, password_hash=hash_password(password), role=UserRole.DOCTOR)
+    user = User(email=email, password_hash=await hash_password_off_loop(password), role=UserRole.DOCTOR)
     session.add(user)
     await session.flush()
 
@@ -92,7 +97,7 @@ async def register_patient_account(
     if await _email_taken(session, email):
         raise AccountExistsError(f"an account for {email} already exists")
 
-    user = User(email=email, password_hash=hash_password(password), role=UserRole.PATIENT)
+    user = User(email=email, password_hash=await hash_password_off_loop(password), role=UserRole.PATIENT)
     session.add(user)
     await session.flush()
 
@@ -138,14 +143,14 @@ async def authenticate(session: AsyncSession, email: str, password: str) -> Auth
     user = await session.scalar(select(User).where(func.lower(User.email) == email.lower()))
 
     if user is None:
-        verify_password(DUMMY_HASH, password)
+        await verify_password_off_loop(DUMMY_HASH, password)
         return None
 
-    if not verify_password(user.password_hash, password) or not user.is_active:
+    if not await verify_password_off_loop(user.password_hash, password) or not user.is_active:
         return None
 
     if needs_rehash(user.password_hash):
-        user.password_hash = hash_password(password)
+        user.password_hash = await hash_password_off_loop(password)
     user.last_login_at = datetime.now(UTC)
 
     doctor_id, patient_id = await _person_ids(session, user)

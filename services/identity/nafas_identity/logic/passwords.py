@@ -1,3 +1,5 @@
+import asyncio
+
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 
@@ -31,3 +33,16 @@ def needs_rehash(password_hash: str) -> bool:
 # verified against when the email is unknown, so a wrong email takes as long
 # as a wrong password and response time does not reveal who has an account
 DUMMY_HASH = _hasher.hash("not-a-real-password-for-timing-only")
+
+
+# argon2 spends tens of milliseconds of CPU on purpose. Run inline, it would
+# stall the service's event loop for every request in flight; in a thread it
+# does not (argon2-cffi releases the GIL while it works).
+
+
+async def hash_password_off_loop(password: str) -> str:
+    return await asyncio.to_thread(hash_password, password)
+
+
+async def verify_password_off_loop(password_hash: str, password: str) -> bool:
+    return await asyncio.to_thread(verify_password, password_hash, password)

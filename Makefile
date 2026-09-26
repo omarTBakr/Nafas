@@ -7,7 +7,7 @@ export GIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null)
 
 COMPOSE := docker compose
 
-.PHONY: up up-cpu down ps logs build db-roles migrate seed storage test test-web web-dev test-gpu-services gpu-check monitoring export-feedback
+.PHONY: up up-cpu down ps logs build db-roles migrate seed storage test test-web web-dev test-gpu-services gpu-check monitoring export-feedback load-test
 
 up:  ## the whole stack, GPU services on the GPU
 	$(COMPOSE) up -d --build
@@ -58,6 +58,9 @@ test-gpu-services:
 
 monitoring:  ## Prometheus on :9090 and Grafana on :3000 beside the stack
 	$(COMPOSE) --profile monitoring up -d prometheus grafana
+
+load-test:  ## 50 simulated patients for a minute against the gateway; fails on a missed SLO
+	uv run python -m scripts.load_test --users 50 --seconds 60
 
 export-feedback:  ## de-identified feedback datasets into data/feedback/<date> (needs FEEDBACK_SALT)
 	uv run python -m scripts.export_feedback

@@ -40,6 +40,8 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://nafas_service:nafas@localhost:5433/nafas",
         description="What services connect as: a role row-level security applies to",
     )
+    db_pool_size: int = Field(20, description="Database connections each process keeps open")
+    db_max_overflow: int = Field(10, description="Extra connections a process may open at a peak, closed after use")
     database_owner_url: str = Field(
         "postgresql+asyncpg://nafas:nafas@localhost:5433/nafas",
         description="The schema owner, for migrations only; RLS does not apply to it",
@@ -97,6 +99,9 @@ class Settings(BaseSettings):
     web_url: str = Field("http://localhost:8088", description="The web app's address, for links in emails")
 
     jwt_secret: SecretStr = Field(SecretStr(""), description="Signs doctor dashboard sessions; required before auth runs")
+    session_check_seconds: int = Field(
+        30, description="How long the gateway trusts an account it confirmed with identity; 0 asks every time"
+    )
     jwt_ttl_minutes: int = Field(720, description="Lifetime of a dashboard session")
     session_cookie_secure: bool = Field(True, description="Send the session cookie over HTTPS only (browsers exempt localhost)")
 
