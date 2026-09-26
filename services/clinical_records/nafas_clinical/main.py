@@ -9,16 +9,14 @@ from nafas_core.config import get_setting
 from nafas_core.interfaces.embeddings import get_embeddings
 from nafas_core.interfaces.llm import get_llm
 from nafas_core.interfaces.storage.factory import get_storage
-from nafas_core.logger import setup_logging
+from nafas_core.startup import start_service
 from nafas_core.temporal import TaskQueue, serve_with_worker
-from nafas_core.tracing import configure_tracing
 
 PORT = 8050
 
 
 def main() -> None:
-    setup_logging()
-    configure_tracing()
+    start_service("clinical-records")
     activities = ClinicalActivities(get_storage(), get_embeddings(), get_llm(), get_setting().llm_chat_model)
     asyncio.run(
         serve_with_worker(app, port=PORT, task_queue=TaskQueue.CLINICAL, workflows=WORKFLOWS, activities=activities.all())

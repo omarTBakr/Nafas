@@ -21,6 +21,7 @@ from nafas_core.interfaces.llm import LLM
 from nafas_core.interfaces.storage.base import Storage
 from nafas_core.interfaces.stt.base import STT
 from nafas_core.logger import get_logger
+from nafas_core.metrics import VISIT_NOTES, WORKFLOW_FAILURES
 
 logger = get_logger(__name__)
 
@@ -120,6 +121,8 @@ class ConsultationActivities:
             consultation = await consultations.get(session, uuid.UUID(failure.consultation_id))
             if consultation.status is not ConsultationStatus.DISCARDED:
                 consultations.mark(consultation, ConsultationStatus.FAILED, failure.error[:500])
+                VISIT_NOTES.labels("failed").inc()
+                WORKFLOW_FAILURES.labels("consultation").inc()
 
     def all(self) -> list:
         return [self.transcribe, self.draft, self.file, self.discard, self.mark_failed]

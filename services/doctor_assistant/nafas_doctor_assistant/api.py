@@ -20,8 +20,10 @@ from nafas_core.clients.conversation import get_conversation
 from nafas_core.clients.identity import get_identity
 from nafas_core.clients.scheduling import get_scheduling
 from nafas_core.config import get_setting
+from nafas_core.health import health_info
 from nafas_core.interfaces.llm import get_llm
 from nafas_core.internal_api import require_internal_token
+from nafas_core.metrics import instrument
 from nafas_doctor_assistant.logic.chat import run_doctor_chat
 from nafas_doctor_assistant.logic.tools import DoctorTools
 from nafas_doctor_assistant.prompts import doctor_chat
@@ -104,9 +106,10 @@ async def chat(doctor_id: uuid.UUID, body: ChatIn):
 
 
 app = FastAPI(title="Nafas doctor assistant (internal)")
+instrument(app, "doctor-assistant")
 app.include_router(router, dependencies=[Depends(require_internal_token)])
 
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "prompt_version": doctor_chat.PROMPT_VERSION}
+    return health_info("doctor-assistant", **{"prompts": {"doctor_chat": doctor_chat.PROMPT_VERSION}})

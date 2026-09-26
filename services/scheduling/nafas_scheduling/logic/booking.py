@@ -16,6 +16,7 @@ from sqlalchemy import and_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from nafas_core.metrics import BOOKINGS
 from nafas_scheduling.enums import BLOCKING_STATUSES, AppointmentMode, AppointmentStatus, Unavailable
 from nafas_scheduling.exceptions import (
     AppointmentNotFoundError,
@@ -179,6 +180,7 @@ async def hold(
             raise SlotUnavailableError(Unavailable.TAKEN, "another booking took this time first") from exc
         raise
 
+    BOOKINGS.labels("held").inc()
     return appointment
 
 
@@ -204,6 +206,7 @@ async def confirm(session: AsyncSession, appointment_id: uuid.UUID, now: datetim
     appointment.status = AppointmentStatus.CONFIRMED
     appointment.hold_expires_at = None
     await session.flush()
+    BOOKINGS.labels("confirmed").inc()
 
     return appointment
 
@@ -219,6 +222,7 @@ async def cancel(session: AsyncSession, appointment_id: uuid.UUID) -> Appointmen
     appointment.status = AppointmentStatus.CANCELLED
     appointment.hold_expires_at = None
     await session.flush()
+    BOOKINGS.labels("cancelled").inc()
 
     return appointment
 
@@ -276,6 +280,7 @@ async def expire_hold(session: AsyncSession, appointment_id: uuid.UUID, now: dat
     appointment.status = AppointmentStatus.CANCELLED
     appointment.hold_expires_at = None
     await session.flush()
+    BOOKINGS.labels("hold_expired").inc()
     return True
 
 
@@ -287,6 +292,7 @@ async def complete(session: AsyncSession, appointment_id: uuid.UUID) -> bool:
 
     appointment.status = AppointmentStatus.COMPLETED
     await session.flush()
+    BOOKINGS.labels("completed").inc()
     return True
 
 
@@ -302,4 +308,5 @@ async def mark_no_show(session: AsyncSession, appointment_id: uuid.UUID, now: da
 
     appointment.status = AppointmentStatus.NO_SHOW
     await session.flush()
+    BOOKINGS.labels("no_show").inc()
     return appointment

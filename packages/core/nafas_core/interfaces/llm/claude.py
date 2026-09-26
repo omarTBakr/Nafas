@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from time import perf_counter
 from typing import Any
 
 import anthropic
@@ -8,6 +9,7 @@ from langsmith import traceable
 from nafas_core.exceptions.providers import LLMError, LLMRefusalError
 from nafas_core.interfaces.llm.base import StreamEvent
 from nafas_core.logger import get_logger
+from nafas_core.metrics import count_llm
 
 logger = get_logger(__name__)
 
@@ -74,22 +76,27 @@ class AnthropicLLM:
         # ls_* metadata is how LangSmith knows the provider and model for pricing
         trace_metadata = {"ls_provider": "anthropic", "ls_model_name": params.get("model")}
 
+        started = perf_counter()
         try:
             response = await _traced_create(self._client, params, langsmith_extra={"metadata": trace_metadata})
         except anthropic.APIStatusError as exc:
             # 4xx other than 408/409/429 is a bug in the request, 5xx outlived
             # the SDK's retries; either way the caller cannot fix it by retrying
+            count_llm(params.get("model"), "error", perf_counter() - started)
             logger.error("claude call failed: %s (request %s)", exc.status_code, exc.request_id)
             raise LLMError(f"Claude returned {exc.status_code}: {exc.message}") from exc
         except anthropic.APIConnectionError as exc:
+            count_llm(params.get("model"), "error", perf_counter() - started)
             raise LLMError(f"could not reach Claude: {exc}") from exc
 
+        count_llm(params.get("model"), _outcome(response), perf_counter() - started, response.usage)
         _refused(response)
         return response
 
     async def stream(self, **params: Any) -> AsyncIterator[StreamEvent]:
         """Text as Claude writes it, then the final message, traced as one LLM run like `create`."""
         final: Message | None = None
+        started = perf_counter()
         try:
             async with self._client.messages.stream(**params) as streamed:
                 async for text in streamed.text_stream:
@@ -102,9 +109,15 @@ class AnthropicLLM:
             raise LLMError(f"could not reach Claude: {exc}") from exc
         finally:
             _trace_stream(params, final)
+            outcome = _outcome(final) if final else "error"
+            count_llm(params.get("model"), outcome, perf_counter() - started, final.usage if final else None)
 
         _refused(final)
         yield StreamEvent(message=final)
+
+
+def _outcome(response: Message) -> str:
+    return {"refusal": "refusal", "max_tokens": "truncated"}.get(response.stop_reason, "ok")
 
 
 def _refused(response: Message) -> None:

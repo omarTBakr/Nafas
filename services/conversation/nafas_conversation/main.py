@@ -17,16 +17,14 @@ from nafas_core.interfaces.llm import get_llm
 from nafas_core.interfaces.storage.factory import get_storage
 from nafas_core.interfaces.stt.factory import get_stt
 from nafas_core.interfaces.tts import get_tts
-from nafas_core.logger import setup_logging
+from nafas_core.startup import start_service
 from nafas_core.temporal import TaskQueue, serve_with_worker
-from nafas_core.tracing import configure_tracing
 
 PORT = 8040
 
 
 def main() -> None:
-    setup_logging()
-    configure_tracing()
+    start_service("conversation")
     settings = get_setting()
     activities = ConversationActivities(
         get_llm(),

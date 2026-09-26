@@ -8,8 +8,10 @@ from nafas_core.clients.base import UpstreamRefusal
 from nafas_core.config import get_setting
 from nafas_core.exceptions.config import ConfigurationError
 from nafas_core.exceptions.providers import ProviderError
-from nafas_core.logger import get_logger, setup_logging
-from nafas_core.tracing import configure_tracing
+from nafas_core.health import health_info
+from nafas_core.logger import get_logger
+from nafas_core.metrics import instrument
+from nafas_core.startup import start_service
 from nafas_gateway.errors import Refusal
 from nafas_gateway.routes import (
     assistant,
@@ -30,6 +32,7 @@ from nafas_gateway.sessions import signing_secret
 logger = get_logger(__name__)
 
 app = FastAPI(title="Nafas gateway", description="HTTP edge for the Nafas doctor dashboard")
+instrument(app, "gateway")
 
 # Each router's routes declare the session they need (current_patient,
 # current_doctor, current_account) because the web app mixes public routes
@@ -78,12 +81,11 @@ async def misconfigured(request: Request, exc: ConfigurationError) -> JSONRespon
 @app.get("/health")
 async def health() -> dict:
     """Open on purpose: a monitor should not need a secret to see we are alive."""
-    return {"status": "ok"}
+    return health_info("gateway")
 
 
 def main() -> None:
-    setup_logging()
-    configure_tracing()
+    start_service("gateway")
     # no sessions without a signing secret: refuse to start rather than fail every login
     signing_secret()
     settings = get_setting()

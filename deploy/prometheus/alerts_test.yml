@@ -1,0 +1,47 @@
+# `promtool test rules deploy/prometheus/alerts_test.yml` (CI runs it): the
+# alerts fire on the series they are meant for, and stay quiet otherwise.
+rule_files:
+  - alerts.yml
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="nafas", instance="consultation:8060"}'
+        values: "1 1 0 0 0 0"
+      - series: 'up{job="nafas", instance="identity:8010"}'
+        values: "1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels: { severity: page, job: nafas, instance: "consultation:8060" }
+            exp_annotations:
+              summary: "consultation:8060 has not answered a scrape for 2 minutes"
+              runbook: docs/operations/runbook.md#a-service-is-down
+
+  - interval: 5m
+    input_series:
+      # 100 guard verdicts per 5 minutes, of which 20 blocks: 20%
+      - series: 'nafas_safety_gate_verdicts_total{gate="guard", verdict="pass"}'
+        values: "0+80x100"
+      - series: 'nafas_safety_gate_verdicts_total{gate="guard", verdict="block"}'
+        values: "0+20x100"
+    alert_rule_test:
+      - eval_time: 8h
+        alertname: GuardBlockingMore
+        exp_alerts:
+          - exp_labels: { severity: ticket }
+            exp_annotations:
+              summary: "the output guard blocks more than 10% of answers; compare with the eval baseline"
+              runbook: docs/operations/runbook.md#behaviour-drift
+
+  - interval: 5m
+    input_series:
+      - series: 'nafas_safety_gate_verdicts_total{gate="guard", verdict="pass"}'
+        values: "0+98x100"
+      - series: 'nafas_safety_gate_verdicts_total{gate="guard", verdict="block"}'
+        values: "0+2x100"
+    alert_rule_test:
+      - eval_time: 8h
+        alertname: GuardBlockingMore
+        exp_alerts: []

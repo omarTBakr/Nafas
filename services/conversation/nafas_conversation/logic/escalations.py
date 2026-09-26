@@ -15,6 +15,7 @@ from nafas_conversation.enums import EscalationReason, EscalationStatus, Message
 from nafas_conversation.exceptions import EscalationClosedError, EscalationNotFoundError
 from nafas_conversation.models import Escalation, Message
 from nafas_core.db import session_scope
+from nafas_core.metrics import ESCALATIONS
 
 
 @dataclass
@@ -35,7 +36,7 @@ async def open_escalation(
 ) -> None:
     """Idempotent on its id, which the workflow chooses."""
     async with session_scope(patient_id=patient_id) as session:
-        await session.execute(
+        opened = await session.execute(
             insert(Escalation)
             .values(
                 id=escalation_id,
@@ -48,6 +49,8 @@ async def open_escalation(
             )
             .on_conflict_do_nothing(index_elements=["id"])
         )
+        if opened.rowcount:
+            ESCALATIONS.labels(reason.value).inc()
 
 
 async def inbox(doctor_id: uuid.UUID, statuses: tuple[EscalationStatus, ...], limit: int = 100) -> list[InboxItem]:

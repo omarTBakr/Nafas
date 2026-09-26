@@ -131,3 +131,14 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  monitoring:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Alert rules parse and fire as their tests expect
+        run: |
+          docker run --rm --entrypoint promtool -v "$PWD/deploy/prometheus:/p" -w /p prom/prometheus:v3.5.0 check rules alerts.yml
+          docker run --rm --entrypoint promtool -v "$PWD/deploy/prometheus:/p" -w /p prom/prometheus:v3.5.0 test rules alerts_test.yml
+      - name: The dashboard is valid JSON
+        run: python3 -m json.tool deploy/grafana/dashboards/nafas-overview.json > /dev/null

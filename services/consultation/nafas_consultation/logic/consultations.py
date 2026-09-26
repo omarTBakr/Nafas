@@ -10,6 +10,7 @@ from nafas_consultation.enums import ConsultationStatus
 from nafas_consultation.exceptions import ConsultationNotFoundError, WrongStateError
 from nafas_consultation.models import Consultation
 from nafas_core.interfaces.storage.base import patient_key
+from nafas_core.metrics import VISIT_NOTES
 
 # what MediaRecorder produces in the browsers we support, and what the stt service reads
 AUDIO_TYPES = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "m4a", "audio/mpeg": "mp3", "audio/wav": "wav"}
@@ -93,6 +94,7 @@ def mark(consultation: Consultation, status: ConsultationStatus, error: str | No
 def forget(consultation: Consultation) -> list[str]:
     """A discarded recording keeps no words: its transcript and drafts go, and the caller deletes the audio keys returned."""
     keys = [p["key"] for p in consultation.parts]
+    VISIT_NOTES.labels("discarded").inc()
     consultation.transcript = None
     consultation.draft = None
     consultation.approved = None

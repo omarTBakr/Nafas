@@ -1,9 +1,16 @@
+from enum import StrEnum
 from pathlib import Path
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from nafas_core.enums.providers import EmbeddingsProvider, LLMProvider, StorageProvider, STTProvider
+
+
+class Environment(StrEnum):
+    DEV = "dev"
+    STAGING = "staging"
+    PROD = "prod"
 
 
 class Settings(BaseSettings):
@@ -16,6 +23,10 @@ class Settings(BaseSettings):
     rather than at the first request that needed it.
     """
 
+    environment: Environment = Field(
+        Environment.DEV, description="dev, staging or prod; staging and prod refuse laptop defaults at startup"
+    )
+    git_sha: str = Field("", description="The commit this build is from, reported on /health; set by the image build")
     api_host: str = Field("0.0.0.0", description="Host the FastAPI server binds to")
     forwarded_allow_ips: str = Field(
         "127.0.0.1", description="Proxies whose X-Forwarded-For the gateway trusts for the client's address"
@@ -90,6 +101,10 @@ class Settings(BaseSettings):
     session_cookie_secure: bool = Field(True, description="Send the session cookie over HTTPS only (browsers exempt localhost)")
 
     log_level: str = Field("INFO", description="Root log level: DEBUG, INFO, WARNING, ERROR")
+    log_format: str = Field("text", description="text for a terminal, json for a log pipeline (one object per line)")
+    metrics_token: SecretStr = Field(
+        SecretStr(""), description="When set, /metrics asks for it as a bearer token; the gateway is public, so set it there"
+    )
 
     # local scratch space; anything written here is disposable
     temp_dir: str = Field("assets", description="Local root directory for scratch files")

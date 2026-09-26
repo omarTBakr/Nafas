@@ -19,6 +19,7 @@ from nafas_core.db import session_scope
 from nafas_core.interfaces.embeddings import Embeddings
 from nafas_core.interfaces.llm import LLM
 from nafas_core.interfaces.storage.base import Storage
+from nafas_core.metrics import WORKFLOW_FAILURES
 
 # Claude reads these image types directly; others are described from their OCR text only
 VISION_TYPES = {"image/png", "image/jpeg", "image/webp"}
@@ -107,6 +108,7 @@ class ClinicalActivities:
     async def mark_failed(self, failure: Failure) -> None:
         async with session_scope(doctor_id=uuid.UUID(failure.doctor_id)) as session:
             await records.mark(session, uuid.UUID(failure.document_id), DocumentStatus.FAILED, failure.error[:500])
+        WORKFLOW_FAILURES.labels("document_ingestion").inc()
 
     def all(self) -> list:
         return [self.read_document, self.describe_image, self.index_document, self.mark_failed]

@@ -17,7 +17,9 @@ from pydantic import AwareDatetime, BaseModel
 from sqlalchemy import select, update
 
 from nafas_core.db import session_scope
+from nafas_core.health import health_info
 from nafas_core.internal_api import require_internal_token
+from nafas_core.metrics import instrument
 from nafas_scheduling.enums import AppointmentMode, AppointmentStatus, NotificationKind, Unavailable
 from nafas_scheduling.events import get_events
 from nafas_scheduling.exceptions import (
@@ -348,12 +350,13 @@ async def doctor_appointments(doctor_id: uuid.UUID, start: AwareDatetime, end: A
 
 
 app = FastAPI(title="Nafas scheduling (internal)")
+instrument(app, "scheduling")
 app.include_router(router, dependencies=[Depends(require_internal_token)])
 
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok"}
+    return health_info("scheduling")
 
 
 # domain refusals become answers a caller can act on, with the reason in the body

@@ -1,0 +1,103 @@
+# System alerts (is it up, fast, erroring) and behavioural ones (is the model
+# still behaving as it did when the evals passed). Thresholds are first
+# guesses, to be set from staging traffic; docs/operations/slo.md explains each.
+groups:
+  - name: system
+    rules:
+      - alert: ServiceDown
+        expr: up{job="nafas"} == 0
+        for: 2m
+        labels: { severity: page }
+        annotations:
+          summary: "{{ $labels.instance }} has not answered a scrape for 2 minutes"
+          runbook: docs/operations/runbook.md#a-service-is-down
+
+      - alert: HighErrorRate
+        expr: |
+          sum by (service) (rate(nafas_http_requests_total{status=~"5.."}[10m]))
+            / sum by (service) (rate(nafas_http_requests_total[10m])) > 0.02
+        for: 10m
+        labels: { severity: page }
+        annotations:
+          summary: "{{ $labels.service }}: more than 2% of requests fail (SLO: 99.5% succeed)"
+          runbook: docs/operations/runbook.md#errors
+
+      - alert: GatewaySlow
+        # the streamed assistant is measured to its first byte, so it counts here too
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(nafas_http_request_seconds_bucket{service="gateway", route!~"/api/chat.*"}[10m]))) > 1
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: "gateway p95 above 1 s outside chat (SLO: 95% under 1 s)"
+
+      - alert: ChatSlow
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(nafas_http_request_seconds_bucket{service="gateway", route=~"/api/chat.*"}[15m]))) > 12
+        for: 15m
+        labels: { severity: ticket }
+        annotations:
+          summary: "patient chat p95 above 12 s (SLO: 95% of replies within 12 s)"
+
+      - alert: ModelErrors
+        expr: |
+          sum(rate(nafas_llm_calls_total{outcome="error"}[10m])) / sum(rate(nafas_llm_calls_total[10m])) > 0.05
+        for: 10m
+        labels: { severity: page }
+        annotations:
+          summary: "more than 5% of Claude calls fail; every gate fails closed, so patients are being sent to the doctor"
+          runbook: docs/operations/runbook.md#the-model-is-failing
+
+      - alert: WorkflowFailures
+        expr: increase(nafas_workflow_failures_total[1h]) > 3
+        labels: { severity: ticket }
+        annotations:
+          summary: "{{ $labels.workflow }}: more than 3 failures in an hour"
+
+  - name: behaviour
+    rules:
+      - alert: GuardBlockingMore
+        # the output guard stopping more drafts means the answering model drifted towards advice
+        expr: |
+          sum(rate(nafas_safety_gate_verdicts_total{gate="guard", verdict="block"}[6h]))
+            / sum(rate(nafas_safety_gate_verdicts_total{gate="guard"}[6h])) > 0.10
+        for: 1h
+        labels: { severity: ticket }
+        annotations:
+          summary: "the output guard blocks more than 10% of answers; compare with the eval baseline"
+          runbook: docs/operations/runbook.md#behaviour-drift
+
+      - alert: GatesFailingClosed
+        expr: |
+          sum(rate(nafas_safety_gate_verdicts_total{verdict="failed"}[30m]))
+            / sum(rate(nafas_safety_gate_verdicts_total{gate="scope"}[30m])) > 0.05
+        for: 30m
+        labels: { severity: ticket }
+        annotations:
+          summary: "the scope gate gives no usable verdict on more than 5% of questions"
+
+      - alert: EmergencySpike
+        expr: increase(nafas_escalations_total{reason="emergency"}[1h]) > 10
+        labels: { severity: page }
+        annotations:
+          summary: "more than 10 emergency escalations in an hour: a real cluster or a keyword false positive"
+          runbook: docs/operations/runbook.md#emergency-spike
+
+      - alert: VisitNotesMostlyRewritten
+        # doctors editing nearly every draft means the summary prompt or model got worse
+        expr: |
+          sum(increase(nafas_visit_notes_total{outcome="approved_edited"}[7d]))
+            / sum(increase(nafas_visit_notes_total{outcome=~"approved_.*"}[7d])) > 0.9
+        for: 1d
+        labels: { severity: ticket }
+        annotations:
+          summary: "doctors edit more than 90% of visit-note drafts this week"
+
+      - alert: HoldsLapsing
+        expr: |
+          sum(increase(nafas_booking_events_total{event="hold_expired"}[1d]))
+            / sum(increase(nafas_booking_events_total{event="held"}[1d])) > 0.5
+        for: 6h
+        labels: { severity: ticket }
+        annotations:
+          summary: "more than half of held slots lapse unconfirmed: the confirm step may be broken"

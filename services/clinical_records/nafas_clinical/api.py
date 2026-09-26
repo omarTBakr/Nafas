@@ -22,9 +22,11 @@ from nafas_core import audit
 from nafas_core.clients.identity import get_identity
 from nafas_core.db import session_scope
 from nafas_core.exceptions.providers import StorageError
+from nafas_core.health import health_info
 from nafas_core.interfaces.embeddings import get_embeddings
 from nafas_core.interfaces.storage.factory import get_storage
 from nafas_core.internal_api import require_internal_token
+from nafas_core.metrics import instrument
 
 UPLOAD_LINK_SECONDS = 600
 
@@ -334,12 +336,13 @@ async def patient_download(patient_id: uuid.UUID, document_id: uuid.UUID) -> dic
 
 
 app = FastAPI(title="Nafas clinical records (internal)")
+instrument(app, "clinical-records")
 app.include_router(router, dependencies=[Depends(require_internal_token)])
 
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok"}
+    return health_info("clinical-records", **{"prompts": {"vision": vision.PROMPT_VERSION}})
 
 
 @app.exception_handler(RecordNotFoundError)

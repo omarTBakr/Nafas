@@ -11,16 +11,14 @@ from nafas_core.config import get_setting
 from nafas_core.interfaces.llm import get_llm
 from nafas_core.interfaces.storage.factory import get_storage
 from nafas_core.interfaces.stt.factory import get_stt
-from nafas_core.logger import setup_logging
+from nafas_core.startup import start_service
 from nafas_core.temporal import TaskQueue, serve_with_worker
-from nafas_core.tracing import configure_tracing
 
 PORT = 8060
 
 
 def main() -> None:
-    setup_logging()
-    configure_tracing()
+    start_service("consultation")
     activities = ConsultationActivities(
         get_storage(), get_stt(), get_llm(), get_identity(), get_clinical(), get_setting().llm_summary_model
     )

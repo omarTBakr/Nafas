@@ -18,13 +18,16 @@ from nafas_consultation.exceptions import ConsultationNotFoundError, NotUnderCar
 from nafas_consultation.logic import consultations
 from nafas_consultation.logic.note import Note
 from nafas_consultation.models import Consultation
+from nafas_consultation.prompts import soap
 from nafas_core import audit
 from nafas_core.clients.base import UpstreamRefusal
 from nafas_core.clients.identity import get_identity
 from nafas_core.db import session_scope
 from nafas_core.exceptions.providers import StorageError
+from nafas_core.health import health_info
 from nafas_core.interfaces.storage.factory import get_storage
 from nafas_core.internal_api import require_internal_token
+from nafas_core.metrics import VISIT_NOTES, instrument
 
 UPLOAD_LINK_SECONDS = 600
 
@@ -219,6 +222,7 @@ async def approve(doctor_id: uuid.UUID, consultation_id: uuid.UUID, body: Approv
             shared=body.share_with_patient,
             edited=consultation.draft != consultation.approved,
         )
+    VISIT_NOTES.labels("approved_edited" if consultation.draft != consultation.approved else "approved_as_drafted").inc()
     await get_events().approved(str(consultation_id))
     return _out(consultation)
 
@@ -243,12 +247,13 @@ async def discard(doctor_id: uuid.UUID, consultation_id: uuid.UUID) -> Consultat
 
 
 app = FastAPI(title="Nafas consultation (internal)")
+instrument(app, "consultation")
 app.include_router(router, dependencies=[Depends(require_internal_token)])
 
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok"}
+    return health_info("consultation", **{"prompts": {"soap": soap.PROMPT_VERSION}})
 
 
 @app.exception_handler(ConsultationNotFoundError)

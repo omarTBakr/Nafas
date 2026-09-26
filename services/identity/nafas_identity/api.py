@@ -11,7 +11,9 @@ from nafas_core import audit
 from nafas_core.db import session_scope
 from nafas_core.enums.dialect import SpokenDialect, VoiceGender
 from nafas_core.enums.identity import Language, UserRole
+from nafas_core.health import health_info
 from nafas_core.internal_api import require_internal_token
+from nafas_core.metrics import instrument
 from nafas_identity.enums import CareStatus, ConsentKind
 from nafas_identity.exceptions import AccountExistsError, ConsentNotFoundError, WeakPasswordError
 from nafas_identity.logic import consents
@@ -388,10 +390,11 @@ async def care_link(link: CareLink) -> None:
 
 
 app = FastAPI(title="Nafas identity (internal)")
+instrument(app, "identity")
 # on the router's inclusion, so an endpoint added later is covered by being added at all
 app.include_router(router, dependencies=[Depends(require_internal_token)])
 
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok"}
+    return health_info("identity")

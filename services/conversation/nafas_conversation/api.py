@@ -15,8 +15,14 @@ from nafas_conversation.events import get_events
 from nafas_conversation.exceptions import EscalationClosedError, EscalationNotFoundError
 from nafas_conversation.logic import escalations, messages, voice
 from nafas_conversation.models import Message
+from nafas_conversation.prompts import booking as booking_prompt
+from nafas_conversation.prompts import intent as intent_prompt
+from nafas_conversation.prompts import patient_chat, replies
+from nafas_conversation.prompts import safety as safety_prompt
 from nafas_core import audit
+from nafas_core.health import health_info
 from nafas_core.internal_api import require_internal_token
+from nafas_core.metrics import instrument
 
 
 class MessageOut(BaseModel):
@@ -139,9 +145,19 @@ async def reply_to_escalation(doctor_id: uuid.UUID, escalation_id: uuid.UUID, bo
 
 
 app = FastAPI(title="Nafas conversation (internal)")
+instrument(app, "conversation")
 app.include_router(router, dependencies=[Depends(require_internal_token)])
 
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok"}
+    return health_info(
+        "conversation",
+        prompts={
+            "intent": intent_prompt.PROMPT_VERSION,
+            "booking": booking_prompt.PROMPT_VERSION,
+            "patient_chat": patient_chat.PROMPT_VERSION,
+            "safety": [safety_prompt.SCOPE_VERSION, safety_prompt.SENSITIVITY_VERSION, safety_prompt.GUARD_VERSION],
+            "replies": replies.VERSION,
+        },
+    )

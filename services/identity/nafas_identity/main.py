@@ -2,16 +2,14 @@
 
 import uvicorn
 
-from nafas_core.logger import setup_logging
-from nafas_core.tracing import configure_tracing
+from nafas_core.startup import start_service
 from nafas_identity.api import app
 
 PORT = 8010
 
 
 def main() -> None:
-    setup_logging()
-    configure_tracing()
+    start_service("identity")
     uvicorn.run(app, host="0.0.0.0", port=PORT)
 
 

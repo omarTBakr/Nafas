@@ -22,6 +22,7 @@ from nafas_core.clients.scheduling import SchedulingClient
 from nafas_core.exceptions.providers import LLMError
 from nafas_core.interfaces.llm import LLM
 from nafas_core.logger import get_logger
+from nafas_core.metrics import GATE_VERDICTS
 
 logger = get_logger(__name__)
 
@@ -75,6 +76,7 @@ async def answer_medical(
     # 2. scope
     verdict = await scope_gate(llm, classifier_model, scope, history)
     record["scope"] = verdict.value if verdict else None
+    GATE_VERDICTS.labels("scope", record["scope"] or "failed").inc()
     if verdict is None:
         return escalated(doctor, language, EscalationReason.UNCLEAR, record)
     if verdict is Scope.NON_MEDICAL:
@@ -85,6 +87,7 @@ async def answer_medical(
     # 3. sensitivity
     sensitivity = await sensitivity_gate(llm, classifier_model, scope, history)
     record["sensitivity"] = sensitivity.category
+    GATE_VERDICTS.labels("sensitivity", sensitivity.category if sensitivity.sensitive else "general").inc()
     if sensitivity.sensitive:
         return escalated(doctor, language, EscalationReason.SENSITIVE, record)
 
@@ -107,6 +110,7 @@ async def answer_medical(
     # 5. the guard reads it before the patient does
     passed = bool(draft) and await output_guard(llm, classifier_model, question, draft)
     record["guard"] = "pass" if passed else "block"
+    GATE_VERDICTS.labels("guard", record["guard"]).inc()
     if not passed:
         return escalated(doctor, language, EscalationReason.OUTPUT_GUARD, record)
 

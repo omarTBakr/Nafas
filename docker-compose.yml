@@ -14,7 +14,8 @@ services:
   postgres:
     # pgvector for embeddings; btree_gist (for the appointment exclusion
     # constraint) ships with Postgres and is enabled by the first migration
-    image: pgvector/pgvector:pg16
+    # images pinned by digest (Phase 9): the same bytes on every machine; bump deliberately
+    image: pgvector/pgvector:pg16@sha256:ccc6e83d6e35e931dc7c5def2022729d5a6c370318d099181995567ff1fb4d6b
     environment:
       POSTGRES_USER: nafas
       POSTGRES_PASSWORD: nafas
@@ -33,7 +34,8 @@ services:
   temporal:
     # the single-binary dev server: frontend on 7234, web UI on 8234,
     # state in a SQLite file on the volume so workflows survive a restart
-    image: temporalio/temporal:latest
+    # temporal CLI 1.9.1 (server 1.32.0, UI 2.54.1)
+    image: temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e
     # the image's own user cannot write to a fresh named volume
     user: root
     command: ["server", "start-dev", "--ip", "0.0.0.0", "--db-filename", "/data/temporal.db"]
@@ -48,7 +50,8 @@ services:
     # only speaks S3, so production can point at any S3-compatible store.
     # Laptop credentials live in deploy/seaweedfs/s3.json; the bucket is
     # created by `uv run python -m scripts.init_storage`.
-    image: chrislusf/seaweedfs:latest
+    # seaweedfs 4.47
+    image: chrislusf/seaweedfs@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882
     command: ["server", "-dir=/data", "-s3", "-s3.port=8333", "-s3.config=/etc/seaweedfs/s3.json", "-ip.bind=0.0.0.0"]
     ports:
       - "8333:8333"
@@ -63,6 +66,7 @@ services:
       context: .
       dockerfile: docker/service.Dockerfile
       args:
+        GIT_SHA: ${GIT_SHA:-}
         PACKAGE: nafas-gateway
         MODULE: nafas_gateway.main
     image: nafas/gateway:dev
@@ -84,6 +88,10 @@ services:
       # laptop only; production injects a real secret
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token}
       JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-me-in-any-real-deployment}
+      # /metrics asks for it; Prometheus reads the same value from deploy/prometheus/metrics-token.dev
+      METRICS_TOKEN: ${METRICS_TOKEN:-dev-metrics-token}
+      ENVIRONMENT: ${ENVIRONMENT:-dev}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
       # plain http on a laptop
       SESSION_COOKIE_SECURE: "false"
       # the gateway keys rate limits on the client address from X-Forwarded-For;
@@ -105,6 +113,7 @@ services:
       context: .
       dockerfile: docker/service.Dockerfile
       args:
+        GIT_SHA: ${GIT_SHA:-}
         PACKAGE: nafas-identity
         MODULE: nafas_identity.main
     image: nafas/identity:dev
@@ -125,6 +134,7 @@ services:
       context: .
       dockerfile: docker/service.Dockerfile
       args:
+        GIT_SHA: ${GIT_SHA:-}
         PACKAGE: nafas-scheduling
         MODULE: nafas_scheduling.main
     image: nafas/scheduling:dev
@@ -145,6 +155,7 @@ services:
       context: .
       dockerfile: docker/service.Dockerfile
       args:
+        GIT_SHA: ${GIT_SHA:-}
         PACKAGE: nafas-conversation
         MODULE: nafas_conversation.main
     image: nafas/conversation:dev
@@ -208,6 +219,7 @@ services:
       context: .
       dockerfile: docker/service.Dockerfile
       args:
+        GIT_SHA: ${GIT_SHA:-}
         PACKAGE: nafas-doctor-assistant
         MODULE: nafas_doctor_assistant.main
     image: nafas/doctor-assistant:dev
@@ -229,6 +241,7 @@ services:
       context: .
       dockerfile: docker/service.Dockerfile
       args:
+        GIT_SHA: ${GIT_SHA:-}
         PACKAGE: nafas-clinical-records
         MODULE: nafas_clinical.main
         # scanned pages and images are read by OCR, in Arabic and English
@@ -253,6 +266,7 @@ services:
       context: .
       dockerfile: docker/service.Dockerfile
       args:
+        GIT_SHA: ${GIT_SHA:-}
         PACKAGE: nafas-consultation
         MODULE: nafas_consultation.main
     image: nafas/consultation:dev
@@ -269,9 +283,34 @@ services:
       temporal:
         condition: service_started
 
+  # `docker compose --profile monitoring up`: metrics, alerts and dashboards on a laptop
+  prometheus:
+    profiles: [monitoring]
+    image: prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - ./deploy/prometheus/metrics-token.dev:/etc/prometheus/metrics-token:ro
+    ports:
+      - "9090:9090"
+
+  grafana:
+    profiles: [monitoring]
+    image: grafana/grafana:12.1.0@sha256:6ac590e7cabc2fbe8d7b8fc1ce9c9f0582177b334e0df9c927ebd9670469440f
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
   mailpit:
     # catches every email on a laptop; nothing leaves the machine
-    image: axllent/mailpit:latest
+    image: axllent/mailpit@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
     ports:
       - "8025:8025"
       - "1025:1025"

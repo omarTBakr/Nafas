@@ -1,9 +1,26 @@
+import json
 import logging
+from datetime import UTC, datetime
 
 from nafas_core import redaction
 from nafas_core.config import get_setting
 
 _configured = False
+
+
+class JsonFormatter(logging.Formatter):
+    """One JSON object per line, for a log pipeline; the message is already redacted by the record factory."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        entry = {
+            "ts": datetime.fromtimestamp(record.created, UTC).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        if record.exc_info:
+            entry["exception"] = self.formatException(record.exc_info)
+        return json.dumps(entry, ensure_ascii=False)
 
 
 def setup_logging() -> None:
@@ -21,9 +38,13 @@ def setup_logging() -> None:
     # before anything logs: patient data never reaches a handler
     redaction.install()
 
-    level = get_setting().log_level.upper()
+    settings = get_setting()
+    level = settings.log_level.upper()
 
     logging.basicConfig(level=level, format="%(asctime)s %(levelname)-8s %(name)s: %(message)s")
+    if settings.log_format == "json":
+        for handler in logging.getLogger().handlers:
+            handler.setFormatter(JsonFormatter())
 
     # basicConfig is a no-op when the root logger already has handlers, which is
     # the case under uvicorn and pytest, so set the level explicitly as well.

@@ -9,4 +9,7 @@ def test_health_is_open():
         response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok" and body["service"] == "gateway"
+    # names and versions only: never a secret
+    assert "secret" not in response.text.lower() and "token" not in response.text.lower()

@@ -2,10 +2,12 @@
 # Docker Desktop (often the default context) runs in a VM that cannot see the
 # GPU, and the dialect-router needs it. Override with DOCKER_CONTEXT=... if needed.
 export DOCKER_CONTEXT ?= default
+# baked into every image and reported on /health
+export GIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null)
 
 COMPOSE := docker compose
 
-.PHONY: up up-cpu down ps logs build db-roles migrate seed storage test test-web web-dev test-gpu-services gpu-check
+.PHONY: up up-cpu down ps logs build db-roles migrate seed storage test test-web web-dev test-gpu-services gpu-check monitoring
 
 up:  ## the whole stack, GPU services on the GPU
 	$(COMPOSE) up -d --build
@@ -53,6 +55,9 @@ test-gpu-services:
 	cd services/stt && uv run pytest
 	cd services/tts && uv run pytest
 	cd services/embeddings && uv run pytest
+
+monitoring:  ## Prometheus on :9090 and Grafana on :3000 beside the stack
+	$(COMPOSE) --profile monitoring up -d prometheus grafana
 
 gpu-check:  ## prove a container can see the GPU
 	docker run --rm --device nvidia.com/gpu=all ubuntu:24.04 nvidia-smi -L
