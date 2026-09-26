@@ -83,6 +83,13 @@ class Settings(BaseSettings):
     clinical_url: str = Field("http://localhost:8050", description="Base URL of the clinical-records service's internal API")
     consultation_url: str = Field("http://localhost:8060", description="Base URL of the consultation service's internal API")
 
+    livekit_url: str = Field("", description="The LiveKit address browsers connect to (wss://...); empty turns online visits off")
+    livekit_api_url: str = Field("", description="The LiveKit address services call; defaults to livekit_url")
+    livekit_api_key: str = Field("", description="LiveKit API key")
+    livekit_api_secret: SecretStr = Field(SecretStr(""), description="LiveKit API secret: signs join tokens, verifies webhooks")
+    egress_s3_endpoint: str = Field(
+        "", description="The S3 endpoint as the LiveKit egress container reaches it; defaults to S3_ENDPOINT_URL"
+    )
     internal_api_token: SecretStr = Field(
         SecretStr(""), description="Shared secret on service-to-service calls; empty refuses them all"
     )

@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from nafas_consultation import online_api
 from nafas_consultation.enums import DISCARDABLE, ConsultationStatus
 from nafas_consultation.events import get_events
 from nafas_consultation.exceptions import ConsultationNotFoundError, NotUnderCareError, WrongStateError
@@ -57,6 +58,8 @@ class ConsultationOut(BaseModel):
     status: ConsultationStatus
     error: str | None
     part_count: int
+    source: str = "in_person"
+    recording: bool = False
     share_with_patient: bool
     started_at: datetime
     approved_at: datetime | None
@@ -79,6 +82,8 @@ def _out(c: Consultation) -> ConsultationOut:
         status=c.status,
         error=c.error,
         part_count=len(c.parts),
+        source=c.source,
+        recording=c.status is ConsultationStatus.RECORDING and c.source == "online" and c.recording_stopped_at is None,
         share_with_patient=c.share_with_patient,
         started_at=c.started_at,
         approved_at=c.approved_at,
@@ -171,6 +176,11 @@ async def finish(doctor_id: uuid.UUID, consultation_id: uuid.UUID) -> Consultati
         except StorageError as exc:
             raise HTTPException(status_code=409, detail="a part of the recording has not been uploaded yet") from exc
 
+    return _out(await begin_processing(doctor_id, consultation_id))
+
+
+async def begin_processing(doctor_id: uuid.UUID, consultation_id: uuid.UUID) -> Consultation:
+    """Hands a recorded visit to its workflow: transcribe, draft, wait for the doctor. Shared by both kinds of visit."""
     async with session_scope(doctor_id=doctor_id) as session:
         consultation = await consultations.get(session, consultation_id)
         consultations.mark(consultation, ConsultationStatus.TRANSCRIBING)
@@ -179,7 +189,7 @@ async def finish(doctor_id: uuid.UUID, consultation_id: uuid.UUID) -> Consultati
         consultation = await consultations.get(session, consultation_id)
         if not started:
             consultations.mark(consultation, ConsultationStatus.FAILED, "could not start processing; try again")
-    return _out(consultation)
+    return consultation
 
 
 @router.get("/doctors/{doctor_id}/consultations", response_model=list[ConsultationOut])
@@ -249,6 +259,8 @@ async def discard(doctor_id: uuid.UUID, consultation_id: uuid.UUID) -> Consultat
 app = FastAPI(title="Nafas consultation (internal)")
 instrument(app, "consultation")
 app.include_router(router, dependencies=[Depends(require_internal_token)])
+app.include_router(online_api.router)
+app.include_router(online_api.webhooks)
 
 
 @app.get("/health")

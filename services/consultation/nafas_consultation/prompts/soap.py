@@ -4,15 +4,16 @@ summary for the patient, from one visit's transcript. A forced tool call, so
 the shape is fixed; the doctor edits and approves it before anything is filed.
 """
 
-PROMPT_VERSION = "soap-v1"
+PROMPT_VERSION = "soap-v2"
 
 SYSTEM = """\
 You draft the clinical note of one in-person visit from its transcript, for the treating doctor to review.
 
-The transcript is automatic speech recognition of the whole room, in Arabic (any dialect), English or a mix, with times from
-the start of the visit. It does not say who is speaking: tell the doctor from the patient by what is said (questions,
-examination findings and advice are usually the doctor's; symptoms and history the patient's). It has recognition errors;
-read through them, and never invent what is not there.
+The transcript is automatic speech recognition, in Arabic (any dialect), English or a mix, with times from the start of the
+visit. When its lines are labelled Doctor and Patient, the labels come from separate microphones (an online visit) and can
+be trusted. When they are not labelled, it is one microphone in the room: tell the doctor from the patient by what is said
+(questions, examination findings and advice are usually the doctor's; symptoms and history the patient's). It has
+recognition errors; read through them, and never invent what is not there.
 
 Write the note in English, the language of the record, keeping drug names, doses and numbers exactly as said.
 - subjective: what the patient reports: complaint, history of it, relevant background.
