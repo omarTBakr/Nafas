@@ -2,10 +2,10 @@
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 
-from nafas_conversation.enums import Intent, MessageRole
+from nafas_conversation.enums import Intent, MessageRole, Modality
 from nafas_conversation.models import Conversation, Message
 from nafas_core.db import session_scope
 
@@ -37,8 +37,23 @@ async def add_message(patient_id: uuid.UUID, message_id: uuid.UUID, conversation
         )
 
 
-async def add_patient_message(patient_id: uuid.UUID, message_id: uuid.UUID, conversation_id: uuid.UUID, text: str) -> None:
-    await add_message(patient_id, message_id, conversation_id, role=MessageRole.PATIENT, content=text)
+async def add_patient_message(
+    patient_id: uuid.UUID,
+    message_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    text: str,
+    modality: Modality = Modality.TEXT,
+    audio_key: str | None = None,
+) -> None:
+    await add_message(
+        patient_id,
+        message_id,
+        conversation_id,
+        role=MessageRole.PATIENT,
+        content=text,
+        modality=modality,
+        audio_key=audio_key,
+    )
 
 
 async def add_assistant_message(
@@ -51,19 +66,28 @@ async def add_assistant_message(
     prompt_version: str,
     tokens_in: int,
     tokens_out: int,
+    intent: Intent | None = None,
+    answers_message_id: uuid.UUID | None = None,
+    audio_key: str | None = None,
 ) -> None:
+    """The reply, and the intent it was answered under on the message it answers."""
     await add_message(
         patient_id,
         message_id,
         conversation_id,
         role=MessageRole.ASSISTANT,
         content=text,
-        intent=Intent.BOOKING,
+        intent=intent,
         model=model,
         prompt_version=prompt_version,
         tokens_in=tokens_in,
         tokens_out=tokens_out,
+        audio_key=audio_key,
+        modality=Modality.VOICE if audio_key else Modality.TEXT,
     )
+    if intent is not None and answers_message_id is not None:
+        async with session_scope(patient_id=patient_id) as session:
+            await session.execute(update(Message).where(Message.id == answers_message_id).values(intent=intent))
 
 
 async def recent_messages(patient_id: uuid.UUID, conversation_id: uuid.UUID, limit: int = HISTORY_LIMIT) -> list[Message]:
@@ -76,6 +100,17 @@ async def recent_messages(patient_id: uuid.UUID, conversation_id: uuid.UUID, lim
             .limit(limit)
         )
         return list(reversed(rows.all()))
+
+
+async def patient_thread(patient_id: uuid.UUID, doctor_id: uuid.UUID, limit: int) -> list[Message]:
+    """The patient's thread with this doctor, oldest first; empty before the first message."""
+    async with session_scope(patient_id=patient_id) as session:
+        conversation_id = await session.scalar(
+            select(Conversation.id).where(Conversation.patient_id == patient_id, Conversation.doctor_id == doctor_id)
+        )
+    if conversation_id is None:
+        return []
+    return await recent_messages(patient_id, conversation_id, limit)
 
 
 def model_history(messages: list[Message]) -> list[dict]:

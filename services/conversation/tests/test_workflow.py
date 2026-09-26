@@ -10,7 +10,8 @@ from temporalio.worker import Worker
 
 from nafas_conversation.client import send_patient_message
 from nafas_conversation.schemas import ConversationStart, StoredMessage, StoredReply, TurnRequest, TurnResult
-from nafas_conversation.workflows import WORKFLOWS, PatientConversationWorkflow, conversation_workflow_id
+from nafas_conversation.workflows import WORKFLOWS, PatientConversationWorkflow
+from nafas_core.clients.conversation import conversation_workflow_id
 
 
 class FakeActivities:
@@ -32,21 +33,22 @@ class FakeActivities:
     async def save_patient_message(self, message: StoredMessage) -> None:
         self.saved.append(message.content)
 
-    @activity.defn(name="conversation.answer_booking")
-    async def answer_booking(self, request: TurnRequest) -> TurnResult:
+    @activity.defn(name="conversation.answer")
+    async def answer(self, request: TurnRequest) -> TurnResult:
         self.answering += 1
         self.overlapped |= self.answering > 1
         await asyncio.sleep(0.2)
         self.answering -= 1
         last = self.saved[-1]
-        return TurnResult(f"reply to {last}", "fake", "booking-v1", 10, 5, [{"type": "hold"}] if "hold" in last else [])
+        actions = [{"type": "hold"}] if "hold" in last else []
+        return TurnResult(f"reply to {last}", "fake", "booking-v1", 10, 5, actions, intent="booking")
 
     @activity.defn(name="conversation.save_reply")
     async def save_reply(self, reply: StoredReply) -> None:
         self.replies.append(reply)
 
     def all(self):
-        return [self.open_conversation, self.save_patient_message, self.answer_booking, self.save_reply]
+        return [self.open_conversation, self.save_patient_message, self.answer, self.save_reply]
 
 
 def ids() -> dict:
@@ -62,6 +64,9 @@ async def test_first_message_starts_the_conversation_and_returns_the_reply(tempo
     assert reply.text == "reply to عايز أحجز hold"
     assert reply.actions == [{"type": "hold"}]
     assert reply.conversation_id == "c-1"
+    assert (reply.intent, reply.patient_text) == ("booking", "عايز أحجز hold")
+    # the reply carries its intent back onto the message it answers
+    assert fakes.replies[0].intent == "booking" and fakes.replies[0].answers_message_id
     assert fakes.saved == ["عايز أحجز hold"]
     assert fakes.replies[0].message_id == reply.message_id
     assert (fakes.replies[0].model, fakes.replies[0].prompt_version, fakes.replies[0].tokens_in) == ("fake", "booking-v1", 10)

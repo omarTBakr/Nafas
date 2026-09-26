@@ -3,12 +3,12 @@
 import uuid
 from datetime import UTC, date, datetime, time
 
-from sqlalchemy import CheckConstraint, Date, DateTime, Index, SmallInteger, String, Text, Time, func, text
-from sqlalchemy.dialects.postgresql import ENUM, UUID, ExcludeConstraint
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, SmallInteger, String, Text, Time, func, text
+from sqlalchemy.dialects.postgresql import ENUM, JSONB, UUID, ExcludeConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from nafas_core.db import Base
-from nafas_scheduling.enums import AppointmentMode, AppointmentStatus, AvailabilityMode
+from nafas_scheduling.enums import AppointmentMode, AppointmentStatus, AvailabilityMode, NotificationKind
 
 SCHEMA = "scheduling"
 
@@ -127,3 +127,26 @@ class Appointment(Base):
     booking_workflow_id: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now, server_default=func.now())
+
+
+class Notification(Base):
+    """
+    An in-app notice to a patient about one appointment: confirmed, a
+    reminder, a lapsed hold. Written by BookingWorkflow in the doctor's scope;
+    read and dismissed by the patient in theirs.
+    """
+
+    __tablename__ = "notifications"
+    __table_args__ = (Index("ix_notifications_patient_created", "patient_id", "created_at"), {"schema": SCHEMA})
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    doctor_id: Mapped[uuid.UUID] = _doctor_id()
+    patient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    appointment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(f"{SCHEMA}.appointments.id", ondelete="CASCADE"))
+    kind: Mapped[NotificationKind] = mapped_column(_enum(NotificationKind, "notification_kind"))
+    # for a reminder, how long before the start it was sent
+    minutes_before: Mapped[int | None] = mapped_column(Integer)
+    # what the web app needs to word it: the start, and the doctor it is with
+    details: Mapped[dict] = mapped_column(JSONB, default=dict, server_default=text("'{}'::jsonb"))
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())

@@ -41,3 +41,12 @@ class Unavailable(StrEnum):
     TIME_OFF = "time_off"
     TAKEN = "taken"
     NOT_BOOKABLE = "not_bookable"
+
+
+class NotificationKind(StrEnum):
+    """An in-app message about an appointment; the web app words it in the reader's language."""
+
+    CONFIRMED = "confirmed"
+    HOLD_EXPIRED = "hold_expired"
+    REMINDER = "reminder"
+    CANCELLED_BY_DOCTOR = "cancelled_by_doctor"

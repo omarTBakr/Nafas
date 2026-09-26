@@ -74,6 +74,7 @@ services:
       STT_URL: http://stt:8420
       IDENTITY_URL: http://identity:8010
       SCHEDULING_URL: http://scheduling:8030
+      CONVERSATION_URL: http://conversation:8040
       # laptop only; production injects a real secret
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token}
       JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-me-in-any-real-deployment}
@@ -118,18 +119,20 @@ services:
         condition: service_healthy
 
   conversation:
-    # a Temporal worker, no port: messages reach it as updates on its
-    # PatientConversationWorkflow
+    # the worker (messages arrive as updates on PatientConversationWorkflow)
+    # and a read-only internal API for the threads
     build:
       context: .
       dockerfile: docker/service.Dockerfile
       args:
         PACKAGE: nafas-conversation
-        MODULE: nafas_conversation.worker
+        MODULE: nafas_conversation.main
     image: nafas/conversation:dev
     environment:
       <<: *service-env
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports:
+      - "8040:8040"
     depends_on:
       postgres:
         condition: service_healthy

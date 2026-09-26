@@ -14,17 +14,19 @@ from datetime import UTC, date, datetime
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import AwareDatetime, BaseModel
+from sqlalchemy import update
 
 from nafas_core.db import session_scope
 from nafas_core.internal_api import require_internal_token
-from nafas_scheduling.enums import AppointmentMode, AppointmentStatus, Unavailable
+from nafas_scheduling.enums import AppointmentMode, AppointmentStatus, NotificationKind, Unavailable
+from nafas_scheduling.events import get_events
 from nafas_scheduling.exceptions import (
     AppointmentNotFoundError,
     HoldExpiredError,
     InvalidTransitionError,
     SlotUnavailableError,
 )
-from nafas_scheduling.logic import booking
+from nafas_scheduling.logic import booking, notifications
 from nafas_scheduling.logic.time_expressions import DayPeriod, DayRef, Meridiem, TimeExpression, resolve
 from nafas_scheduling.models import Appointment, BookingSettings
 
@@ -229,6 +231,13 @@ async def hold(doctor_id: uuid.UUID, request: HoldIn) -> AppointmentOut:
             reason_for_visit=request.reason_for_visit,
         )
 
+    # committed first: the workflow's activities must find the row
+    workflow_id = await get_events().held(held)
+    if workflow_id:
+        async with session_scope(doctor_id=doctor_id) as session:
+            await session.execute(update(Appointment).where(Appointment.id == held.id).values(booking_workflow_id=workflow_id))
+        held.booking_workflow_id = workflow_id
+
     return _appointment(held)
 
 
@@ -245,14 +254,71 @@ async def _doctor_of(appointment_id: uuid.UUID, actor: Actor) -> uuid.UUID:
 async def confirm(appointment_id: uuid.UUID, actor: Actor) -> AppointmentOut:
     doctor_id = await _doctor_of(appointment_id, actor)
     async with session_scope(doctor_id=doctor_id) as session:
-        return _appointment(await booking.confirm(session, appointment_id, _now()))
+        confirmed = await booking.confirm(session, appointment_id, _now())
+    await get_events().confirmed(confirmed)
+    return _appointment(confirmed)
 
 
 @router.post("/appointments/{appointment_id}/cancel", response_model=AppointmentOut)
 async def cancel(appointment_id: uuid.UUID, actor: Actor) -> AppointmentOut:
     doctor_id = await _doctor_of(appointment_id, actor)
     async with session_scope(doctor_id=doctor_id) as session:
-        return _appointment(await booking.cancel(session, appointment_id))
+        cancelled = await booking.cancel(session, appointment_id)
+    await get_events().cancelled(cancelled, by="doctor" if actor.doctor_id else "patient")
+    return _appointment(cancelled)
+
+
+class DoctorActor(BaseModel):
+    doctor_id: uuid.UUID
+
+
+@router.post("/appointments/{appointment_id}/no-show", response_model=AppointmentOut)
+async def no_show(appointment_id: uuid.UUID, actor: DoctorActor) -> AppointmentOut:
+    """The doctor records that the patient did not come; only the appointment's own doctor can."""
+    doctor_id = await _doctor_of(appointment_id, Actor(doctor_id=actor.doctor_id))
+    async with session_scope(doctor_id=doctor_id) as session:
+        marked = await booking.mark_no_show(session, appointment_id, _now())
+    await get_events().no_show(marked)
+    return _appointment(marked)
+
+
+class NotificationOut(BaseModel):
+    notification_id: uuid.UUID
+    appointment_id: uuid.UUID
+    doctor_id: uuid.UUID
+    kind: NotificationKind
+    minutes_before: int | None
+    details: dict
+    read_at: datetime | None
+    created_at: datetime
+
+
+@router.get("/patients/{patient_id}/notifications", response_model=list[NotificationOut])
+async def patient_notifications(
+    patient_id: uuid.UUID, unread_only: bool = False, limit: int = Query(default=50, ge=1, le=200)
+) -> list[NotificationOut]:
+    async with session_scope(patient_id=patient_id) as session:
+        found = await notifications.patient_notifications(session, unread_only=unread_only, limit=limit)
+    return [
+        NotificationOut(
+            notification_id=n.id,
+            appointment_id=n.appointment_id,
+            doctor_id=n.doctor_id,
+            kind=n.kind,
+            minutes_before=n.minutes_before,
+            details=n.details,
+            read_at=n.read_at,
+            created_at=n.created_at,
+        )
+        for n in found
+    ]
+
+
+@router.post("/patients/{patient_id}/notifications/{notification_id}/read", status_code=204)
+async def read_notification(patient_id: uuid.UUID, notification_id: uuid.UUID) -> None:
+    async with session_scope(patient_id=patient_id) as session:
+        if not await notifications.mark_read(session, notification_id, _now()):
+            raise HTTPException(status_code=404, detail="no such notification")
 
 
 @router.get("/patients/{patient_id}/appointments", response_model=list[AppointmentOut])

@@ -29,6 +29,7 @@ with workflow.unsafe.imports_passed_through():
         StoredReply,
         TurnRequest,
     )
+    from nafas_core.clients import conversation
 
 IDLE_TIMEOUT = timedelta(days=7)
 MAX_MESSAGE_CHARS = 4000
@@ -39,11 +40,7 @@ STORE = {"start_to_close_timeout": timedelta(seconds=15), "retry_policy": RetryP
 TURN = {"start_to_close_timeout": timedelta(minutes=3), "retry_policy": RetryPolicy(maximum_attempts=1)}
 
 
-def conversation_workflow_id(doctor_id: str, patient_id: str) -> str:
-    return f"conv-{doctor_id}-{patient_id}"
-
-
-@workflow.defn
+@workflow.defn(name=conversation.WORKFLOW)
 class PatientConversationWorkflow:
     @workflow.init
     def __init__(self, start: ConversationStart) -> None:
@@ -75,7 +72,7 @@ class PatientConversationWorkflow:
             )
         )
 
-    @workflow.update
+    @workflow.update(name=conversation.SEND_MESSAGE)
     async def send_message(self, message: PatientMessage) -> ChatReply:
         async with self._lock:
             if self._conversation_id is None:
@@ -83,14 +80,16 @@ class PatientConversationWorkflow:
                     ConversationActivities.open_conversation, self._start, **STORE
                 )
             patient_id, conversation_id = self._start.patient_id, self._conversation_id
+            text = message.text.strip()
 
+            message_id = str(workflow.uuid4())
             await workflow.execute_activity_method(
                 ConversationActivities.save_patient_message,
-                StoredMessage(str(workflow.uuid4()), conversation_id, patient_id, message.text.strip()),
+                StoredMessage(message_id, conversation_id, patient_id, text),
                 **STORE,
             )
             result = await workflow.execute_activity_method(
-                ConversationActivities.answer_booking,
+                ConversationActivities.answer,
                 TurnRequest(patient_id, self._start.doctor_id, conversation_id),
                 **TURN,
             )
@@ -106,11 +105,13 @@ class PatientConversationWorkflow:
                     result.prompt_version,
                     result.tokens_in,
                     result.tokens_out,
+                    intent=result.intent,
+                    answers_message_id=message_id,
                 ),
                 **STORE,
             )
             self._turns += 1
-            return ChatReply(conversation_id, reply_id, result.text, result.actions)
+            return ChatReply(conversation_id, reply_id, result.text, result.actions, result.intent, patient_text=text)
 
     @send_message.validator
     def _check_message(self, message: PatientMessage) -> None:

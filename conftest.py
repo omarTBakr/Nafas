@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from pathlib import Path
 
 import pytest
@@ -6,8 +7,11 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import make_url, text
 from sqlalchemy.ext.asyncio import create_async_engine
+from temporalio.client import Client
+from temporalio.testing import WorkflowEnvironment
 
 import nafas_core.config
+from nafas_core.config import get_setting
 from nafas_core.db.session import dispose_engine
 
 # GPU services live outside the workspace with their own environment and
@@ -31,6 +35,73 @@ def fresh_settings(monkeypatch, tmp_path):
     yield
 
     nafas_core.config._settings_instance = None
+
+
+class RecordingBookingEvents:
+    """Stands in for BookingWorkflow's starter: records what the scheduling API would have told Temporal."""
+
+    def __init__(self):
+        self.events: list[tuple[str, str]] = []
+
+    async def held(self, appointment):
+        self.events.append(("held", str(appointment.id)))
+        return None
+
+    async def confirmed(self, appointment):
+        self.events.append(("confirmed", str(appointment.id)))
+
+    async def cancelled(self, appointment, by):
+        self.events.append((f"cancelled_by_{by}", str(appointment.id)))
+
+    async def no_show(self, appointment):
+        self.events.append(("no_show", str(appointment.id)))
+
+
+@pytest.fixture(autouse=True)
+def booking_events():
+    """
+    No test reaches Temporal through the scheduling API by accident: a test
+    that wants to see what would have been sent takes this fixture.
+    """
+    from nafas_scheduling import events
+
+    recorder = RecordingBookingEvents()
+    events.set_events(recorder)
+    yield recorder
+    events.set_events(None)
+
+
+# --- temporal -------------------------------------------------------------
+
+
+@pytest.fixture
+async def temporal() -> Client:
+    """
+    A Temporal to run workflows on: the SDK's own test server when it can be
+    fetched, otherwise the stack's Temporal on TEMPORAL_HOST (`make up`).
+    Without either the test is skipped, as database tests are without Postgres.
+    Each test uses its own task queue and ids, so a shared server is fine.
+    """
+    try:
+        env = await WorkflowEnvironment.start_time_skipping()
+    except RuntimeError:
+        env = None
+    if env is not None:
+        yield env.client
+        await env.shutdown()
+        return
+
+    host = get_setting().temporal_host
+    try:
+        client = await asyncio.wait_for(Client.connect(host), timeout=3)
+    except (TimeoutError, RuntimeError, OSError) as exc:
+        pytest.skip(f"no Temporal for workflow tests (test server unavailable, nothing at {host}): {exc}")
+    yield client
+
+
+@pytest.fixture
+def task_queue() -> str:
+    return f"conversation-test-{uuid.uuid4()}"
 
 
 # --- database -------------------------------------------------------------

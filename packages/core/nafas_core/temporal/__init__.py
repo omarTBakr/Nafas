@@ -7,6 +7,7 @@ call each other without sharing code beyond `schemas`.
 
 from nafas_core.temporal.client import get_temporal_client
 from nafas_core.temporal.queues import TaskQueue
+from nafas_core.temporal.serve import serve_with_worker
 from nafas_core.temporal.worker import create_worker, run_worker
 
-__all__ = ["TaskQueue", "create_worker", "get_temporal_client", "run_worker"]
+__all__ = ["TaskQueue", "create_worker", "get_temporal_client", "run_worker", "serve_with_worker"]

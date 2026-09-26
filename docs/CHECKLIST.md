@@ -36,9 +36,9 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 **Phase 3: Booking by AI chat in the UI, text and voice** (creates `conversation`)
 - [x] `conversation` service: conversations and messages tables; `PatientConversationWorkflow` per patient and doctor (update-with-start, continue_as_new), its worker in compose
 - [x] The booking tool loop on Claude: a versioned prompt; tools that only reach scheduling (`interpret_time` resolves and checks what the model extracted, then hold, confirm, cancel, my appointments), bound to one patient and doctor, times in clinic time; tested with a scripted model
-- [ ] Intent routing: booking to the agent; other intents answered safely until phase 4
+- [x] Intent routing: an emergency keyword gate (AR/EN, code only) before a Haiku classifier; booking, admin and small talk to the agent, emergencies and medical questions to fixed replies until phase 4
 - [ ] Chat panel in the patient portal with streamed replies; chat and slot picker share the same holds
-- [ ] `BookingWorkflow`: hold expiry and in-app reminders (T-24h, T-1h); Temporal time-skipping tests
+- [x] `BookingWorkflow`: hold expiry and in-app reminders (T-24h, T-1h), completion or a doctor's no-show, notices when a doctor cancels; tests on the time-skipping server, or in seconds on a real Temporal where it cannot be fetched
 - [x] Patient dialect and voice: `dialect` (13 Lahgtna codes) and `voice` (male/female) on the patient, chosen at sign-up or on the profile page (`/api/me/profile`, patient scope)
 - [ ] The dialect-router suggests a default from a patient's first chat messages (with the conversation service)
 - [x] `stt` GPU service: `whisper-large-v3-turbo-arabic-dialectal-v2` pinned in a CUDA image with ffmpeg, `/health` config, `/metrics` (incl. realtime factor), and the `interfaces/stt` HTTP client; runs on the RTX 4060 at ~12× realtime, and the card's Egyptian and Iraqi samples (wav and browser webm/opus) come back within a word or two of their references

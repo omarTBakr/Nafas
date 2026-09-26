@@ -1,6 +1,8 @@
 """
 Dataclasses crossing a Temporal boundary: workflow input, updates, activity arguments.
 
+The workflow's own contract (its input, the message, the reply) lives in
+nafas_core.clients.conversation, shared with the callers that send messages.
 Ids travel as strings so any worker, whatever its converter, reads them the
 same way. Adding a field needs a default, or a run in flight cannot decode
 its own history (README, "one generation of workers per task queue").
@@ -8,22 +10,17 @@ its own history (README, "one generation of workers per task queue").
 
 from dataclasses import dataclass, field
 
+from nafas_core.clients.conversation import ChatReply, ConversationStart, PatientMessage
 
-@dataclass
-class ConversationStart:
-    """The workflow's input, and what continue_as_new carries forward."""
-
-    patient_id: str
-    doctor_id: str
-    # found or created by the first message, then carried across runs
-    conversation_id: str | None = None
-    # continue_as_new after this many turns, so the history stays small
-    turns_per_run: int = 50
-
-
-@dataclass
-class PatientMessage:
-    text: str
+__all__ = [
+    "ChatReply",
+    "ConversationStart",
+    "PatientMessage",
+    "StoredMessage",
+    "StoredReply",
+    "TurnRequest",
+    "TurnResult",
+]
 
 
 @dataclass
@@ -34,6 +31,8 @@ class StoredMessage:
     conversation_id: str
     patient_id: str
     content: str
+    modality: str = "text"
+    audio_key: str | None = None
 
 
 @dataclass
@@ -46,6 +45,10 @@ class StoredReply:
     prompt_version: str
     tokens_in: int = 0
     tokens_out: int = 0
+    intent: str | None = None
+    # the patient message this answers, which gets the same intent
+    answers_message_id: str | None = None
+    audio_key: str | None = None
 
 
 @dataclass
@@ -63,13 +66,4 @@ class TurnResult:
     tokens_in: int = 0
     tokens_out: int = 0
     actions: list[dict] = field(default_factory=list)
-
-
-@dataclass
-class ChatReply:
-    """What the patient's send returns: the reply, and what changed in the calendar."""
-
-    conversation_id: str
-    message_id: str
-    text: str
-    actions: list[dict] = field(default_factory=list)
+    intent: str | None = None

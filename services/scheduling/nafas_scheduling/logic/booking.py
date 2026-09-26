@@ -265,3 +265,41 @@ async def find_visible_appointment(session: AsyncSession, appointment_id: uuid.U
         raise AppointmentNotFoundError(str(appointment_id))
 
     return appointment
+
+
+async def expire_hold(session: AsyncSession, appointment_id: uuid.UUID, now: datetime) -> bool:
+    """Cancels this hold if it is still waiting past its expiry; False if it was confirmed or cancelled meanwhile."""
+    appointment = await _get(session, appointment_id)
+    if appointment.status is not AppointmentStatus.HELD or appointment.hold_expires_at > now:
+        return False
+
+    appointment.status = AppointmentStatus.CANCELLED
+    appointment.hold_expires_at = None
+    await session.flush()
+    return True
+
+
+async def complete(session: AsyncSession, appointment_id: uuid.UUID) -> bool:
+    """A confirmed visit that has ended becomes completed; anything else (a no-show, a cancellation) stays as it is."""
+    appointment = await _get(session, appointment_id)
+    if appointment.status is not AppointmentStatus.CONFIRMED:
+        return False
+
+    appointment.status = AppointmentStatus.COMPLETED
+    await session.flush()
+    return True
+
+
+async def mark_no_show(session: AsyncSession, appointment_id: uuid.UUID, now: datetime) -> Appointment:
+    """The doctor records that the patient did not come: only for a confirmed visit that has started."""
+    appointment = await _get(session, appointment_id)
+    if appointment.status is AppointmentStatus.NO_SHOW:
+        return appointment
+    if appointment.status not in (AppointmentStatus.CONFIRMED, AppointmentStatus.COMPLETED):
+        raise InvalidTransitionError(f"a {appointment.status.value} appointment cannot be a no-show")
+    if appointment.starts_at > now:
+        raise InvalidTransitionError("an appointment that has not started cannot be a no-show")
+
+    appointment.status = AppointmentStatus.NO_SHOW
+    await session.flush()
+    return appointment

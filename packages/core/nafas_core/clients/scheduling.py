@@ -42,6 +42,17 @@ class SchedulingClient(InternalClient):
     async def cancel(self, appointment_id: uuid.UUID, actor: dict) -> dict:
         return (await self.request("POST", f"/internal/v1/appointments/{appointment_id}/cancel", json=actor)).json()
 
+    async def no_show(self, appointment_id: uuid.UUID, doctor_id: uuid.UUID) -> dict:
+        body = {"doctor_id": str(doctor_id)}
+        return (await self.request("POST", f"/internal/v1/appointments/{appointment_id}/no-show", json=body)).json()
+
+    async def notifications(self, patient_id: uuid.UUID, unread_only: bool = False) -> list[dict]:
+        params = {"unread_only": str(unread_only).lower()}
+        return (await self.request("GET", f"/internal/v1/patients/{patient_id}/notifications", params=params)).json()
+
+    async def read_notification(self, patient_id: uuid.UUID, notification_id: uuid.UUID) -> None:
+        await self.request("POST", f"/internal/v1/patients/{patient_id}/notifications/{notification_id}/read")
+
     async def patient_appointments(self, patient_id: uuid.UUID) -> list[dict]:
         return (await self.request("GET", f"/internal/v1/patients/{patient_id}/appointments")).json()
 
