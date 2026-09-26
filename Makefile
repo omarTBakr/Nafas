@@ -55,3 +55,17 @@ test-gpu-services:
 
 gpu-check:  ## prove a container can see the GPU
 	docker run --rm --device nvidia.com/gpu=all ubuntu:24.04 nvidia-smi -L
+
+# --- checks that need the GPU services or a person (docs/CHECKLIST.md, "Needs you") ---
+
+check-stt:  ## WER per dialect on labelled clips: make check-stt CLIPS=path/to/clips
+	uv run python -m scripts.checks.stt_wer $(CLIPS)
+
+check-tts:  ## which dialects the tts model knows, and a sample WAV of each in tts-samples/
+	uv run python -m scripts.checks.tts_probe
+
+listening-test:  ## the blind v2/v3 Egyptian page: make listening-test V2_URL=... V3_URL=...
+	uv run python -m scripts.checks.listening_test build --v2-url $(V2_URL) --v3-url $(V3_URL)
+
+normaliser-sheet:  ## normaliser-review.csv for native speakers
+	uv run python -m scripts.checks.normaliser_sheet

@@ -17,3 +17,8 @@ assets/
 
 # agent worktrees: git repositories of their own, not part of this one
 .claude/worktrees/
+
+# outputs of the checks in scripts/checks: patient-free, but not source
+tts-samples/
+listening-test/
+normaliser-review.csv
