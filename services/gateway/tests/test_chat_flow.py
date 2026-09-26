@@ -26,7 +26,7 @@ from nafas_core.interfaces.tts.fake import FakeTTS
 from nafas_gateway.main import app as gateway
 from nafas_gateway.routes.chat import chat_sender
 
-from .conftest import browser, consent_to_chat, next_wednesday, sign_up
+from .conftest import DOCTOR_PASSWORD, browser, consent_to_chat, next_wednesday, sign_up
 
 
 def classified(intent: str):
@@ -181,3 +181,30 @@ async def test_signing_up_needs_the_data_processing_box(doctor_id):
         )
 
     assert refused.status_code == 422
+
+
+async def test_a_dose_question_goes_to_the_doctor_whose_answer_appears_in_the_chat(doctor_id, conversation):
+    from nafas_conversation.prompts import safety as safety_prompts
+
+    llm = FakeLLM([classified("medical"), tool_use_message(safety_prompts.SCOPE_TOOL["name"], {"verdict": "in_scope"})])
+    async with conversation(llm), browser() as sara, browser() as doctor:
+        await sign_up(sara)
+        await consent_to_chat(sara, doctor_id)
+        start = next_wednesday(time(18)).isoformat()
+        held = await sara.post("/api/appointments", json={"doctor_id": str(doctor_id), "start": start})
+        await sara.post(f"/api/appointments/{held.json()['appointment_id']}/confirm")
+
+        asked = (await sara.post(f"/api/chat/{doctor_id}/messages", json={"text": "ينفع أزود جرعة الدوا؟"})).json()
+
+        await doctor.post("/api/auth/login", json={"email": "heart@example.com", "password": DOCTOR_PASSWORD})
+        [item] = (await doctor.get("/api/doctor/escalations")).json()
+        path = f"/api/doctor/escalations/{item['escalation_id']}/reply"
+        answered = await doctor.post(path, json={"reply": "لا، نتكلم في الزيارة."})
+        stolen = await sara.post(f"/api/doctor/escalations/{item['escalation_id']}/reply", json={"reply": "x"})
+        thread = (await sara.get(f"/api/chat/{doctor_id}/messages")).json()
+
+    assert asked["intent"] == "medical" and "د. قلب" in asked["text"]
+    assert (item["patient_name"], item["reason"], item["question"]) == ("سارة", "sensitive", "ينفع أزود جرعة الدوا؟")
+    assert answered.status_code == 200
+    assert stolen.status_code == 403
+    assert (thread[-1]["role"], thread[-1]["content"]) == ("doctor", "لا، نتكلم في الزيارة.")

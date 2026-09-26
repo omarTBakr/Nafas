@@ -66,10 +66,10 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 
 **Phase 4: Patient medical chat and escalation**
 - [ ] Evaluate the dialect-router on our labelled AR samples; tag messages with the dialect if it holds up
-- [ ] Gates: emergency, scope, sensitivity and output guard (prompts plus the conversation service's safety logic)
-- [ ] Patient-visible RAG retrieval
-- [ ] `EscalationWorkflow` and the escalations table; the doctor's answer appears in the patient's chat
-- [ ] Minimal escalations inbox for the doctor, so escalation is testable end to end (moved from Phase 5, which extends it)
+- [x] Gates: emergency, scope, sensitivity and output guard (versioned prompts, forced tool verdicts, every gate fails closed; a plain-code rule sends any dose or change of medicine to the doctor); only for patients under the doctor's care with a confirmed or past visit; verdicts stored on each reply
+- [x] Patient-visible retrieval as a port: the patient's own visits with this doctor today; the patient-visible clinical record plugs in with Phase 6
+- [x] `EscalationWorkflow` and the escalations table; the patient is told in fixed words, nudged after a day, the question expires after three; the doctor's answer appears in the patient's chat as theirs; emergencies open one too
+- [x] Minimal escalations inbox for the doctor (open questions with the patient's name, emergencies marked, reply in place, a count in the top bar), tested end to end through the gateway
 - [ ] Safety eval set (~150 AR/EN prompts covering in-scope, out-of-scope, sensitive and emergency) run in CI with threshold assertions; drafted here, signed off by a clinician before it gates anything
 
 **Phase 5: Doctor dashboard** (creates `doctor_assistant`)

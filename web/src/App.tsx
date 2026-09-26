@@ -4,6 +4,7 @@ import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "reac
 import { api, type Role } from "./api";
 import { useAuth } from "./auth";
 import { useI18n } from "./i18n";
+import Inbox from "./pages/doctor/Inbox";
 import Schedule from "./pages/doctor/Schedule";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -25,20 +26,20 @@ function RequireRole({ role, children }: { role: Role; children: ReactNode }) {
   return <>{children}</>;
 }
 
-/** How many notices the patient has not dismissed, refreshed on each page change and every minute. */
-function useUnread(enabled: boolean): number {
+/** How many items wait for the reader (a patient's notices, a doctor's questions), refreshed on each page change and every minute. */
+function useUnread(enabled: boolean, fetchCount: () => Promise<number>): number {
   const [count, setCount] = useState(0);
   const location = useLocation();
   useEffect(() => {
     if (!enabled) return;
     const load = () =>
-      api
-        .notifications(true)
-        .then((n) => setCount(n.length))
+      fetchCount()
+        .then(setCount)
         .catch(() => setCount(0));
     load();
     const timer = setInterval(load, 60_000);
     return () => clearInterval(timer);
+    // fetchCount is a fresh closure each render: the role and the page change are what should refresh
   }, [enabled, location.pathname]);
   return enabled ? count : 0;
 }
@@ -47,7 +48,8 @@ function TopBar() {
   const { me, logout } = useAuth();
   const { t, lang, setLang } = useI18n();
   const navigate = useNavigate();
-  const unread = useUnread(me?.role === "patient");
+  const unread = useUnread(me?.role === "patient", () => api.notifications(true).then((n) => n.length));
+  const waiting = useUnread(me?.role === "doctor", () => api.escalations(["open"]).then((e) => e.length));
 
   return (
     <header className="topbar">
@@ -60,7 +62,15 @@ function TopBar() {
         </NavLink>
         <nav className="nav" aria-label="main">
           {me?.role === "doctor" ? (
-            <NavLink to="/doctor">{t("schedule")}</NavLink>
+            <>
+              <NavLink to="/doctor" end>
+                {t("schedule")}
+              </NavLink>
+              <NavLink to="/doctor/inbox" className="bell">
+                {t("inbox")}
+                {waiting > 0 && <span className="count">{waiting}</span>}
+              </NavLink>
+            </>
           ) : (
             <>
               <NavLink to="/" end>
@@ -146,6 +156,14 @@ export default function App() {
             element={
               <RequireRole role="doctor">
                 <Schedule />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/doctor/inbox"
+            element={
+              <RequireRole role="doctor">
+                <Inbox />
               </RequireRole>
             }
           />

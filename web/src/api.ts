@@ -145,6 +145,21 @@ export interface AppNotification {
   created_at: string;
 }
 
+export type EscalationReason = "sensitive" | "out_of_scope_medical" | "emergency" | "unclear" | "output_guard";
+
+export interface Escalation {
+  escalation_id: string;
+  patient_id: string;
+  patient_name: string | null;
+  reason: EscalationReason;
+  status: "open" | "answered" | "closed" | "expired";
+  question: string;
+  doctor_reply: string | null;
+  nudged_at: string | null;
+  answered_at: string | null;
+  created_at: string;
+}
+
 export interface Schedule {
   timezone: string;
   appointments: Appointment[];
@@ -253,6 +268,11 @@ export const api = {
   notifications: (unreadOnly = false) =>
     call<AppNotification[]>("GET", `/api/notifications?${query({ unread_only: String(unreadOnly) })}`),
   readNotification: (id: string) => call<void>("POST", `/api/notifications/${id}/read`),
+
+  escalations: (status: string[] = ["open"]) =>
+    call<Escalation[]>("GET", `/api/doctor/escalations?${status.map((s) => `status=${s}`).join("&")}`),
+  replyToEscalation: (id: string, reply: string) =>
+    call<Escalation>("POST", `/api/doctor/escalations/${id}/reply`, { reply }),
 
   noShow: (appointmentId: string) => call<Appointment>("POST", `/api/doctor/appointments/${appointmentId}/no-show`),
 
