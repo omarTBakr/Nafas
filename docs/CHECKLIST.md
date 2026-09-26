@@ -13,7 +13,7 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [x] Restructure into a uv workspace: `packages/core` (`nafas_core`) and `services/gateway`; tests per package; CI and pre-commit updated
 - [x] `Makefile` running compose on the native Docker engine (the GPU is unreachable from Docker Desktop)
 - [x] `dialect-router` GPU service (FastAPI + transformers, CUDA image, model baked in at a pinned revision, config on `/health`, Prometheus `/metrics`, low-confidence predictions logged for feedback) and the `interfaces/dialect` client, fake and factory
-- [ ] STT vendor spike on Arabic dialect samples, with the decision recorded in PLAN.md
+- [x] STT choice recorded in PLAN.md: self-hosted `whisper-large-v3-turbo-arabic-dialectal-v2` (13 dialects, published per-dialect WER); validation on our own samples moves to Phase 3
 
 **Phase 1: Doctors, specializations and scheduling core** (creates the `identity` and `scheduling` services)
 - [x] Database roles: services connect as `nafas_service` (not the owner), so row-level security applies; `nafas_current_doctor()` for policies
@@ -38,12 +38,15 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [ ] Intent classifier; the booking tool loop on Claude (extract a `TimeExpression`, then find, check, hold, confirm, cancel through scheduling)
 - [ ] Chat panel in the patient portal with streamed replies; chat and slot picker share the same holds
 - [ ] `BookingWorkflow`: hold expiry and in-app reminders (T-24h, T-1h); Temporal time-skipping tests
-- [ ] Voice input: record in the browser → STT (vendor from the spike) → the same pipeline; audio in S3, transcript on the message
-- [ ] Arabic and English voice booking tested end to end
-- [ ] `tts` GPU service: Lahgtna OmniVoice v3 pinned at its sha in a CUDA image, `/health` config, `/metrics`, and the `interfaces/tts` client and fake
-- [ ] Reference voice: record one with the speaker's written consent, and store it with that consent
-- [ ] Text normaliser before TTS: numbers, dates and times to Egyptian words; refuse text with Latin script or clinical content
-- [ ] Voice replies for Egyptian patients (dialect-router `eg`, confident) on admin messages, always shown with the text
+- [ ] Patient dialect and voice: `dialect` (13 Lahgtna codes) and `voice` (male/female) on the patient, chosen at sign-up or in a profile page; the dialect-router suggests a default from early messages
+- [ ] `stt` GPU service: `whisper-large-v3-turbo-arabic-dialectal-v2` pinned in a CUDA image, `/health` config, `/metrics`, and the `interfaces/stt` client and fake
+- [ ] Voice input: record in the browser → STT → the same pipeline; audio in S3, transcript on the message; check English voice notes and fall back to base turbo for English patients if the fine-tune lost English
+- [ ] Validate STT on our own labelled samples per dialect against the published WER
+- [ ] `tts` GPU service: Lahgtna OmniVoice v2 (13 dialects, built-in voices, `language` = the patient's dialect) pinned in a CUDA image, `/health` config, `/metrics`, and the `interfaces/tts` client and fake
+- [ ] Egyptian: side-by-side listening test of v2 and `lahgtna-omnivoice-egyptian-v3` (its default voices); use v3 for Egyptian only if it wins
+- [ ] Text normaliser before TTS: numbers, dates and times to words in the patient's dialect; refuse text with Latin script or clinical content
+- [ ] Voice replies in the patient's chosen dialect and voice, on admin messages only, always shown with the text
+- [ ] Before any commercial deployment: clear the licences of the voice models' training audio (v2 has none declared; v3's voices come from YouTube creators)
 
 **Phase 4: Patient medical chat and escalation**
 - [ ] Evaluate the dialect-router on our labelled AR samples; tag messages with the dialect if it holds up
