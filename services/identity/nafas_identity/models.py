@@ -43,7 +43,7 @@ def _created_at() -> Mapped[datetime]:
 
 
 class User(Base):
-    """A dashboard account. Patients have none: they are reached through channels."""
+    """A web account: a doctor's, a patient's, or staff's. The role decides the portal."""
 
     __tablename__ = "users"
     __table_args__ = (
@@ -106,6 +106,8 @@ class Patient(Base):
     __table_args__ = {"schema": SCHEMA}
 
     id: Mapped[uuid.UUID] = _id()
+    # their web login; None for a patient known only through a channel
+    user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey(f"{SCHEMA}.users.id"), unique=True)
     full_name: Mapped[str] = mapped_column(Text)
     date_of_birth: Mapped[date | None] = mapped_column(Date)
     sex: Mapped[Sex | None] = mapped_column(_enum(Sex, "sex"))

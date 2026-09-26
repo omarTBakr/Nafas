@@ -25,8 +25,8 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [x] Doctor auth: gateway `/api/auth/login|logout|me` (signed httpOnly session, account re-checked every request) over identity's internal API; admin-created accounts only
 
 **Phase 2: The web app, and booking in the UI** (patient portal, doctor schedule; decided 2026-09-26: web only, no bots for now)
-- [ ] **(in progress)** Patient accounts: a `patient` role, self sign-up in identity, `patients.user_id`; patient-scoped RLS (`nafas_current_patient()`, `session_scope(patient_id=...)`)
-- [ ] Doctor directory: doctors with their specialization, from identity's internal API
+- [x] Patient accounts: a `patient` role, self sign-up in identity, `patients.user_id`; patient-scoped RLS (`nafas_current_patient()`, `session_scope(patient_id=...)`), and a narrow security-definer lookup for login
+- [ ] **(in progress)** Doctor directory: doctors with their specialization, from identity's internal API
 - [ ] Scheduling internal API: free slots, check an exact time, hold, confirm, cancel, a patient's and a doctor's appointments
 - [ ] Care link (`doctor_patients`) created by identity on a patient's first booking
 - [ ] Gateway: `/api/auth/register`, `/api/doctors`, `/api/doctors/{id}/slots`, `/api/appointments` (hold, confirm, cancel, mine), `/api/doctor/schedule`, with a role check on every route

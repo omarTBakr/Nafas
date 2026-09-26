@@ -6,9 +6,10 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 
 from nafas_core.db import session_scope
-from nafas_core.enums.identity import UserRole
+from nafas_core.enums.identity import Language, UserRole
 from nafas_core.internal_api import require_internal_token
-from nafas_identity.logic.accounts import AuthenticatedUser, authenticate, get_user
+from nafas_identity.exceptions import AccountExistsError, WeakPasswordError
+from nafas_identity.logic.accounts import AuthenticatedUser, authenticate, get_user, register_patient_account
 
 
 class Credentials(BaseModel):
@@ -21,10 +22,19 @@ class Account(BaseModel):
     email: str
     role: UserRole
     doctor_id: uuid.UUID | None
+    patient_id: uuid.UUID | None
+
+
+class PatientSignUp(BaseModel):
+    email: str
+    password: str
+    full_name: str
+    preferred_language: Language = Language.ARABIC
+    phone: str | None = None
 
 
 def _account(user: AuthenticatedUser) -> Account:
-    return Account(user_id=user.user_id, email=user.email, role=user.role, doctor_id=user.doctor_id)
+    return Account(user_id=user.user_id, email=user.email, role=user.role, doctor_id=user.doctor_id, patient_id=user.patient_id)
 
 
 router = APIRouter(prefix="/internal/v1")
@@ -37,6 +47,27 @@ async def verify_credentials(credentials: Credentials) -> Account:
         user = await authenticate(session, credentials.email, credentials.password)
     if user is None:
         raise HTTPException(status_code=401, detail="invalid credentials")
+
+    return _account(user)
+
+
+@router.post("/patients", response_model=Account, status_code=201)
+async def sign_up_patient(form: PatientSignUp) -> Account:
+    """409 when the email is taken, 422 when the password is too weak."""
+    try:
+        async with session_scope() as session:
+            user = await register_patient_account(
+                session,
+                email=form.email,
+                password=form.password,
+                full_name=form.full_name,
+                preferred_language=form.preferred_language,
+                phone=form.phone,
+            )
+    except AccountExistsError as exc:
+        raise HTTPException(status_code=409, detail="an account with this email already exists") from exc
+    except WeakPasswordError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return _account(user)
 

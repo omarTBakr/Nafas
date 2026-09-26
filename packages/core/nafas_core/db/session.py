@@ -7,8 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from nafas_core.config import get_setting
 
-# the Postgres setting row-level security policies read
+# the Postgres settings row-level security policies read
 CURRENT_DOCTOR_SETTING = "app.current_doctor_id"
+CURRENT_PATIENT_SETTING = "app.current_patient_id"
 
 _engine: AsyncEngine | None = None
 _sessionmaker: async_sessionmaker[AsyncSession] | None = None
@@ -45,23 +46,23 @@ async def dispose_engine() -> None:
 
 
 @asynccontextmanager
-async def session_scope(doctor_id: UUID | None = None) -> AsyncIterator[AsyncSession]:
+async def session_scope(doctor_id: UUID | None = None, patient_id: UUID | None = None) -> AsyncIterator[AsyncSession]:
     """
     One transaction: committed on success, rolled back on any exception.
 
     With `doctor_id`, the transaction runs as that doctor: row-level security
-    then shows only their rows. The setting is transaction-local
-    (`set_config(..., true)`), so it ends with the transaction and can never
-    leak onto a pooled connection that serves the next caller.
+    shows their rows. With `patient_id`, it runs as that patient: RLS shows
+    the patient's own rows (their profile, their appointments with any
+    doctor). The settings are transaction-local (`set_config(..., true)`), so
+    they end with the transaction and can never leak onto a pooled connection
+    that serves the next caller.
 
-    Without it, no doctor is set and RLS-protected tables show nothing — the
-    safe default. System jobs that genuinely need every row connect as a role
-    that bypasses RLS instead of weakening this.
+    With neither, RLS-protected tables show nothing — the safe default.
+    System jobs that genuinely need every row connect as a role that bypasses
+    RLS instead of weakening this.
     """
     async with get_sessionmaker()() as session, session.begin():
-        if doctor_id is not None:
-            await session.execute(
-                text("SELECT set_config(:name, :value, true)"),
-                {"name": CURRENT_DOCTOR_SETTING, "value": str(doctor_id)},
-            )
+        for name, value in ((CURRENT_DOCTOR_SETTING, doctor_id), (CURRENT_PATIENT_SETTING, patient_id)):
+            if value is not None:
+                await session.execute(text("SELECT set_config(:name, :value, true)"), {"name": name, "value": str(value)})
         yield session

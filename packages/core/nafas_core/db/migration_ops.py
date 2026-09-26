@@ -52,3 +52,16 @@ def enable_patient_isolation(table: str, patient_column: str = "patient_id") -> 
     op.execute(f"CREATE POLICY linked_doctor_updates ON {table} FOR UPDATE TO {APP_ROLE} USING ({linked}) WITH CHECK ({linked})")
     op.execute(f"CREATE POLICY linked_doctor_deletes ON {table} FOR DELETE TO {APP_ROLE} USING ({linked})")
     op.execute(f"CREATE POLICY anyone_inserts ON {table} FOR INSERT TO {APP_ROLE} WITH CHECK (true)")
+
+
+def enable_patient_self_access(table: str, column: str = "patient_id", commands: tuple[str, ...] = ("SELECT",)) -> None:
+    """
+    Lets a patient reach their own rows in `table`, as set by
+    session_scope(patient_id=...). Postgres ORs permissive policies, so this
+    adds to the doctor policies rather than replacing them.
+    """
+    own = f"{column} = nafas_current_patient()"
+    for command in commands:
+        check = f" WITH CHECK ({own})" if command in ("INSERT", "UPDATE") else ""
+        using = f" USING ({own})" if command != "INSERT" else ""
+        op.execute(f"CREATE POLICY patient_own_{command.lower()} ON {table} FOR {command} TO {APP_ROLE}{using}{check}")

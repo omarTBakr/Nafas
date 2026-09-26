@@ -2,9 +2,10 @@ from enum import StrEnum
 
 
 class UserRole(StrEnum):
-    """Who a dashboard account belongs to; carried in the session token."""
+    """Who a web account belongs to; decides which portal and routes it may use."""
 
     DOCTOR = "doctor"
+    PATIENT = "patient"
     ADMIN = "admin"
     STAFF = "staff"
 
