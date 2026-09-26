@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { api, type Appointment, type Schedule as ScheduleData } from "../../api";
 import { useI18n } from "../../i18n";
 import { clinicClock, clinicDate, clinicDay, upcomingDates } from "../../time";
+import { joinable } from "../../visit";
 import NextPatient from "./NextPatient";
 
 type Range = "today" | "week";
@@ -80,6 +82,12 @@ export default function Schedule() {
                 </div>
                 <div className="row">
                   <span className={`badge ${a.status}`}>{t(`status_${a.status}`)}</span>
+                  {a.mode === "online" && <span className="badge">{t("onlineVisit")}</span>}
+                  {joinable(a) && (
+                    <Link className="button" to={`/visit/${a.appointment_id}`}>
+                      {t("joinOnline")}
+                    </Link>
+                  )}
                   {a.status === "confirmed" && new Date(a.start).getTime() > Date.now() && (
                     <button className="danger" onClick={() => cancel(a)}>
                       {t("cancel")}

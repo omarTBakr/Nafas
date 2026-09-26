@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { api, type Timeline, type TimelineItem, uploadDocument, type Visibility } from "../../api";
 import { type Key, useI18n } from "../../i18n";
 import { clinicClock, clinicDay } from "../../time";
+import { joinable } from "../../visit";
 import Assistant from "./Assistant";
 import RecordVisit from "./RecordVisit";
 
@@ -64,7 +65,9 @@ function Item({ item, tz, reload }: { item: TimelineItem; tz: string; reload: ()
       {item.type === "appointment" && (
         <div className="row">
           <span className={`badge ${item.status}`}>{t(`status_${item.status}`)}</span>
+          {item.mode === "online" && <span className="badge">{t("onlineVisit")}</span>}
           {item.reason_for_visit && <span className="muted">{item.reason_for_visit}</span>}
+          {joinable(item) && <Link to={`/visit/${item.appointment_id}`}>{t("joinOnline")}</Link>}
         </div>
       )}
       {item.type === "history" && (

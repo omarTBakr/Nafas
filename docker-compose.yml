@@ -278,6 +278,13 @@ services:
     environment:
       <<: *service-env
       DATABASE_URL: postgresql+asyncpg://nafas_consultation_svc:nafas@postgres:5432/nafas
+      # online visits (the `online` profile); empty LIVEKIT_URL turns them off
+      LIVEKIT_URL: ${LIVEKIT_URL:-ws://localhost:7880}
+      LIVEKIT_API_URL: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-dev-livekit-secret-change-me-anywhere-real}
+      # egress runs in LiveKit's network namespace, where storage is s3:8333 as for everyone
+      EGRESS_S3_ENDPOINT: http://s3:8333
       # the SOAP draft is written by the summary model (LLM_SUMMARY_MODEL)
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     ports:
@@ -287,6 +294,61 @@ services:
         condition: service_healthy
       temporal:
         condition: service_started
+
+  # --- online visits: `docker compose --profile online up` (docs/PLAN.md §6c) ---------
+  # One LiveKit server, Redis for it and its egress, and the egress that
+  # writes each participant's microphone to storage. The keys here are a
+  # laptop's; docker-compose.prod.yml takes them from the secret store.
+  redis:
+    profiles: [online]
+    image: redis:7-alpine@sha256:858f009f9709ce576febc734aa78b8f6d624b82571f9ddb6bda4377c833b3499
+
+  livekit:
+    profiles: [online]
+    image: livekit/livekit-server:v1.13.7@sha256:6fd3b7088874c4d119160dd688798dfec852bc014786d392caad15f6f63912a3
+    environment:
+      LIVEKIT_CONFIG: |
+        port: 7880
+        rtc:
+          tcp_port: 7881
+          port_range_start: 50000
+          port_range_end: 50100
+          use_external_ip: false
+          # the address browsers reach the media ports on; a public IP in production
+          node_ip: ${LIVEKIT_NODE_IP:-127.0.0.1}
+        redis:
+          address: redis:6379
+        keys:
+          ${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-dev-livekit-secret-change-me-anywhere-real}
+        webhook:
+          api_key: ${LIVEKIT_API_KEY:-devkey}
+          urls:
+            - ${LIVEKIT_WEBHOOK_URL:-http://consultation:8060/webhooks/livekit}
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "50000-50100:50000-50100/udp"
+    # the consultation service may run on the host while developing
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - redis
+
+  egress:
+    profiles: [online]
+    image: livekit/egress:v1.14.1@sha256:bf2b648b947349c3e9ff7aa8c718f00378d5c06af7624652a3653318e00333ce
+    # in LiveKit's network namespace: the media addresses it is offered (node_ip) then reach it
+    network_mode: "service:livekit"
+    environment:
+      EGRESS_CONFIG_BODY: |
+        api_key: ${LIVEKIT_API_KEY:-devkey}
+        api_secret: ${LIVEKIT_API_SECRET:-dev-livekit-secret-change-me-anywhere-real}
+        ws_url: ws://localhost:7880
+        redis:
+          address: redis:6379
+        log_level: info
+    depends_on:
+      - livekit
 
   # `docker compose --profile monitoring up`: metrics, alerts and dashboards on a laptop
   prometheus:

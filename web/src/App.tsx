@@ -18,6 +18,7 @@ import Notifications from "./pages/patient/Notifications";
 import ProfilePage from "./pages/patient/Profile";
 import Records from "./pages/patient/Records";
 import Register from "./pages/Register";
+import Visit from "./pages/Visit";
 
 /** Renders its page only for the right role; otherwise to login, remembering where to come back to. */
 function RequireRole({ role, children }: { role: Role; children: ReactNode }) {
@@ -28,6 +29,17 @@ function RequireRole({ role, children }: { role: Role; children: ReactNode }) {
   if (!ready) return <p className="muted">{t("loading")}</p>;
   if (!me) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
   if (me.role !== role) return <Navigate to={me.role === "doctor" ? "/doctor" : "/"} replace />;
+  return <>{children}</>;
+}
+
+/** Renders its page for anyone logged in, patient or doctor; otherwise to login, remembering where to come back to. */
+function RequireLogin({ children }: { children: ReactNode }) {
+  const { me, ready } = useAuth();
+  const location = useLocation();
+  const { t } = useI18n();
+
+  if (!ready) return <p className="muted">{t("loading")}</p>;
+  if (!me) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
   return <>{children}</>;
 }
 
@@ -221,6 +233,7 @@ export default function App() {
               </RequireRole>
             }
           />
+          <Route path="/visit/:appointmentId" element={<RequireLogin><Visit /></RequireLogin>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
