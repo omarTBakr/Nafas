@@ -77,7 +77,12 @@ export type Unavailable =
   | "hold_expired"
   | "invalid_transition"
   | "consent_required"
-  | "rate_limited";
+  | "rate_limited"
+  | "not_online"
+  | "not_confirmed"
+  | "too_early"
+  | "too_late"
+  | "online_visits_off";
 
 export interface CheckResult {
   bookable: boolean;
@@ -462,6 +467,19 @@ export const api = {
   approveConsultation: (id: string, note: VisitNote, shareWithPatient: boolean) =>
     call<Consultation>("POST", `/api/doctor/consultations/${id}/approve`, { note, share_with_patient: shareWithPatient }),
   discardConsultation: (id: string) => call<Consultation>("POST", `/api/doctor/consultations/${id}/discard`),
+
+  joinVisit: (appointmentId: string) =>
+    call<{ url: string; room: string; token: string; role: "doctor" | "patient"; appointment: Appointment }>(
+      "POST",
+      `/api/visits/${appointmentId}/join`,
+    ),
+  startVisitRecording: (appointmentId: string) =>
+    call<{ consultation_id: string; tracks: number }>("POST", `/api/doctor/visits/${appointmentId}/recording`, {}),
+  stopVisitRecording: (consultationId: string) =>
+    call<{ consultation_id: string; status: string; waiting_for_tracks: boolean }>(
+      "POST",
+      `/api/doctor/consultations/${consultationId}/stop-recording`,
+    ),
 
   myRecords: () => call<MyRecords>("GET", "/api/me/records"),
   myDocumentLink: (documentId: string) => call<{ url: string }>("GET", `/api/me/documents/${documentId}/download`),

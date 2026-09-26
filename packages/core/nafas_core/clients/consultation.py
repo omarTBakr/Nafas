@@ -38,6 +38,17 @@ class ConsultationClient(InternalClient):
     async def approve(self, doctor_id: uuid.UUID, consultation_id: uuid.UUID, body: dict) -> dict:
         return (await self.request("POST", self._at(doctor_id, f"consultations/{consultation_id}/approve"), json=body)).json()
 
+    async def join_visit(self, appointment_id: uuid.UUID, role: str, person_id: uuid.UUID, name: str) -> dict:
+        body = {"role": role, "person_id": str(person_id), "name": name}
+        return (await self.request("POST", f"/internal/v1/appointments/{appointment_id}/join", json=body)).json()
+
+    async def start_online_recording(self, doctor_id: uuid.UUID, appointment_id: uuid.UUID, evidence: str) -> dict:
+        path = self._at(doctor_id, f"appointments/{appointment_id}/recording")
+        return (await self.request("POST", path, json={"evidence": evidence})).json()
+
+    async def stop_online_recording(self, doctor_id: uuid.UUID, consultation_id: uuid.UUID) -> dict:
+        return (await self.request("POST", self._at(doctor_id, f"consultations/{consultation_id}/stop-recording"))).json()
+
     async def discard(self, doctor_id: uuid.UUID, consultation_id: uuid.UUID) -> dict:
         return (await self.request("POST", self._at(doctor_id, f"consultations/{consultation_id}/discard"))).json()
 

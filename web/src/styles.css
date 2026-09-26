@@ -224,3 +224,11 @@ textarea { min-height: 80px; resize: vertical; }
 .thumbs { display: inline-flex; gap: 4px; margin-block-start: 4px; }
 .thumbs button { opacity: 0.45; padding: 2px 4px; }
 .thumbs button[aria-pressed="true"], .thumbs button:hover { opacity: 1; }
+
+/* online visits */
+.visit-stage { position: relative; background: #111; border-radius: var(--radius); overflow: hidden; min-height: 320px; }
+.visit-remote { display: grid; place-items: center; min-height: 320px; }
+.visit-remote video { width: 100%; max-height: 70vh; object-fit: contain; }
+.visit-remote .muted { color: #ccc; }
+.visit-local { position: absolute; inset-inline-end: 12px; inset-block-end: 12px; width: 28%; max-width: 220px; border-radius: var(--radius-sm); overflow: hidden; }
+.visit-local video { width: 100%; display: block; transform: scaleX(-1); }

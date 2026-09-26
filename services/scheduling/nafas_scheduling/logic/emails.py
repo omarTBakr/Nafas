@@ -36,6 +36,12 @@ LINES = {
     },
 }
 MODES = {"in_person": {"ar": "في العيادة", "en": "in person"}, "online": {"ar": "أونلاين", "en": "online"}}
+# an online visit's confirmation and reminder carry the way in
+JOIN = {
+    "ar": "رابط الزيارة (يفتح قبل موعدها بربع ساعة): {link}",
+    "en": "Your visit's link (it opens 15 minutes before the start): {link}",
+}
+JOINABLE = {NotificationKind.CONFIRMED, NotificationKind.REMINDER}
 FOOTER = {
     "ar": "مواعيدك: {link}\nلإيقاف هذه الرسائل غيّر الإعدادات من صفحة ملفك.",
     "en": "Your appointments: {link}\nTo stop these emails, change the setting on your profile page.",
@@ -58,7 +64,7 @@ def clinic_time(start: datetime, timezone: str, language: str) -> str:
     return text.translate(AR_DIGITS)
 
 
-def invite(appointment_id: str, start: datetime, end: datetime, summary: str) -> Attachment:
+def invite(appointment_id: str, start: datetime, end: datetime, summary: str, location: str | None = None) -> Attachment:
     """A calendar invite for the appointment, in UTC so every calendar places it right."""
     stamp = "%Y%m%dT%H%M%SZ"
     body = "\r\n".join(
@@ -73,6 +79,7 @@ def invite(appointment_id: str, start: datetime, end: datetime, summary: str) ->
             f"DTSTART:{start.astimezone(ZoneInfo('UTC')).strftime(stamp)}",
             f"DTEND:{end.astimezone(ZoneInfo('UTC')).strftime(stamp)}",
             f"SUMMARY:{summary}",
+            *([f"LOCATION:{location}", f"URL:{location}"] if location else []),
             "END:VEVENT",
             "END:VCALENDAR",
             "",
@@ -96,13 +103,12 @@ def compose(
     language = "en" if recipient.language == "en" else "ar"
     when = f"{clinic_time(start, timezone, language)} ({MODES.get(mode, MODES['in_person'])[language]})"
     greeting = f"Hello {recipient.full_name}," if language == "en" else f"أهلاً {recipient.full_name}،"
+    base = web_url.rstrip("/")
+    join = [JOIN[language].format(link=f"{base}/visit/{appointment_id}")] if mode == "online" and kind in JOINABLE else []
     text = "\n\n".join(
-        [
-            greeting,
-            LINES[kind][language].format(when=when),
-            FOOTER[language].format(link=f"{web_url.rstrip('/')}/appointments"),
-        ]
+        [greeting, LINES[kind][language].format(when=when), *join, FOOTER[language].format(link=f"{base}/appointments")]
     )
     subject = SUBJECTS[kind][language].format(doctor=doctor_name)
-    attachments = [invite(appointment_id, start, end, subject)] if kind is NotificationKind.CONFIRMED else []
+    location = f"{base}/visit/{appointment_id}" if mode == "online" else None
+    attachments = [invite(appointment_id, start, end, subject, location)] if kind is NotificationKind.CONFIRMED else []
     return Email(to=recipient.email, subject=subject, text=text, attachments=attachments)

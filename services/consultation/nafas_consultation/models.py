@@ -27,6 +27,7 @@ class Consultation(Base):
     __tablename__ = "consultations"
     __table_args__ = (
         Index("ix_consultations_doctor_patient_created", "doctor_id", "patient_id", "created_at"),
+        Index("ix_consultations_room", "room"),
         {"schema": SCHEMA},
     )
 
@@ -47,7 +48,13 @@ class Consultation(Base):
         default=ConsultationStatus.RECORDING,
         server_default="recording",
     )
-    # [{"index", "mime", "offset_seconds", "key"}], in the order recorded
+    # "in_person" (the browser recorder) or "online" (a LiveKit room)
+    source: Mapped[str] = mapped_column(String(16), default="in_person", server_default="in_person")
+    room: Mapped[str | None] = mapped_column(String(100))
+    # online: when the doctor stopped; the visit is processed once every track's file is written
+    recording_stopped_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # [{"index", "mime", "offset_seconds", "key"}], in the order recorded; online parts add
+    # "speaker" (doctor or patient), "egress_id" and "state" (recording, written, failed)
     parts: Mapped[list] = mapped_column(JSONB, default=list, server_default=text("'[]'::jsonb"))
     # [{"start", "end", "text"}], in seconds from the start of the recording
     transcript: Mapped[list | None] = mapped_column(JSONB)

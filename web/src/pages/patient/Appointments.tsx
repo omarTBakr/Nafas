@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { api, type Appointment } from "../../api";
 import { useI18n } from "../../i18n";
 import { clinicClock, clinicDay } from "../../time";
+import { joinable } from "../../visit";
 
 const ACTIVE = new Set(["held", "confirmed"]);
 
@@ -47,6 +48,16 @@ export default function Appointments() {
           {clinicDay(a.start, tz, locale)} · {clinicClock(a.start, tz, locale)}
         </span>
         {a.reason_for_visit && <span className="muted small">{a.reason_for_visit}</span>}
+        {a.mode === "online" && a.status === "confirmed" && (
+          <div className="row">
+            <span className="badge">{t("onlineVisit")}</span>
+            {joinable(a) && (
+              <Link className="button" to={`/visit/${a.appointment_id}`}>
+                {t("joinOnline")}
+              </Link>
+            )}
+          </div>
+        )}
         {canCancel && (
           <div>
             <button className="danger" onClick={() => cancel(a)}>
