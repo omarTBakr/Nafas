@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Appointments from "./pages/patient/Appointments";
 import Book from "./pages/patient/Book";
+import ProfilePage from "./pages/patient/Profile";
 import Register from "./pages/Register";
 
 /** Renders its page only for the right role; otherwise to login, remembering where to come back to. */
@@ -45,7 +46,12 @@ function TopBar() {
               <NavLink to="/" end>
                 {t("doctors")}
               </NavLink>
-              {me?.role === "patient" && <NavLink to="/appointments">{t("myAppointments")}</NavLink>}
+              {me?.role === "patient" && (
+                <>
+                  <NavLink to="/appointments">{t("myAppointments")}</NavLink>
+                  <NavLink to="/profile">{t("profile")}</NavLink>
+                </>
+              )}
             </>
           )}
           <button className="link" onClick={() => setLang(lang === "ar" ? "en" : "ar")} lang={lang === "ar" ? "en" : "ar"}>
@@ -92,6 +98,14 @@ export default function App() {
             element={
               <RequireRole role="patient">
                 <Appointments />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <RequireRole role="patient">
+                <ProfilePage />
               </RequireRole>
             }
           />

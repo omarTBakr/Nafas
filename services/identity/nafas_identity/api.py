@@ -7,11 +7,13 @@ from pydantic import BaseModel
 from sqlalchemy import select
 
 from nafas_core.db import session_scope
+from nafas_core.enums.dialect import SpokenDialect, VoiceGender
 from nafas_core.enums.identity import Language, UserRole
 from nafas_core.internal_api import require_internal_token
 from nafas_identity.exceptions import AccountExistsError, WeakPasswordError
 from nafas_identity.logic.accounts import AuthenticatedUser, authenticate, get_user, register_patient_account
 from nafas_identity.logic.directory import DoctorCard, ensure_care_link, list_doctors, list_specializations
+from nafas_identity.logic.profile import PatientProfile, get_profile, update_profile
 from nafas_identity.models import Patient
 
 
@@ -34,6 +36,31 @@ class PatientSignUp(BaseModel):
     full_name: str
     preferred_language: Language = Language.ARABIC
     phone: str | None = None
+    dialect: SpokenDialect | None = None
+    voice: VoiceGender | None = None
+
+
+class ProfileOut(BaseModel):
+    patient_id: uuid.UUID
+    full_name: str
+    phone: str | None
+    preferred_language: Language
+    dialect: SpokenDialect | None
+    voice: VoiceGender | None
+
+
+class ProfileChanges(BaseModel):
+    """Only the fields sent are changed; send null to clear dialect, voice or phone."""
+
+    full_name: str | None = None
+    phone: str | None = None
+    preferred_language: Language | None = None
+    dialect: SpokenDialect | None = None
+    voice: VoiceGender | None = None
+
+
+def _profile(profile: PatientProfile) -> ProfileOut:
+    return ProfileOut(**profile.__dict__)
 
 
 class DoctorOut(BaseModel):
@@ -91,6 +118,8 @@ async def sign_up_patient(form: PatientSignUp) -> Account:
                 full_name=form.full_name,
                 preferred_language=form.preferred_language,
                 phone=form.phone,
+                dialect=form.dialect,
+                voice=form.voice,
             )
     except AccountExistsError as exc:
         raise HTTPException(status_code=409, detail="an account with this email already exists") from exc
@@ -98,6 +127,32 @@ async def sign_up_patient(form: PatientSignUp) -> Account:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return _account(user)
+
+
+@router.get("/patients/{patient_id}/profile", response_model=ProfileOut)
+async def read_profile(patient_id: uuid.UUID) -> ProfileOut:
+    async with session_scope(patient_id=patient_id) as session:
+        profile = await get_profile(session, patient_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="no such patient")
+
+    return _profile(profile)
+
+
+@router.patch("/patients/{patient_id}/profile", response_model=ProfileOut)
+async def change_profile(patient_id: uuid.UUID, changes: ProfileChanges) -> ProfileOut:
+    sent = changes.model_dump(exclude_unset=True)
+    if sent.get("full_name") is None:
+        sent.pop("full_name", None)
+    if sent.get("preferred_language") is None:
+        sent.pop("preferred_language", None)
+
+    async with session_scope(patient_id=patient_id) as session:
+        profile = await update_profile(session, patient_id, **sent)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="no such patient")
+
+    return _profile(profile)
 
 
 @router.get("/users/{user_id}", response_model=Account)

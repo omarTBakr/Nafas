@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from nafas_core.enums.dialect import SpokenDialect, VoiceGender
 from nafas_core.enums.identity import Language, UserRole
 from nafas_identity.exceptions import AccountExistsError, UnknownSpecializationError
 from nafas_identity.logic.passwords import DUMMY_HASH, hash_password, needs_rehash, verify_password
@@ -73,6 +74,8 @@ async def register_patient_account(
     full_name: str,
     preferred_language: Language = Language.ARABIC,
     phone: str | None = None,
+    dialect: SpokenDialect | None = None,
+    voice: VoiceGender | None = None,
 ) -> AuthenticatedUser:
     """
     Self sign-up: a patient's login and their patient record, together.
@@ -87,7 +90,15 @@ async def register_patient_account(
     session.add(user)
     await session.flush()
 
-    patient = Patient(user_id=user.id, full_name=full_name, email=email, preferred_language=preferred_language, phone=phone)
+    patient = Patient(
+        user_id=user.id,
+        full_name=full_name,
+        email=email,
+        preferred_language=preferred_language,
+        phone=phone,
+        dialect=dialect,
+        voice=voice,
+    )
     session.add(patient)
     await session.flush()
 

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
-import { ApiError } from "../api";
+import { ApiError, DIALECTS, type SpokenDialect } from "../api";
 import { useAuth } from "../auth";
 import { useI18n, type Lang } from "../i18n";
 
@@ -10,7 +10,14 @@ export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [form, setForm] = useState({ full_name: "", email: "", password: "", phone: "", preferred_language: lang as Lang });
+  const [form, setForm] = useState({
+    full_name: "",
+    email: "",
+    password: "",
+    phone: "",
+    preferred_language: lang as Lang,
+    dialect: "" as SpokenDialect | "",
+  });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -34,7 +41,7 @@ export default function Register() {
     setBusy(true);
     setError(null);
     try {
-      await register({ ...form, phone: form.phone || undefined });
+      await register({ ...form, phone: form.phone || undefined, dialect: form.dialect || undefined });
       navigate(params.get("next") ?? "/", { replace: true });
     } catch (e) {
       setError(explain(e));
@@ -67,6 +74,17 @@ export default function Register() {
         <select value={form.preferred_language} onChange={set("preferred_language")}>
           <option value="ar">العربية</option>
           <option value="en">English</option>
+        </select>
+      </label>
+      <label>
+        {t("dialect")} <span className="hint">{t("dialectHint")}</span>
+        <select value={form.dialect} onChange={set("dialect")}>
+          <option value="">{t("chooseDialect")}</option>
+          {DIALECTS.map((d) => (
+            <option key={d} value={d}>
+              {t(`dialect_${d}`)}
+            </option>
+          ))}
         </select>
       </label>
       {error && (

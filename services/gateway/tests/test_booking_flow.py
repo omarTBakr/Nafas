@@ -168,3 +168,18 @@ async def test_the_directory_is_public_but_booking_is_not(doctor_id):
                 "/api/appointments", json={"doctor_id": str(doctor_id), "start": next_wednesday(time(17)).isoformat()}
             )
         ).status_code == 401
+
+
+async def test_a_patient_chooses_their_dialect_and_voice(doctor_id):
+    async with browser() as sara:
+        signed_up = await sara.post(
+            "/api/auth/register",
+            json={"email": "sara@example.com", "password": PATIENT_PASSWORD, "full_name": "سارة", "dialect": "lb"},
+        )
+        assert signed_up.status_code == 201
+        assert (await sara.get("/api/me/profile")).json()["dialect"] == "lb"
+
+        changed = await sara.patch("/api/me/profile", json={"dialect": "eg", "voice": "female"})
+        assert (changed.json()["dialect"], changed.json()["voice"]) == ("eg", "female")
+
+        assert (await sara.patch("/api/me/profile", json={"dialect": "klingon"})).status_code == 422

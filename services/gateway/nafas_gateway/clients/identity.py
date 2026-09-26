@@ -52,6 +52,12 @@ class IdentityClient(InternalClient):
     async def sign_up_patient(self, form: dict) -> Account:
         return _account((await self.request("POST", "/internal/v1/patients", json=form)).json())
 
+    async def profile(self, patient_id: uuid.UUID) -> dict:
+        return (await self.request("GET", f"/internal/v1/patients/{patient_id}/profile")).json()
+
+    async def update_profile(self, patient_id: uuid.UUID, changes: dict) -> dict:
+        return (await self.request("PATCH", f"/internal/v1/patients/{patient_id}/profile", json=changes)).json()
+
     async def specializations(self) -> list[dict]:
         return (await self.request("GET", "/internal/v1/specializations")).json()
 

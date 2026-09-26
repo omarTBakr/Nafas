@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, EmailStr, Field
 
 from nafas_core.config import get_setting
+from nafas_core.enums.dialect import SpokenDialect, VoiceGender
 from nafas_core.enums.identity import Language
 from nafas_gateway.clients.identity import Account, get_identity
 from nafas_gateway.sessions import COOKIE_NAME, current_account, issue_token
@@ -20,6 +21,8 @@ class SignUp(BaseModel):
     full_name: str = Field(min_length=2, max_length=200)
     preferred_language: Language = Language.ARABIC
     phone: str | None = Field(default=None, max_length=32)
+    dialect: SpokenDialect | None = None
+    voice: VoiceGender | None = None
 
 
 class Me(BaseModel):

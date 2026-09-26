@@ -11,6 +11,19 @@ export interface Me {
   patient_id: string | null;
 }
 
+export const DIALECTS = ["eg", "sa", "ma", "bh", "sd", "iq", "lb", "sy", "ly", "ps", "tn", "dz", "ye"] as const;
+export type SpokenDialect = (typeof DIALECTS)[number];
+export type VoiceGender = "female" | "male";
+
+export interface Profile {
+  patient_id: string;
+  full_name: string;
+  phone: string | null;
+  preferred_language: "ar" | "en";
+  dialect: SpokenDialect | null;
+  voice: VoiceGender | null;
+}
+
 export interface Specialization {
   code: string;
   name_en: string;
@@ -136,8 +149,16 @@ const query = (params: Record<string, string | number | undefined>) =>
 export const api = {
   me: () => call<Me>("GET", "/api/auth/me"),
   login: (email: string, password: string) => call<Me>("POST", "/api/auth/login", { email, password }),
-  register: (form: { email: string; password: string; full_name: string; preferred_language: "ar" | "en"; phone?: string }) =>
-    call<Me>("POST", "/api/auth/register", form),
+  register: (form: {
+    email: string;
+    password: string;
+    full_name: string;
+    preferred_language: "ar" | "en";
+    phone?: string;
+    dialect?: SpokenDialect;
+  }) => call<Me>("POST", "/api/auth/register", form),
+  profile: () => call<Profile>("GET", "/api/me/profile"),
+  updateProfile: (changes: Partial<Omit<Profile, "patient_id">>) => call<Profile>("PATCH", "/api/me/profile", changes),
   logout: () => call<void>("POST", "/api/auth/logout"),
 
   specializations: () => call<Specialization[]>("GET", "/api/specializations"),

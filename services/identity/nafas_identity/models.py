@@ -20,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from nafas_core.db import Base
 from nafas_core.enums.channel import Channel
+from nafas_core.enums.dialect import SpokenDialect, VoiceGender
 from nafas_core.enums.identity import Language, UserRole
 from nafas_identity.enums import CareStatus, ConsentKind, Sex
 
@@ -116,6 +117,10 @@ class Patient(Base):
     preferred_language: Mapped[Language] = mapped_column(
         _enum(Language, "language"), default=Language.ARABIC, server_default="ar"
     )
+    # chosen by the patient: the dialect replies are spoken (and written) in,
+    # and the built-in voice that speaks them; None until they choose
+    dialect: Mapped[SpokenDialect | None] = mapped_column(_enum(SpokenDialect, "spoken_dialect"))
+    voice: Mapped[VoiceGender | None] = mapped_column(_enum(VoiceGender, "voice_gender"))
     created_at: Mapped[datetime] = _created_at()
 
 

@@ -38,8 +38,9 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [ ] Intent classifier; the booking tool loop on Claude (extract a `TimeExpression`, then find, check, hold, confirm, cancel through scheduling)
 - [ ] Chat panel in the patient portal with streamed replies; chat and slot picker share the same holds
 - [ ] `BookingWorkflow`: hold expiry and in-app reminders (T-24h, T-1h); Temporal time-skipping tests
-- [ ] Patient dialect and voice: `dialect` (13 Lahgtna codes) and `voice` (male/female) on the patient, chosen at sign-up or in a profile page; the dialect-router suggests a default from early messages
-- [ ] `stt` GPU service: `whisper-large-v3-turbo-arabic-dialectal-v2` pinned in a CUDA image, `/health` config, `/metrics`, and the `interfaces/stt` client and fake
+- [x] Patient dialect and voice: `dialect` (13 Lahgtna codes) and `voice` (male/female) on the patient, chosen at sign-up or on the profile page (`/api/me/profile`, patient scope)
+- [ ] The dialect-router suggests a default from a patient's first chat messages (with the conversation service)
+- [ ] **(in progress)** `stt` GPU service: `whisper-large-v3-turbo-arabic-dialectal-v2` pinned in a CUDA image, `/health` config, `/metrics`, and the `interfaces/stt` client and fake
 - [ ] Voice input: record in the browser → STT → the same pipeline; audio in S3, transcript on the message; check English voice notes and fall back to base turbo for English patients if the fine-tune lost English
 - [ ] Validate STT on our own labelled samples per dialect against the published WER
 - [ ] `tts` GPU service: Lahgtna OmniVoice v2 (13 dialects, built-in voices, `language` = the patient's dialect) pinned in a CUDA image, `/health` config, `/metrics`, and the `interfaces/tts` client and fake
