@@ -66,8 +66,8 @@ def _start_session(response: Response, account: Account) -> None:
 async def login(credentials: Login, response: Response, request: Request) -> Me:
     """Sets the session cookie. One answer for every kind of failure, so it says nothing about who has an account."""
     # per address and per account: guessing one password from many addresses is slowed too
-    limiter.hit(LOGIN_PER_ADDRESS, client_address(request))
-    limiter.hit(LOGIN_PER_EMAIL, credentials.email.strip().lower())
+    await limiter.hit(LOGIN_PER_ADDRESS, client_address(request))
+    await limiter.hit(LOGIN_PER_EMAIL, credentials.email.strip().lower())
     account = await get_identity().verify(credentials.email, credentials.password)
     if account is None:
         raise HTTPException(status_code=401, detail="email or password is wrong")

@@ -38,6 +38,7 @@ NOT_ISOLATED = {
     "identity.doctors": "the public doctor directory",
     "identity.specializations": "the public list of specializations",
     "identity.users": "login looks accounts up by email before anyone is known; closed to other services by per-service roles",
+    "edge.rate_hits": "hashed rate-limit keys, no patient data; the gateway's own",
     "audit.audit_log": "services may only insert; nobody but the owner reads it (checked below)",
 }
 

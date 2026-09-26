@@ -29,7 +29,7 @@ class ChatIn(BaseModel):
 
 @router.post("/assistant")
 async def assistant(body: ChatIn, doctor: Account = Depends(current_doctor)) -> StreamingResponse:
-    limiter.hit(ASSISTANT_PER_DOCTOR, str(doctor.doctor_id))
+    await limiter.hit(ASSISTANT_PER_DOCTOR, str(doctor.doctor_id))
     stream = await get_doctor_assistant().open_chat(doctor.doctor_id, body.model_dump(mode="json"))
     return StreamingResponse(
         stream, media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}

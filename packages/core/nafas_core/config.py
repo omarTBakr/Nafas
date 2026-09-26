@@ -100,6 +100,9 @@ class Settings(BaseSettings):
     jwt_ttl_minutes: int = Field(720, description="Lifetime of a dashboard session")
     session_cookie_secure: bool = Field(True, description="Send the session cookie over HTTPS only (browsers exempt localhost)")
 
+    rate_limits_shared: bool = Field(
+        False, description="Count the gateway's rate limits in Postgres, shared by every replica, not in one process's memory"
+    )
     log_level: str = Field("INFO", description="Root log level: DEBUG, INFO, WARNING, ERROR")
     log_format: str = Field("text", description="text for a terminal, json for a log pipeline (one object per line)")
     metrics_token: SecretStr = Field(

@@ -71,7 +71,10 @@ services:
         MODULE: nafas_gateway.main
     image: nafas/gateway:dev
     environment: &service-env
-      DATABASE_URL: postgresql+asyncpg://nafas_service:nafas@postgres:5432/nafas
+      # the gateway's own login: the edge schema (shared rate limits) and nothing else;
+      # every other service names its own below
+      DATABASE_URL: postgresql+asyncpg://nafas_edge_svc:nafas@postgres:5432/nafas
+      RATE_LIMITS_SHARED: "true"
       TEMPORAL_HOST: temporal:7233
       S3_ENDPOINT_URL: http://s3:8333
       DIALECT_ROUTER_URL: http://dialect-router:8410
@@ -225,6 +228,8 @@ services:
     image: nafas/doctor-assistant:dev
     environment:
       <<: *service-env
+      # no database: it reads through the services that own the data
+      DATABASE_URL: ""
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     ports:
       - "8020:8020"

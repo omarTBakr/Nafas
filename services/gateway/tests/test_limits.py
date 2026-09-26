@@ -1,4 +1,9 @@
-from nafas_gateway.limits import Limit, RateLimiter
+import pytest
+from sqlalchemy import text
+
+from nafas_core.db import session_scope
+from nafas_gateway.errors import Refusal
+from nafas_gateway.limits import Limit, MemoryStore, PostgresStore, RateLimiter
 
 from .conftest import browser, sign_up
 
@@ -11,24 +16,40 @@ class Clock:
         return self.now
 
 
-def test_a_full_window_refuses_until_its_oldest_hit_ages_out():
+async def test_a_full_window_refuses_until_its_oldest_hit_ages_out():
     clock = Clock()
-    limiter = RateLimiter(clock)
+    limiter = RateLimiter(MemoryStore(clock))
     limit = Limit("t", 2, 60)
-    limiter.hit(limit, "a")
+    await limiter.hit(limit, "a")
     clock.now += 10
-    limiter.hit(limit, "a")
+    await limiter.hit(limit, "a")
 
-    try:
-        limiter.hit(limit, "a")
-        raise AssertionError("the third hit should be refused")
-    except Exception as refused:
-        assert (refused.status_code, refused.reason, refused.retry_after) == (429, "rate_limited", 50)
+    with pytest.raises(Refusal) as refused:
+        await limiter.hit(limit, "a")
+    assert (refused.value.status_code, refused.value.reason, refused.value.retry_after) == (429, "rate_limited", 50)
 
     # another key has its own window
-    limiter.hit(limit, "b")
+    await limiter.hit(limit, "b")
     clock.now += 50
-    limiter.hit(limit, "a")
+    await limiter.hit(limit, "a")
+
+
+async def test_replicas_share_one_window_in_postgres_and_keys_are_hashed(database):
+    limit = Limit("shared-test", 3, 60)
+    # two gateway replicas: two limiters, one database
+    first, second = RateLimiter(PostgresStore()), RateLimiter(PostgresStore())
+    await first.hit(limit, "sara@example.com")
+    await second.hit(limit, "sara@example.com")
+    await first.hit(limit, "sara@example.com")
+
+    with pytest.raises(Refusal) as refused:
+        await second.hit(limit, "sara@example.com")
+    assert 50 <= refused.value.retry_after <= 60
+    await second.hit(limit, "omar@example.com")
+
+    async with session_scope() as session:
+        keys = (await session.execute(text("SELECT DISTINCT key_hash FROM edge.rate_hits"))).scalars().all()
+    assert len(keys) == 2 and not any("@" in k for k in keys)
 
 
 async def test_login_guessing_is_slowed_per_account(doctor_id):
@@ -57,7 +78,7 @@ async def test_chat_is_limited_per_patient(doctor_id):
         await sign_up(sara)
         me = (await sara.get("/api/auth/me")).json()
         for _ in range(CHAT_PER_PATIENT.count):
-            limiter.hit(CHAT_PER_PATIENT, me["patient_id"])
+            await limiter.hit(CHAT_PER_PATIENT, me["patient_id"])
         refused = await sara.post(f"/api/chat/{doctor_id}/messages", json={"text": "hi"})
 
     assert refused.status_code == 429

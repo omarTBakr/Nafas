@@ -89,6 +89,7 @@ def test_dev_may_run_on_laptop_defaults_and_production_may_not():
     assert any("FORWARDED_ALLOW_IPS" in p for p in found)
     assert any("SESSION_COOKIE_SECURE" in p for p in found)
     assert any("GIT_SHA" in p for p in found)
+    assert any("RATE_LIMITS_SHARED" in p for p in found)
 
 
 def test_production_with_real_settings_starts():
@@ -101,6 +102,7 @@ def test_production_with_real_settings_starts():
         database_url="postgresql+asyncpg://nafas_identity_svc:long-secret@db:5432/nafas",
         forwarded_allow_ips="10.0.0.5",
         git_sha="abc1234",
+        rate_limits_shared=True,
     )
 
     assert problems(ready) == []

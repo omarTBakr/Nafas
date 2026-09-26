@@ -8,6 +8,7 @@
 --   nafas_service  the test suite's login; not an owner and not a
 --                  superuser, so row-level security actually applies to it
 --   nafas_<service>_access   NOLOGIN: one service's tables and nothing else
+--                            (the gateway's schema is called edge)
 --   nafas_<service>_svc      what that service logs in as: nafas_app (so the
 --                            row-level security policies apply to it) plus its
 --                            own _access group, and no other service's
@@ -27,7 +28,7 @@ BEGIN
     END IF;
 
     -- one database login per service, holding only that service's schema
-    FOREACH service IN ARRAY ARRAY['identity', 'scheduling', 'conversation', 'clinical', 'consultation'] LOOP
+    FOREACH service IN ARRAY ARRAY['identity', 'scheduling', 'conversation', 'clinical', 'consultation', 'edge'] LOOP
         IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'nafas_' || service || '_access') THEN
             EXECUTE format('CREATE ROLE %I NOLOGIN', 'nafas_' || service || '_access');
         END IF;

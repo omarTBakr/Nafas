@@ -33,6 +33,8 @@ def problems(settings: Settings) -> list[str]:
         found.append("SESSION_COOKIE_SECURE is off")
     if settings.forwarded_allow_ips.strip() == "*":
         found.append("FORWARDED_ALLOW_IPS trusts every sender; name the web proxy")
+    if not settings.rate_limits_shared:
+        found.append("RATE_LIMITS_SHARED is off: each gateway replica would keep its own count")
     if not settings.git_sha:
         found.append("GIT_SHA is unset: /health could not say which build is answering")
     # traces carry prompts, and prompts carry PHI (PLAN.md §2, tracing)
