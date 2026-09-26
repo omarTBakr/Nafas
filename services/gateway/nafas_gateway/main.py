@@ -9,17 +9,27 @@ from nafas_core.exceptions.config import ConfigurationError
 from nafas_core.exceptions.providers import ProviderError
 from nafas_core.logger import get_logger, setup_logging
 from nafas_core.tracing import configure_tracing
-from nafas_gateway.routes import auth
+from nafas_gateway.clients.base import UpstreamRefusal
+from nafas_gateway.routes import auth, booking, directory, doctor
 from nafas_gateway.sessions import signing_secret
 
 logger = get_logger(__name__)
 
 app = FastAPI(title="Nafas gateway", description="HTTP edge for the Nafas doctor dashboard")
 
-# routers are included here; anything that must apply to all of them — the
-# session dependency, say — is attached at inclusion rather than on each
-# endpoint. auth carries its own: login must be reachable logged out.
+# Each router's routes declare the session they need (current_patient,
+# current_doctor, current_account) because the web app mixes public routes
+# (sign-up, the doctor directory) with role-bound ones.
 app.include_router(auth.router)
+app.include_router(directory.router)
+app.include_router(booking.router)
+app.include_router(doctor.router)
+
+
+@app.exception_handler(UpstreamRefusal)
+async def upstream_refusal(request: Request, exc: UpstreamRefusal) -> JSONResponse:
+    """A service refused for a reason the user can act on (taken, not found, invalid): pass it on as is."""
+    return JSONResponse(status_code=exc.status_code, content=exc.body)
 
 
 @app.exception_handler(ProviderError)

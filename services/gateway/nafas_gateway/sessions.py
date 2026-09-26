@@ -10,9 +10,10 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import jwt
-from fastapi import Cookie, HTTPException
+from fastapi import Cookie, Depends, HTTPException
 
 from nafas_core.config import get_setting
+from nafas_core.enums.identity import UserRole
 from nafas_core.exceptions.config import MissingSettingError
 from nafas_gateway.clients.identity import Account, get_identity
 
@@ -56,5 +57,21 @@ async def current_account(nafas_session: str | None = Cookie(default=None)) -> A
     account = await get_identity().get_user(user_id) if user_id else None
     if account is None:
         raise HTTPException(status_code=401, detail="not logged in")
+
+    return account
+
+
+async def current_patient(account: Account = Depends(current_account)) -> Account:
+    """A logged-in patient, or 403 for any other role. Patient routes act only on this patient."""
+    if account.role is not UserRole.PATIENT or account.patient_id is None:
+        raise HTTPException(status_code=403, detail="for patients only")
+
+    return account
+
+
+async def current_doctor(account: Account = Depends(current_account)) -> Account:
+    """A logged-in doctor, or 403 for any other role. Doctor routes act only on this doctor."""
+    if account.role is not UserRole.DOCTOR or account.doctor_id is None:
+        raise HTTPException(status_code=403, detail="for doctors only")
 
     return account

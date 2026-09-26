@@ -2,8 +2,9 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel
+from sqlalchemy import select
 
 from nafas_core.db import session_scope
 from nafas_core.enums.identity import Language, UserRole
@@ -11,6 +12,7 @@ from nafas_core.internal_api import require_internal_token
 from nafas_identity.exceptions import AccountExistsError, WeakPasswordError
 from nafas_identity.logic.accounts import AuthenticatedUser, authenticate, get_user, register_patient_account
 from nafas_identity.logic.directory import DoctorCard, ensure_care_link, list_doctors, list_specializations
+from nafas_identity.models import Patient
 
 
 class Credentials(BaseModel):
@@ -129,6 +131,20 @@ async def doctor(doctor_id: uuid.UUID) -> DoctorOut:
         raise HTTPException(status_code=404, detail="no such doctor")
 
     return _doctor(found[0])
+
+
+class PatientName(BaseModel):
+    patient_id: uuid.UUID
+    full_name: str
+
+
+@router.get("/doctors/{doctor_id}/patients", response_model=list[PatientName])
+async def patient_names(doctor_id: uuid.UUID, ids: list[uuid.UUID] = Query(default=[])) -> list[PatientName]:
+    """Names of the doctor's own patients among `ids`; anyone not under their care is simply absent."""
+    async with session_scope(doctor_id=doctor_id) as session:
+        rows = (await session.execute(select(Patient.id, Patient.full_name).where(Patient.id.in_(ids)))).all()
+
+    return [PatientName(patient_id=pid, full_name=name) for pid, name in rows]
 
 
 @router.post("/care-links", status_code=204)
