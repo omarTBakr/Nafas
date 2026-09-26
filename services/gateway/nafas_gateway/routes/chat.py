@@ -6,7 +6,7 @@ workflow, and the reply comes back on the same request.
 
 import uuid
 from dataclasses import asdict
-from typing import Protocol
+from typing import Literal, Protocol
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import RedirectResponse
@@ -133,3 +133,15 @@ async def message_audio(doctor_id: uuid.UUID, message_id: uuid.UUID, patient: Ac
 @router.get("/{doctor_id}/messages")
 async def thread(doctor_id: uuid.UUID, patient: Account = Depends(current_patient)) -> list[dict]:
     return await get_conversation().patient_messages(patient.patient_id, doctor_id)
+
+
+class FeedbackIn(BaseModel):
+    rating: Literal["up", "down"]
+
+
+@router.put("/{doctor_id}/messages/{message_id}/feedback", status_code=204)
+async def rate_reply(
+    doctor_id: uuid.UUID, message_id: uuid.UUID, body: FeedbackIn, patient: Account = Depends(current_patient)
+) -> None:
+    """Thumbs up or down on one of the assistant's replies."""
+    await get_conversation().rate_reply(patient.patient_id, doctor_id, message_id, body.rating)

@@ -7,7 +7,7 @@ export GIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null)
 
 COMPOSE := docker compose
 
-.PHONY: up up-cpu down ps logs build db-roles migrate seed storage test test-web web-dev test-gpu-services gpu-check monitoring
+.PHONY: up up-cpu down ps logs build db-roles migrate seed storage test test-web web-dev test-gpu-services gpu-check monitoring export-feedback
 
 up:  ## the whole stack, GPU services on the GPU
 	$(COMPOSE) up -d --build
@@ -58,6 +58,9 @@ test-gpu-services:
 
 monitoring:  ## Prometheus on :9090 and Grafana on :3000 beside the stack
 	$(COMPOSE) --profile monitoring up -d prometheus grafana
+
+export-feedback:  ## de-identified feedback datasets into data/feedback/<date> (needs FEEDBACK_SALT)
+	uv run python -m scripts.export_feedback
 
 gpu-check:  ## prove a container can see the GPU
 	docker run --rm --device nvidia.com/gpu=all ubuntu:24.04 nvidia-smi -L

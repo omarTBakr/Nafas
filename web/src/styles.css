@@ -221,3 +221,6 @@ textarea { min-height: 80px; resize: vertical; }
 .note-row input { flex: 1 1 140px; min-width: 0; }
 .transcript { padding-inline-start: 0; list-style: none; display: grid; gap: 6px; margin: 12px 0 0; }
 .notice.warn ul { margin: 6px 0 0; padding-inline-start: 20px; }
+.thumbs { display: inline-flex; gap: 4px; margin-block-start: 4px; }
+.thumbs button { opacity: 0.45; padding: 2px 4px; }
+.thumbs button[aria-pressed="true"], .thumbs button:hover { opacity: 1; }

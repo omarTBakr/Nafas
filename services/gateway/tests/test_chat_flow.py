@@ -208,3 +208,22 @@ async def test_a_dose_question_goes_to_the_doctor_whose_answer_appears_in_the_ch
     assert answered.status_code == 200
     assert stolen.status_code == 403
     assert (thread[-1]["role"], thread[-1]["content"]) == ("doctor", "لا، نتكلم في الزيارة.")
+
+
+async def test_a_patient_rates_a_reply_and_may_change_their_mind(doctor_id, conversation):
+    async with conversation(FakeLLM([classified("other"), "العيادة بتفتح الساعة ٥."])), browser() as sara, browser() as omar:
+        await sign_up(sara)
+        await consent_to_chat(sara, doctor_id)
+        await sara.post(f"/api/chat/{doctor_id}/messages", json={"text": "العيادة بتفتح إمتى؟"})
+        question, reply = (await sara.get(f"/api/chat/{doctor_id}/messages")).json()
+
+        down = await sara.put(f"/api/chat/{doctor_id}/messages/{reply['message_id']}/feedback", json={"rating": "down"})
+        up = await sara.put(f"/api/chat/{doctor_id}/messages/{reply['message_id']}/feedback", json={"rating": "up"})
+        own_message = await sara.put(f"/api/chat/{doctor_id}/messages/{question['message_id']}/feedback", json={"rating": "up"})
+        await sign_up(omar, email="omar@example.com", name="عمر")
+        someone_else = await omar.put(f"/api/chat/{doctor_id}/messages/{reply['message_id']}/feedback", json={"rating": "down"})
+        thread = (await sara.get(f"/api/chat/{doctor_id}/messages")).json()
+
+    assert (down.status_code, up.status_code) == (204, 204)
+    assert own_message.status_code == 404 and someone_else.status_code == 404
+    assert [m["feedback"] for m in thread] == [None, "up"]

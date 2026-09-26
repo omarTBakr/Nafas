@@ -12,10 +12,36 @@ interface Line {
   actions?: ChatAction[];
   // this message has a voice note or a spoken reply to play
   audio?: boolean;
+  feedback?: "up" | "down" | null;
 }
 
 function fromThread(m: ChatMessage): Line {
-  return { id: m.message_id, role: m.role, text: m.content, audio: Boolean(m.audio_key) };
+  return { id: m.message_id, role: m.role, text: m.content, audio: Boolean(m.audio_key), feedback: m.feedback ?? null };
+}
+
+/** Thumbs on one of the assistant's replies: what helps and what does not, read (de-identified) into the evals. */
+function Thumbs({ doctorId, line }: { doctorId: string; line: Line }) {
+  const { t } = useI18n();
+  const [rating, setRating] = useState(line.feedback ?? null);
+  async function rate(value: "up" | "down") {
+    const before = rating;
+    setRating(value);
+    try {
+      await api.rateReply(doctorId, line.id, value);
+    } catch {
+      setRating(before);
+    }
+  }
+  return (
+    <span className="thumbs" role="group" aria-label={t("rateReply")}>
+      <button type="button" className="link" aria-pressed={rating === "up"} aria-label={t("helpful")} onClick={() => rate("up")}>
+        👍
+      </button>
+      <button type="button" className="link" aria-pressed={rating === "down"} aria-label={t("notHelpful")} onClick={() => rate("down")}>
+        👎
+      </button>
+    </span>
+  );
 }
 
 /** A hold, confirmation or cancellation the assistant made, as a card; a hold can be confirmed right here. */
@@ -208,6 +234,7 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
               </span>
               <p>{line.text}</p>
               {line.audio && <audio controls preload="none" src={api.audioUrl(doctorId, line.id)} aria-label={t("voiceNote")} />}
+              {line.role === "assistant" && !line.id.startsWith("pending") && <Thumbs doctorId={doctorId} line={line} />}
             </div>
             {line.actions?.map((action) => (
               <ActionCard

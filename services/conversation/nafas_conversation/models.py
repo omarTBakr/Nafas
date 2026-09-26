@@ -90,3 +90,18 @@ class Escalation(Base):
     nudged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
+
+
+class ReplyFeedback(Base):
+    """A patient's thumbs up or down on one of the assistant's replies; one per reply, changeable."""
+
+    __tablename__ = "reply_feedback"
+    __table_args__ = (UniqueConstraint("message_id", name="uq_reply_feedback_message"), {"schema": SCHEMA})
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    message_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(f"{SCHEMA}.messages.id", ondelete="CASCADE"))
+    patient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    doctor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    # "up" or "down"
+    rating: Mapped[str] = mapped_column(String(8))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())

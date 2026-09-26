@@ -104,6 +104,11 @@ async def clinic_a(database):
     conversation_id = await messages.open_conversation(patient_a, doctor_a)
     question_id = uuid.uuid4()
     await messages.add_patient_message(patient_a, question_id, conversation_id, "ينفع أزود الجرعة؟")
+    reply_id = uuid.uuid4()
+    await messages.add_assistant_message(
+        patient_a, reply_id, conversation_id, text="هسأل الدكتور.", model="m", prompt_version="v", tokens_in=1, tokens_out=1
+    )
+    await messages.rate_reply(patient_a, doctor_a, reply_id, "up")
     await escalations.open_escalation(
         escalation_id=uuid.uuid4(),
         patient_id=patient_a,

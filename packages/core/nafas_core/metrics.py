@@ -37,6 +37,7 @@ BOOKINGS = Counter("nafas_booking_events_total", "Appointments held, confirmed, 
 VISIT_NOTES = Counter(
     "nafas_visit_notes_total", "Recorded visits by outcome: approved as drafted or edited, discarded, failed", ["outcome"]
 )
+REPLY_FEEDBACK = Counter("nafas_reply_feedback_total", "Patients' thumbs on the assistant's replies", ["rating"])
 WORKFLOW_FAILURES = Counter("nafas_workflow_failures_total", "Workflows that ended in a failure state", ["workflow"])
 
 

@@ -11,3 +11,7 @@ class EscalationNotFoundError(ConversationError):
 
 class EscalationClosedError(ConversationError):
     """The escalation was already answered, closed or expired."""
+
+
+class MessageNotFoundError(ConversationError):
+    """No such assistant reply in this patient's thread with this doctor."""

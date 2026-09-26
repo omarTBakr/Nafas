@@ -6,8 +6,10 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from nafas_conversation.enums import Intent, MessageRole, Modality
-from nafas_conversation.models import Conversation, Message
+from nafas_conversation.exceptions import MessageNotFoundError
+from nafas_conversation.models import Conversation, Message, ReplyFeedback
 from nafas_core.db import session_scope
+from nafas_core.metrics import REPLY_FEEDBACK
 
 # how much of the thread the model sees; older turns rarely matter to a booking
 HISTORY_LIMIT = 40
@@ -113,6 +115,34 @@ async def patient_thread(patient_id: uuid.UUID, doctor_id: uuid.UUID, limit: int
     if conversation_id is None:
         return []
     return await recent_messages(patient_id, conversation_id, limit)
+
+
+async def rate_reply(patient_id: uuid.UUID, doctor_id: uuid.UUID, message_id: uuid.UUID, rating: str) -> None:
+    """The patient's thumbs on an assistant reply in their thread with this doctor; a second rating replaces the first."""
+    async with session_scope(patient_id=patient_id) as session:
+        reply = await session.scalar(
+            select(Message.id)
+            .join(Conversation, Conversation.id == Message.conversation_id)
+            .where(Message.id == message_id, Message.role == MessageRole.ASSISTANT, Conversation.doctor_id == doctor_id)
+        )
+        if reply is None:
+            raise MessageNotFoundError(str(message_id))
+        await session.execute(
+            insert(ReplyFeedback)
+            .values(message_id=message_id, patient_id=patient_id, doctor_id=doctor_id, rating=rating)
+            .on_conflict_do_update(constraint="uq_reply_feedback_message", set_={"rating": rating})
+        )
+    REPLY_FEEDBACK.labels(rating).inc()
+
+
+async def ratings(patient_id: uuid.UUID, message_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+    if not message_ids:
+        return {}
+    async with session_scope(patient_id=patient_id) as session:
+        rows = await session.execute(
+            select(ReplyFeedback.message_id, ReplyFeedback.rating).where(ReplyFeedback.message_id.in_(message_ids))
+        )
+        return dict(rows.all())
 
 
 def model_history(messages: list[Message]) -> list[dict]:

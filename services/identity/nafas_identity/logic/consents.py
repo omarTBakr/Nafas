@@ -16,7 +16,7 @@ from nafas_identity.enums import ConsentKind
 from nafas_identity.exceptions import ConsentNotFoundError
 from nafas_identity.models import Consent
 
-PLATFORM_WIDE = {ConsentKind.DATA_PROCESSING}
+PLATFORM_WIDE = {ConsentKind.DATA_PROCESSING, ConsentKind.SERVICE_IMPROVEMENT}
 
 
 def _check_shape(kind: ConsentKind, doctor_id: uuid.UUID | None) -> None:

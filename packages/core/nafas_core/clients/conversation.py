@@ -104,6 +104,10 @@ class ConversationClient(InternalClient):
         )
         return response.json()
 
+    async def rate_reply(self, patient_id: uuid.UUID, doctor_id: uuid.UUID, message_id: uuid.UUID, rating: str) -> None:
+        path = f"/internal/v1/patients/{patient_id}/conversations/{doctor_id}/messages/{message_id}/feedback"
+        await self.request("PUT", path, json={"rating": rating})
+
     async def escalations(
         self, doctor_id: uuid.UUID, statuses: list[str] | None = None, patient_id: uuid.UUID | None = None
     ) -> list[dict]:

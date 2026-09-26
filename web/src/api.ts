@@ -8,7 +8,7 @@ export const CONSENT_VERSION = "consent-v1";
 
 export interface Consent {
   consent_id: string;
-  kind: "data_processing" | "ai_chat" | "session_recording";
+  kind: "data_processing" | "ai_chat" | "session_recording" | "service_improvement";
   doctor_id: string | null;
   granted_at: string;
   evidence: string | null;
@@ -114,6 +114,7 @@ export interface ChatMessage {
   audio_key: string | null;
   intent: Intent | null;
   created_at: string;
+  feedback?: "up" | "down" | null;
 }
 
 export interface ChatAction {
@@ -417,6 +418,8 @@ export const api = {
   cancel: (id: string) => call<Appointment>("POST", `/api/appointments/${id}/cancel`),
   mine: () => call<Appointment[]>("GET", "/api/appointments/mine"),
 
+  rateReply: (doctorId: string, messageId: string, rating: "up" | "down") =>
+    call<void>("PUT", `/api/chat/${doctorId}/messages/${messageId}/feedback`, { rating }),
   chatThread: (doctorId: string) => call<ChatMessage[]>("GET", `/api/chat/${doctorId}/messages`),
   chatSend: (doctorId: string, text: string) => call<ChatReply>("POST", `/api/chat/${doctorId}/messages`, { text }),
   chatVoice: (doctorId: string, audio: Blob) => {
@@ -426,7 +429,7 @@ export const api = {
   },
   audioUrl: (doctorId: string, messageId: string) => `/api/chat/${doctorId}/messages/${messageId}/audio`,
   consents: () => call<Consent[]>("GET", "/api/me/consents"),
-  grantConsent: (kind: "data_processing" | "ai_chat", doctorId?: string) =>
+  grantConsent: (kind: "data_processing" | "ai_chat" | "service_improvement", doctorId?: string) =>
     call<Consent>("POST", "/api/me/consents", { kind, doctor_id: doctorId ?? null }),
   revokeConsent: (id: string) => call<void>("POST", `/api/me/consents/${id}/revoke`),
   dialectSuggestion: () => call<{ dialect: SpokenDialect | null }>("GET", "/api/me/dialect-suggestion"),

@@ -186,4 +186,34 @@ describe("consent", () => {
     expect(await screen.findByLabelText("Type your message")).toBeInTheDocument();
     expect(granted).toEqual([{ kind: "ai_chat", doctor_id: "d1" }]);
   });
+  it("rates a reply, and shows the rating given before", async () => {
+    const puts: [string, unknown][] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/api/me/consents") return json(CONSENTED);
+        if (init?.method === "PUT") {
+          puts.push([url, JSON.parse(String(init.body))]);
+          return new Response(null, { status: 204 });
+        }
+        if (url === "/api/chat/d1/messages")
+          return json([
+            { message_id: "m1", role: "patient", modality: "text", content: "When do you open?", audio_key: null, intent: null, created_at: "2026-09-26T10:00:00Z" },
+            { message_id: "m2", role: "assistant", modality: "text", content: "At 5 pm.", audio_key: null, intent: "other", created_at: "2026-09-26T10:00:01Z", feedback: "down" },
+          ]);
+        return json({}, 404);
+      }),
+    );
+    renderChat();
+
+    expect(await screen.findByText("At 5 pm.")).toBeInTheDocument();
+    // only the assistant's reply can be rated
+    expect(screen.getAllByRole("group", { name: "Rate this reply" })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "Not helpful" })).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(screen.getByRole("button", { name: "Helpful" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Helpful" })).toHaveAttribute("aria-pressed", "true"));
+    expect(puts).toEqual([["/api/chat/d1/messages/m2/feedback", { rating: "up" }]]);
+  });
 });

@@ -6,13 +6,14 @@ only reads, always in the scope of the person asking.
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from nafas_conversation.enums import EscalationReason, EscalationStatus, Intent, MessageRole, Modality
 from nafas_conversation.events import get_events
-from nafas_conversation.exceptions import EscalationClosedError, EscalationNotFoundError
+from nafas_conversation.exceptions import EscalationClosedError, EscalationNotFoundError, MessageNotFoundError
 from nafas_conversation.logic import escalations, messages, voice
 from nafas_conversation.models import Message
 from nafas_conversation.prompts import booking as booking_prompt
@@ -33,9 +34,15 @@ class MessageOut(BaseModel):
     audio_key: str | None
     intent: Intent | None
     created_at: datetime
+    # the patient's thumbs on an assistant reply, if they gave one
+    feedback: Literal["up", "down"] | None = None
 
 
-def _message(m: Message) -> MessageOut:
+class FeedbackIn(BaseModel):
+    rating: Literal["up", "down"]
+
+
+def _message(m: Message, feedback: str | None = None) -> MessageOut:
     return MessageOut(
         message_id=m.id,
         role=m.role,
@@ -44,6 +51,7 @@ def _message(m: Message) -> MessageOut:
         audio_key=m.audio_key,
         intent=m.intent,
         created_at=m.created_at,
+        feedback=feedback,
     )
 
 
@@ -68,7 +76,17 @@ async def patient_messages(
             doctor_id=doctor_id,
             detail={"messages": len(thread)},
         )
-    return [_message(m) for m in thread]
+    rated = await messages.ratings(patient_id, [m.id for m in thread if m.role is MessageRole.ASSISTANT])
+    return [_message(m, rated.get(m.id)) for m in thread]
+
+
+@router.put("/patients/{patient_id}/conversations/{doctor_id}/messages/{message_id}/feedback", status_code=204)
+async def rate_reply(patient_id: uuid.UUID, doctor_id: uuid.UUID, message_id: uuid.UUID, body: FeedbackIn) -> None:
+    """The patient's thumbs on one reply: read into eval candidates by the feedback export, de-identified."""
+    try:
+        await messages.rate_reply(patient_id, doctor_id, message_id, body.rating)
+    except MessageNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="no such reply") from exc
 
 
 @router.get("/patients/{patient_id}/dialect-suggestion")

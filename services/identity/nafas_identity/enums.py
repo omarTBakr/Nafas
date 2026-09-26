@@ -18,3 +18,5 @@ class ConsentKind(StrEnum):
     AI_CHAT = "ai_chat"
     # asked afresh for every recording, never assumed from an earlier one
     SESSION_RECORDING = "session_recording"
+    # optional, off unless given: de-identified extracts reviewed to test and improve the assistants
+    SERVICE_IMPROVEMENT = "service_improvement"

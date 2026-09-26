@@ -16,7 +16,7 @@ CONSENT_VERSION = "consent-v1"
 
 
 class ConsentIn(BaseModel):
-    kind: Literal["data_processing", "ai_chat"]
+    kind: Literal["data_processing", "ai_chat", "service_improvement"]
     doctor_id: uuid.UUID | None = None
 
 

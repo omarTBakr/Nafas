@@ -23,3 +23,6 @@ tts-samples/
 listening-test/
 normaliser-review.csv
 services/conversation/evals/last-run.json
+
+# feedback exports: de-identified, but reviewed before anything leaves the machine
+data/

@@ -112,6 +112,19 @@ export default function ProfilePage() {
       <section className="stack" aria-label={t("consents")}>
         <h3>{t("consents")}</h3>
         <p className="hint">{t("revokeHint")}</p>
+        <label className="consent">
+          <input
+            type="checkbox"
+            checked={consents.some((c) => c.kind === "service_improvement")}
+            onChange={async (e) => {
+              const given = consents.find((c) => c.kind === "service_improvement");
+              if (e.target.checked) await api.grantConsent("service_improvement");
+              else if (given) await api.revokeConsent(given.consent_id);
+              loadConsents();
+            }}
+          />
+          <span>{t("improvementOptIn")}</span>
+        </label>
         {consents.map((c) => {
           const doctor = doctors.find((d) => d.doctor_id === c.doctor_id);
           return (
