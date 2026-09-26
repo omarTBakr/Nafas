@@ -22,8 +22,22 @@ from nafas_core.interfaces.storage.base import Storage
 from nafas_core.interfaces.stt.base import STT
 from nafas_core.logger import get_logger
 from nafas_core.metrics import VISIT_NOTES, WORKFLOW_FAILURES
+from nafas_core.tracing import step
 
 logger = get_logger(__name__)
+
+
+@step("consultation.draft")
+async def draft_note(llm: LLM, model: str, patient_language: str, timed_transcript: str):
+    """The summary model's note, as a forced tool call; traced, so a draft can be read beside its transcript."""
+    return await llm.create(
+        model=model,
+        system=soap.system(patient_language),
+        tools=[soap.TOOL],
+        tool_choice={"type": "tool", "name": soap.TOOL["name"]},
+        messages=[{"role": "user", "content": f"Transcript of the visit:\n\n{timed_transcript}"}],
+        max_tokens=4000,
+    )
 
 
 class ConsultationActivities:
@@ -68,14 +82,7 @@ class ConsultationActivities:
             raise ApplicationError("nothing could be heard in the recording", non_retryable=True)
 
         language = (await self._identity.profile(patient_id)).get("preferred_language") or "ar"
-        response = await self._llm.create(
-            model=self._model,
-            system=soap.system(language),
-            tools=[soap.TOOL],
-            tool_choice={"type": "tool", "name": soap.TOOL["name"]},
-            messages=[{"role": "user", "content": f"Transcript of the visit:\n\n{transcript.for_prompt(segments)}"}],
-            max_tokens=4000,
-        )
+        response = await draft_note(self._llm, self._model, language, transcript.for_prompt(segments))
         raw = next((b.input for b in response.content if b.type == "tool_use" and b.name == soap.TOOL["name"]), None)
         try:
             note = Note.model_validate(raw)

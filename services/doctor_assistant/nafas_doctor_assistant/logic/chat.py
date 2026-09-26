@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator
 from nafas_core.exceptions.providers import LLMError
 from nafas_core.interfaces.llm import LLM
 from nafas_core.logger import get_logger
+from nafas_core.tracing import step
 
 logger = get_logger(__name__)
 
@@ -16,6 +17,7 @@ MAX_STEPS = 6
 MAX_TOKENS = 1500
 
 
+@step("doctor_assistant.chat")
 async def run_doctor_chat(
     llm: LLM, tools, *, model: str, system: str, tool_definitions: list[dict], prompt_version: str, history: list[dict]
 ) -> AsyncIterator[dict]:

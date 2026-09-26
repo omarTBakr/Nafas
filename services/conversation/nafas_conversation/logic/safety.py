@@ -18,6 +18,7 @@ from nafas_conversation.prompts import safety as prompts
 from nafas_core.exceptions.providers import LLMError
 from nafas_core.interfaces.llm import LLM
 from nafas_core.logger import get_logger
+from nafas_core.tracing import step
 
 logger = get_logger(__name__)
 
@@ -82,6 +83,7 @@ async def _verdict(llm: LLM, model: str, system: str, tool: dict, content: str) 
     return None
 
 
+@step("gate.scope")
 async def scope_gate(llm: LLM, model: str, scope: dict, history: list[dict]) -> Scope | None:
     system = prompts.SCOPE_SYSTEM.format(
         specialization=scope["name_en"],
@@ -95,6 +97,7 @@ async def scope_gate(llm: LLM, model: str, scope: dict, history: list[dict]) -> 
         return None
 
 
+@step("gate.sensitivity")
 async def sensitivity_gate(llm: LLM, model: str, scope: dict, history: list[dict]) -> Sensitivity:
     """Sensitive unless the model clearly says general; the medication rule decides first."""
     if mentions_medication_change(history[-1]["content"]):
@@ -106,6 +109,7 @@ async def sensitivity_gate(llm: LLM, model: str, scope: dict, history: list[dict
     return Sensitivity(verdict["sensitive"], str(verdict.get("category", "unclear")))
 
 
+@step("gate.output_guard")
 async def output_guard(llm: LLM, model: str, question: str, draft: str) -> bool:
     """True when the draft may be shown; any doubt or failure blocks it."""
     if mentions_medication_change(draft):

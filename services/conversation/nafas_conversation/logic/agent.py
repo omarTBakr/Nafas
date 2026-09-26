@@ -14,6 +14,7 @@ from nafas_core.clients.base import UpstreamRefusal
 from nafas_core.exceptions.providers import LLMError
 from nafas_core.interfaces.llm import LLM
 from nafas_core.logger import get_logger
+from nafas_core.tracing import step
 
 logger = get_logger(__name__)
 
@@ -46,6 +47,7 @@ class AgentReply:
     actions: list[dict] = field(default_factory=list)
 
 
+@step("conversation.booking_tool", run_type="tool")
 async def _run_tool(tools: BookingTools, name: str, arguments: dict, actions: list[dict]) -> tuple[Any, bool]:
     """(result, is_error). A refusal is a result the model must read and explain, not a crash."""
     try:
@@ -74,6 +76,7 @@ async def _run_tool(tools: BookingTools, name: str, arguments: dict, actions: li
         return {"error": f"missing argument {missing}"}, True
 
 
+@step("conversation.booking_agent")
 async def run_booking_turn(
     llm: LLM,
     tools: BookingTools,

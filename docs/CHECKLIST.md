@@ -9,7 +9,7 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [x] `utils/db` engine, session and RLS helper; Alembic initialized
 - [x] Protocols and factories for llm, stt, embeddings, storage and channels, with fake implementations for tests
 - [x] LangSmith tracing: every Claude call traced as an LLM run with usage, a no-op unless `LANGSMITH_TRACING=true`
-- [ ] `@traceable` on each agent loop and pipeline step as they are written (phases 3–7)
+- [x] `@traceable` on each agent loop and pipeline step (`nafas_core.tracing.step`): a patient's message is one trace (turn, intent, medical, the three gates, context retrieval, the booking agent and its tools); the doctor assistant, record search and visit-note drafts too; clients never appear in a trace's inputs
 - [x] Restructure into a uv workspace: `packages/core` (`nafas_core`) and `services/gateway`; tests per package; CI and pre-commit updated
 - [x] `Makefile` running compose on the native Docker engine (the GPU is unreachable from Docker Desktop)
 - [x] `dialect-router` GPU service (FastAPI + transformers, CUDA image, model baked in at a pinned revision, config on `/health`, Prometheus `/metrics`, low-confidence predictions logged for feedback) and the `interfaces/dialect` client, fake and factory

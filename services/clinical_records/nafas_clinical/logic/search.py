@@ -17,6 +17,7 @@ from nafas_clinical.enums import SourceType, Visibility
 from nafas_clinical.logic.chunking import split_text
 from nafas_clinical.models import Chunk
 from nafas_core.interfaces.embeddings import Embeddings
+from nafas_core.tracing import step
 
 # each method proposes this many times k before fusing; RRF's usual constant
 CANDIDATES = 4
@@ -70,6 +71,7 @@ async def index(
     return len(passages)
 
 
+@step("clinical.search", run_type="retriever")
 async def search(
     session: AsyncSession, embeddings: Embeddings, *, patient_id: uuid.UUID, doctor_id: uuid.UUID, query: str, k: int = 6
 ) -> list[Passage]:

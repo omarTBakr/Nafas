@@ -23,6 +23,7 @@ from nafas_core.exceptions.providers import LLMError
 from nafas_core.interfaces.llm import LLM
 from nafas_core.logger import get_logger
 from nafas_core.metrics import GATE_VERDICTS
+from nafas_core.tracing import step
 
 logger = get_logger(__name__)
 
@@ -49,6 +50,7 @@ def escalated(doctor: dict, language: str, reason: EscalationReason, safety_reco
     return MedicalOutcome(AgentReply(text, FIXED, replies.VERSION), reason, safety_record | {"escalated": reason.value})
 
 
+@step("conversation.medical")
 async def answer_medical(
     llm: LLM,
     identity: IdentityClient,

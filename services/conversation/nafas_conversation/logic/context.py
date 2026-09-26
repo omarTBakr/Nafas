@@ -13,11 +13,13 @@ from typing import Protocol
 from zoneinfo import ZoneInfo
 
 from nafas_core.clients.scheduling import SchedulingClient
+from nafas_core.tracing import step
 
 ACTIVE = ("confirmed", "completed")
 
 
 class PatientContext(Protocol):
+    @step("conversation.context", run_type="retriever")
     async def for_patient(self, patient_id: uuid.UUID, doctor_id: uuid.UUID, question: str) -> list[str]:
         """Short facts the patient may see, relevant to the question; never another patient's."""
         ...
@@ -31,6 +33,7 @@ class AppointmentsContext:
         mine = await self._scheduling.patient_appointments(patient_id)
         return [a for a in mine if a["doctor_id"] == str(doctor_id) and a["status"] in ACTIVE]
 
+    @step("conversation.context", run_type="retriever")
     async def for_patient(self, patient_id: uuid.UUID, doctor_id: uuid.UUID, question: str) -> list[str]:
         zone = ZoneInfo((await self._scheduling.booking_info(doctor_id))["timezone"])
         facts = []
@@ -54,6 +57,7 @@ class ClinicalContext:
     async def visits(self, patient_id: uuid.UUID, doctor_id: uuid.UUID) -> list[dict]:
         return await self._appointments.visits(patient_id, doctor_id)
 
+    @step("conversation.context", run_type="retriever")
     async def for_patient(self, patient_id: uuid.UUID, doctor_id: uuid.UUID, question: str) -> list[str]:
         facts = await self._appointments.for_patient(patient_id, doctor_id, question)
         passages = await self._clinical.search(patient_id, doctor_id, question, audience="patient", k=PASSAGES)

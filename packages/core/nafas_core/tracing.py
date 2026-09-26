@@ -1,4 +1,8 @@
 import os
+import uuid
+from datetime import date, datetime
+
+from langsmith import traceable
 
 from nafas_core.config import Settings, get_setting
 from nafas_core.logger import get_logger
@@ -41,3 +45,30 @@ def configure_tracing(settings: Settings | None = None) -> bool:
     logger.info("LangSmith tracing on, project %r", settings.langsmith_project)
 
     return True
+
+
+_PLAIN = (str, int, float, bool, type(None), uuid.UUID, datetime, date)
+
+
+def _plain(value, depth: int = 0) -> bool:
+    if isinstance(value, _PLAIN):
+        return True
+    if depth < 4 and isinstance(value, list | tuple):
+        return all(_plain(v, depth + 1) for v in value)
+    if depth < 4 and isinstance(value, dict):
+        return all(isinstance(k, str) and _plain(v, depth + 1) for k, v in value.items())
+    return False
+
+
+def plain_inputs(inputs: dict) -> dict:
+    """A step's arguments as data: the question, the history, ids. Clients, sessions and models are left out."""
+    return {name: value for name, value in inputs.items() if _plain(value)}
+
+
+def step(name: str, run_type: str = "chain"):
+    """
+    One step of a pipeline, as a run nested under whatever called it, so a
+    patient's message is one trace: intent, gates, retrieval, answer, guard.
+    A pass-through when tracing is off (configure_tracing).
+    """
+    return traceable(name=name, run_type=run_type, process_inputs=plain_inputs)

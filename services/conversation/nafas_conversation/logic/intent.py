@@ -14,6 +14,7 @@ from nafas_conversation.prompts import intent as prompt
 from nafas_core.exceptions.providers import LLMError
 from nafas_core.interfaces.llm import LLM
 from nafas_core.logger import get_logger
+from nafas_core.tracing import step
 
 logger = get_logger(__name__)
 
@@ -68,6 +69,7 @@ def _transcript(history: list[dict]) -> str:
     return "\n".join(f"{speaker[m['role']]}: {m['content']}" for m in history[-CONTEXT_MESSAGES:])
 
 
+@step("conversation.intent")
 async def classify_intent(llm: LLM, model: str, history: list[dict]) -> Intent | None:
     """The model's reading of the last message; None when it fails, and the caller decides the default."""
     try:

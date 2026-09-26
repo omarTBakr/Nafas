@@ -23,6 +23,7 @@ from nafas_core.clients.identity import IdentityClient
 from nafas_core.clients.scheduling import SchedulingClient
 from nafas_core.interfaces.llm import LLM
 from nafas_core.logger import get_logger
+from nafas_core.tracing import step
 
 logger = get_logger(__name__)
 
@@ -60,6 +61,7 @@ def fixed(text: str) -> AgentReply:
     return AgentReply(text, FIXED, replies.VERSION)
 
 
+@step("conversation.booking")
 async def answer_booking(
     llm: LLM,
     identity: IdentityClient,
@@ -86,6 +88,7 @@ async def answer_booking(
     )
 
 
+@step("conversation.turn")
 async def answer_turn(
     llm: LLM,
     identity: IdentityClient,
