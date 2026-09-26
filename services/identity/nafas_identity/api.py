@@ -4,7 +4,7 @@ import uuid
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from nafas_core import audit
@@ -23,6 +23,7 @@ from nafas_identity.logic.directory import (
     list_doctors,
     list_specializations,
     under_care,
+    under_care_as_doctor,
 )
 from nafas_identity.logic.profile import PatientProfile, get_profile, update_profile
 from nafas_identity.models import DoctorPatient, Patient
@@ -219,6 +220,21 @@ async def revoke_consent(patient_id: uuid.UUID, consent_id: uuid.UUID) -> None:
             await consents.revoke(session, patient_id, consent_id)
     except ConsentNotFoundError as exc:
         raise HTTPException(status_code=404, detail="no such consent") from exc
+
+
+class RecordingConsentIn(BaseModel):
+    evidence: str = Field(min_length=1, max_length=200)
+
+
+@router.post("/doctors/{doctor_id}/patients/{patient_id}/recording-consent", response_model=ConsentOut, status_code=201)
+async def recording_consent(doctor_id: uuid.UUID, patient_id: uuid.UUID, body: RecordingConsentIn) -> ConsentOut:
+    """The patient agreed, in the room, to this one session being recorded; recorded by their doctor."""
+    async with session_scope(doctor_id=doctor_id) as session:
+        if not await under_care_as_doctor(session, doctor_id, patient_id):
+            raise HTTPException(status_code=409, detail="this patient is not under your care")
+        return _consent(
+            await consents.record_session_recording(session, patient_id=patient_id, doctor_id=doctor_id, evidence=body.evidence)
+        )
 
 
 @router.get("/patients/{patient_id}/may-chat/{doctor_id}")

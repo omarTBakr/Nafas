@@ -79,3 +79,11 @@ async def doctor_scope(session: AsyncSession, doctor_id: uuid.UUID) -> Specializ
     return await session.scalar(
         select(Specialization).join(Doctor, Doctor.specialization_id == Specialization.id).where(Doctor.id == doctor_id)
     )
+
+
+async def under_care_as_doctor(session: AsyncSession, doctor_id: uuid.UUID, patient_id: uuid.UUID) -> bool:
+    """The same question in the doctor's scope, where their own care links are visible."""
+    status = await session.scalar(
+        select(DoctorPatient.status).where(DoctorPatient.doctor_id == doctor_id, DoctorPatient.patient_id == patient_id)
+    )
+    return status is CareStatus.ACTIVE

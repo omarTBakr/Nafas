@@ -53,7 +53,7 @@ body{{font-family:system-ui;max-width:760px;margin:24px auto;padding:0 16px}}
 section{{border-bottom:1px solid #ddd;padding:12px 0}}
 </style>
 <h1>أي صوت أوضح وأطبع؟</h1><p>اسمع A و B لكل جملة واختار. في الآخر احفظ النتيجة وابعتها.</p>
-{''.join(rows)}
+{"".join(rows)}
 <button id="save">احفظ النتيجة</button>
 <script>
 document.getElementById("save").onclick = () => {{

@@ -89,6 +89,10 @@ class IdentityClient(InternalClient):
     async def may_chat(self, patient_id: uuid.UUID, doctor_id: uuid.UUID) -> bool:
         return (await self.request("GET", f"/internal/v1/patients/{patient_id}/may-chat/{doctor_id}")).json()["allowed"]
 
+    async def record_recording_consent(self, doctor_id: uuid.UUID, patient_id: uuid.UUID, evidence: str) -> dict:
+        path = f"/internal/v1/doctors/{doctor_id}/patients/{patient_id}/recording-consent"
+        return (await self.request("POST", path, json={"evidence": evidence})).json()
+
     async def roster(self, doctor_id: uuid.UUID) -> list[dict]:
         return (await self.request("GET", f"/internal/v1/doctors/{doctor_id}/roster")).json()
 

@@ -67,3 +67,17 @@ async def may_chat(session: AsyncSession, patient_id: uuid.UUID, doctor_id: uuid
     """Both in force: data processing, and AI chat with this doctor."""
     kinds = {(c.kind, c.doctor_id) for c in await in_force(session, patient_id)}
     return (ConsentKind.DATA_PROCESSING, None) in kinds and (ConsentKind.AI_CHAT, doctor_id) in kinds
+
+
+async def record_session_recording(
+    session: AsyncSession, *, patient_id: uuid.UUID, doctor_id: uuid.UUID, evidence: str
+) -> Consent:
+    """
+    Consent to record one session, taken in the room and recorded by the doctor
+    (their scope). Always a new row: consent to record is asked afresh for
+    every recording, never carried over from an earlier one.
+    """
+    consent = Consent(patient_id=patient_id, doctor_id=doctor_id, kind=ConsentKind.SESSION_RECORDING, evidence=evidence)
+    session.add(consent)
+    await session.flush()
+    return consent

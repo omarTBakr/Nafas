@@ -27,7 +27,7 @@ TOOLS = [
     {
         "name": "get_patient_timeline",
         "description": (
-            "The selected patient's appointments, notes, documents and escalated questions " "with this doctor, newest first."
+            "The selected patient's appointments, notes, documents and escalated questions with this doctor, newest first."
         ),
         "input_schema": {
             "type": "object",
