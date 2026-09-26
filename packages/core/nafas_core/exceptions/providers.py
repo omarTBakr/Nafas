@@ -21,6 +21,10 @@ class TTSError(ProviderError):
     """The text-to-speech service failed or refused."""
 
 
+class EmailError(ProviderError):
+    """The mail server refused a message or could not be reached."""
+
+
 class StorageError(ProviderError):
     """Object storage failed."""
 

@@ -5,10 +5,13 @@ from datetime import UTC, datetime
 
 from temporalio import activity
 
+from nafas_core.clients.identity import get_identity
+from nafas_core.config import get_setting
 from nafas_core.db import session_scope
+from nafas_core.interfaces.email import get_email_sender
 from nafas_scheduling.enums import NotificationKind
 from nafas_scheduling.exceptions import AppointmentNotFoundError
-from nafas_scheduling.logic import booking, notifications
+from nafas_scheduling.logic import booking, emails, notifications
 from nafas_scheduling.models import Appointment
 from nafas_scheduling.schemas import AppointmentRef, NotificationRequest
 
@@ -41,4 +44,38 @@ async def notify(request: NotificationRequest) -> None:
         )
 
 
-ACTIVITIES = [expire_hold, complete, notify]
+@activity.defn(name="scheduling.email_notice")
+async def email_notice(request: NotificationRequest) -> str:
+    """
+    The notice by email too: "sent", "off" (no mail server configured), or
+    "skipped" (no address, or the patient turned emails off). A retry after a
+    send that went through can send twice; for a reminder that beats none.
+    """
+    async with session_scope(doctor_id=uuid.UUID(request.doctor_id)) as session:
+        appointment = await session.get(Appointment, uuid.UUID(request.appointment_id))
+        if appointment is None:
+            raise AppointmentNotFoundError(request.appointment_id)
+        timezone = await booking.timezone_of(session, appointment.doctor_id)
+
+    identity = get_identity()
+    profile = await identity.profile(appointment.patient_id)
+    if not profile.get("email") or not profile.get("email_notices", True):
+        return "skipped"
+    doctor = await identity.doctor(appointment.doctor_id)
+    language = profile["preferred_language"]
+
+    email = emails.compose(
+        kind=NotificationKind(request.kind),
+        recipient=emails.Recipient(profile["email"], profile["full_name"], language),
+        doctor_name=doctor["full_name_en"] if language == "en" else doctor["full_name_ar"],
+        appointment_id=str(appointment.id),
+        start=appointment.starts_at,
+        end=appointment.ends_at,
+        mode=appointment.mode.value,
+        timezone=timezone,
+        web_url=get_setting().web_url,
+    )
+    return "sent" if await get_email_sender().send(email) else "off"
+
+
+ACTIVITIES = [expire_hold, complete, notify, email_notice]

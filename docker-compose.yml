@@ -84,6 +84,11 @@ services:
       # the gateway keys rate limits on the client address from X-Forwarded-For;
       # on a laptop any sender is trusted, in production only the web proxy
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
+      # appointment emails go to Mailpit on a laptop (inbox on :8025)
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+      WEB_URL: ${WEB_URL:-http://localhost:8088}
     ports:
       - "8000:8000"
     depends_on:
@@ -191,6 +196,13 @@ services:
       - "8440:8440"
     devices:
       - nvidia.com/gpu=all
+
+  mailpit:
+    # catches every email on a laptop; nothing leaves the machine
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+      - "1025:1025"
 
 volumes:
   postgres-data:

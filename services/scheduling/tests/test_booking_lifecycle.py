@@ -154,3 +154,45 @@ async def test_a_real_booking_runs_its_workflow(api, clinic, temporal, task_queu
         assert await temporal.get_workflow_handle(stored.booking_workflow_id).result() == "cancelled"
 
     assert await kinds() == ["cancelled_by_doctor", "confirmed"]
+
+
+async def test_a_notice_is_emailed_unless_the_patient_turned_emails_off(api, clinic, monkeypatch):
+    import httpx
+
+    from nafas_core.clients.identity import IdentityClient, set_identity
+    from nafas_core.interfaces.email import set_email_sender
+    from nafas_core.interfaces.email.fake import FakeEmailSender
+    from nafas_identity.api import app as identity_app
+    from nafas_identity.logic.accounts import register_patient_account
+    from nafas_identity.logic.profile import update_profile
+
+    async with session_scope() as session:
+        web = await register_patient_account(session, email="mona@example.com", password="a long password", full_name="منى")
+    set_identity(IdentityClient(httpx.AsyncClient(transport=httpx.ASGITransport(app=identity_app), base_url="http://identity")))
+    sender = FakeEmailSender()
+    set_email_sender(sender)
+    try:
+        response = await api.post(
+            f"/internal/v1/doctors/{clinic.doctor_id}/holds",
+            json={"patient_id": str(web.patient_id), "start": next_wednesday(time(19)).isoformat(), "mode": "in_person"},
+        )
+        appointment_id = response.json()["appointment_id"]
+        request = NotificationRequest(str(uuid.uuid4()), appointment_id, str(clinic.doctor_id), "confirmed")
+
+        assert await activities.email_notice(request) == "sent"
+        async with session_scope(patient_id=web.patient_id) as session:
+            await update_profile(session, web.patient_id, email_notices=False)
+        assert await activities.email_notice(request) == "skipped"
+
+        set_email_sender(None)
+        async with session_scope(patient_id=web.patient_id) as session:
+            await update_profile(session, web.patient_id, email_notices=True)
+        # no SMTP_HOST: switched off, and says so
+        assert await activities.email_notice(request) == "off"
+    finally:
+        set_identity(None)
+        set_email_sender(None)
+
+    [sent] = sender.sent
+    assert (sent.to, sent.subject) == ("mona@example.com", "تم تأكيد موعدك مع د. تجربة")
+    assert sent.attachments[0].filename == "appointment.ics"

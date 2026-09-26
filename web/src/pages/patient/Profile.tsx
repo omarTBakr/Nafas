@@ -8,6 +8,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [dialect, setDialect] = useState<SpokenDialect | "">("");
   const [voice, setVoice] = useState<VoiceGender | "">("");
+  const [emailNotices, setEmailNotices] = useState(true);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [suggested, setSuggested] = useState<SpokenDialect | null>(null);
   const [consents, setConsents] = useState<Consent[]>([]);
@@ -26,6 +27,7 @@ export default function ProfilePage() {
         setProfile(p);
         setDialect(p.dialect ?? "");
         setVoice(p.voice ?? "");
+        setEmailNotices(p.email_notices);
       })
       .catch(() => setState("error"));
     // a suggestion from what the patient has written; offered, never applied by itself
@@ -44,7 +46,7 @@ export default function ProfilePage() {
     event.preventDefault();
     setState("saving");
     try {
-      setProfile(await api.updateProfile({ dialect: dialect || null, voice: voice || null }));
+      setProfile(await api.updateProfile({ dialect: dialect || null, voice: voice || null, email_notices: emailNotices }));
       setState("saved");
     } catch {
       setState("error");
@@ -89,6 +91,11 @@ export default function ProfilePage() {
           ))}
         </div>
       </fieldset>
+
+      <label className="consent">
+        <input type="checkbox" checked={emailNotices} onChange={(e) => setEmailNotices(e.target.checked)} />
+        <span>{t("emailNotices")}</span>
+      </label>
 
       {state === "saved" && (
         <p className="notice ok" role="status">

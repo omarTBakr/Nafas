@@ -18,6 +18,7 @@ class ProfileChanges(BaseModel):
     preferred_language: Language | None = None
     dialect: SpokenDialect | None = None
     voice: VoiceGender | None = None
+    email_notices: bool | None = None
 
 
 @router.get("/profile")

@@ -25,9 +25,11 @@ from nafas_scheduling.workflows import WORKFLOWS
 
 
 class FakeActivities:
-    def __init__(self, hold_still_waiting: bool = True):
+    def __init__(self, hold_still_waiting: bool = True, email_fails: bool = False):
         self.hold_still_waiting = hold_still_waiting
+        self.email_fails = email_fails
         self.calls: list[str] = []
+        self.emails: list[str] = []
 
     @activity.defn(name="scheduling.expire_hold")
     async def expire_hold(self, ref: AppointmentRef) -> bool:
@@ -43,8 +45,15 @@ class FakeActivities:
     async def notify(self, request: NotificationRequest) -> None:
         self.calls.append(request.kind)
 
+    @activity.defn(name="scheduling.email_notice")
+    async def email_notice(self, request: NotificationRequest) -> str:
+        if self.email_fails:
+            raise RuntimeError("mail server down")
+        self.emails.append(request.kind)
+        return "sent"
+
     def all(self):
-        return [self.expire_hold, self.complete, self.notify]
+        return [self.expire_hold, self.complete, self.notify, self.email_notice]
 
 
 def booking(*, hold_in: float, starts_in: float, lasts: float = 1, reminders=(2, 1)) -> BookingStart:
@@ -90,6 +99,19 @@ async def test_a_confirmed_visit_is_announced_reminded_and_completed(temporal, t
 
     assert result == "completed"
     assert fakes.calls == ["confirmed", "reminder", "reminder", "complete"]
+    # every in-app notice goes by email too
+    assert fakes.emails == ["confirmed", "reminder", "reminder"]
+
+
+async def test_an_email_that_cannot_go_does_not_stop_the_booking(temporal, task_queue):
+    fakes = FakeActivities(email_fails=True)
+
+    async def confirm(handle):
+        await handle.signal(CONFIRMED_SIGNAL)
+
+    result = await run(temporal, task_queue, fakes, booking(hold_in=60, starts_in=1.5, reminders=()), confirm)
+
+    assert result == "completed" and fakes.calls == ["confirmed", "complete"]
 
 
 async def test_reminders_already_past_are_skipped(temporal, task_queue):

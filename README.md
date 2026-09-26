@@ -47,7 +47,7 @@ uv sync                       # every workspace package, editable
 uv run pre-commit install     # once, so the hooks run on every commit
 cp .env.example .env          # optional: every setting already has a default
 
-make up                       # Postgres :5433, Temporal :7234 (UI :8234), S3 :8333, services
+make up                       # Postgres :5433, Temporal :7234 (UI :8234), S3 :8333, Mailpit :8025, services
 make migrate                  # apply database migrations
 make seed                     # the specializations
 make storage                  # create the bucket

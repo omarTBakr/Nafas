@@ -134,6 +134,7 @@ const STRINGS = {
     revokeHint: "سحب موافقة المحادثة يوقف المساعد مع هذا الطبيب. سحب معالجة البيانات يوقف كل المحادثات.",
     reason_consent_required: "لازم توافق الأول قبل المحادثة",
     reason_rate_limited: "طلبات كتير في وقت قصير، استنى شوية وجرب تاني",
+    emailNotices: "ابعتلي التأكيد والتذكير بالمواعيد على الإيميل كمان",
   },
   en: {
     brand: "Nafas",
@@ -264,6 +265,7 @@ const STRINGS = {
     revokeHint: "Withdrawing chat consent stops the assistant for that doctor. Withdrawing data processing stops every chat.",
     reason_consent_required: "Please agree first, then chat",
     reason_rate_limited: "Too many requests in a short time; wait a little and try again",
+    emailNotices: "Also email me confirmations and reminders of my appointments",
   },
 } as const;
 

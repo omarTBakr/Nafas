@@ -73,6 +73,14 @@ class Settings(BaseSettings):
     scheduling_url: str = Field("http://localhost:8030", description="Base URL of the scheduling service's internal API")
     conversation_url: str = Field("http://localhost:8040", description="Base URL of the conversation service's internal API")
 
+    smtp_host: str = Field("", description="Mail server for appointment emails; empty sends none")
+    smtp_port: int = Field(587, description="Mail server port")
+    smtp_username: str = Field("", description="Mail server login; empty for none")
+    smtp_password: SecretStr = Field(SecretStr(""), description="Mail server password")
+    smtp_starttls: bool = Field(True, description="Upgrade the connection with STARTTLS")
+    smtp_from: str = Field("Nafas <no-reply@nafas.local>", description="The From address of appointment emails")
+    web_url: str = Field("http://localhost:8088", description="The web app's address, for links in emails")
+
     jwt_secret: SecretStr = Field(SecretStr(""), description="Signs doctor dashboard sessions; required before auth runs")
     jwt_ttl_minutes: int = Field(720, description="Lifetime of a dashboard session")
     session_cookie_secure: bool = Field(True, description="Send the session cookie over HTTPS only (browsers exempt localhost)")

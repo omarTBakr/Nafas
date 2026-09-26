@@ -19,6 +19,8 @@ class PatientProfile:
     preferred_language: Language
     dialect: SpokenDialect | None
     voice: VoiceGender | None
+    email: str | None = None
+    email_notices: bool = True
 
 
 def _profile(patient: Patient) -> PatientProfile:
@@ -29,6 +31,8 @@ def _profile(patient: Patient) -> PatientProfile:
         preferred_language=patient.preferred_language,
         dialect=patient.dialect,
         voice=patient.voice,
+        email=patient.email,
+        email_notices=patient.email_notices,
     )
 
 
@@ -47,7 +51,7 @@ async def update_profile(session: AsyncSession, patient_id: uuid.UUID, **changes
     if patient is None:
         return None
 
-    for field in ("full_name", "phone", "preferred_language", "dialect", "voice"):
+    for field in ("full_name", "phone", "preferred_language", "dialect", "voice", "email_notices"):
         value = changes.get(field, UNCHANGED)
         if value is not UNCHANGED:
             setattr(patient, field, value)

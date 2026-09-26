@@ -115,6 +115,8 @@ class Patient(Base):
     sex: Mapped[Sex | None] = mapped_column(_enum(Sex, "sex"))
     phone: Mapped[str | None] = mapped_column(String(32))
     email: Mapped[str | None] = mapped_column(String(320))
+    # confirmations and reminders by email as well as in the app; the patient may turn it off
+    email_notices: Mapped[bool] = mapped_column(default=True, server_default=text("true"))
     preferred_language: Mapped[Language] = mapped_column(
         _enum(Language, "language"), default=Language.ARABIC, server_default="ar"
     )

@@ -33,6 +33,8 @@ export interface Profile {
   preferred_language: "ar" | "en";
   dialect: SpokenDialect | null;
   voice: VoiceGender | null;
+  email: string | null;
+  email_notices: boolean;
 }
 
 export interface Specialization {
@@ -215,7 +217,7 @@ export const api = {
     accept_data_processing: true;
   }) => call<Me>("POST", "/api/auth/register", { consent_version: CONSENT_VERSION, ...form }),
   profile: () => call<Profile>("GET", "/api/me/profile"),
-  updateProfile: (changes: Partial<Omit<Profile, "patient_id">>) => call<Profile>("PATCH", "/api/me/profile", changes),
+  updateProfile: (changes: Partial<Omit<Profile, "patient_id" | "email">>) => call<Profile>("PATCH", "/api/me/profile", changes),
   logout: () => call<void>("POST", "/api/auth/logout"),
 
   specializations: () => call<Specialization[]>("GET", "/api/specializations"),

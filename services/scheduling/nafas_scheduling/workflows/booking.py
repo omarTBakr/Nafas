@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ActivityError
 
 with workflow.unsafe.imports_passed_through():
     from nafas_scheduling import activities
@@ -31,6 +32,7 @@ with workflow.unsafe.imports_passed_through():
         NotificationRequest,
     )
 
+EMAIL = {"start_to_close_timeout": timedelta(seconds=30), "retry_policy": RetryPolicy(maximum_attempts=3)}
 ACTIVITY = {"start_to_close_timeout": timedelta(seconds=15), "retry_policy": RetryPolicy(maximum_interval=timedelta(minutes=1))}
 
 
@@ -65,11 +67,15 @@ class BookingWorkflow:
             return False
 
     async def _notify(self, start: BookingStart, kind: NotificationKind, minutes_before: int | None = None) -> None:
-        await workflow.execute_activity(
-            activities.notify,
-            NotificationRequest(str(workflow.uuid4()), start.appointment_id, start.doctor_id, kind.value, minutes_before),
-            **ACTIVITY,
-        )
+        request = NotificationRequest(str(workflow.uuid4()), start.appointment_id, start.doctor_id, kind.value, minutes_before)
+        await workflow.execute_activity(activities.notify, request, **ACTIVITY)
+        # runs in flight when email arrived replay without it
+        if workflow.patched("email-notices"):
+            try:
+                await workflow.execute_activity(activities.email_notice, request, **EMAIL)
+            except ActivityError:
+                # the in-app notice stands; an email that cannot go is not worth failing the booking
+                workflow.logger.warning("an appointment email could not be sent")
 
     @workflow.run
     async def run(self, start: BookingStart) -> str:

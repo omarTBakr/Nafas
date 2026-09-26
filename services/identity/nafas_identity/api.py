@@ -53,6 +53,8 @@ class ProfileOut(BaseModel):
     preferred_language: Language
     dialect: SpokenDialect | None
     voice: VoiceGender | None
+    email: str | None = None
+    email_notices: bool = True
 
 
 class ProfileChanges(BaseModel):
@@ -63,6 +65,7 @@ class ProfileChanges(BaseModel):
     preferred_language: Language | None = None
     dialect: SpokenDialect | None = None
     voice: VoiceGender | None = None
+    email_notices: bool | None = None
 
 
 def _profile(profile: PatientProfile) -> ProfileOut:
@@ -153,6 +156,8 @@ async def change_profile(patient_id: uuid.UUID, changes: ProfileChanges) -> Prof
         sent.pop("full_name", None)
     if sent.get("preferred_language") is None:
         sent.pop("preferred_language", None)
+    if sent.get("email_notices") is None:
+        sent.pop("email_notices", None)
 
     async with session_scope(patient_id=patient_id) as session:
         profile = await update_profile(session, patient_id, **sent)
