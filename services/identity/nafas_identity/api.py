@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from nafas_core import audit
 from nafas_core.db import session_scope
 from nafas_core.enums.dialect import SpokenDialect, VoiceGender
 from nafas_core.enums.identity import Language, UserRole
@@ -259,6 +260,16 @@ async def patient_names(doctor_id: uuid.UUID, ids: list[uuid.UUID] = Query(defau
     async with session_scope(doctor_id=doctor_id) as session:
         rows = (await session.execute(select(Patient.id, Patient.full_name).where(Patient.id.in_(ids)))).all()
 
+    if rows:
+        await audit.record(
+            service="identity",
+            actor=audit.Actor.DOCTOR,
+            actor_id=doctor_id,
+            action="read_patient_names",
+            resource_type="patient",
+            doctor_id=doctor_id,
+            detail={"patient_ids": [str(pid) for pid, _ in rows]},
+        )
     return [PatientName(patient_id=pid, full_name=name) for pid, name in rows]
 
 

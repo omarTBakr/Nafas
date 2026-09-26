@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from nafas_conversation.enums import Intent, MessageRole, Modality
 from nafas_conversation.logic import messages, voice
 from nafas_conversation.models import Message
+from nafas_core import audit
 from nafas_core.internal_api import require_internal_token
 
 
@@ -46,7 +47,20 @@ async def patient_messages(
     patient_id: uuid.UUID, doctor_id: uuid.UUID, limit: int = Query(default=100, ge=1, le=500)
 ) -> list[MessageOut]:
     """The patient's thread with this doctor, oldest first, read in the patient's own scope."""
-    return [_message(m) for m in await messages.patient_thread(patient_id, doctor_id, limit)]
+    thread = await messages.patient_thread(patient_id, doctor_id, limit)
+    if thread:
+        await audit.record(
+            service="conversation",
+            actor=audit.Actor.PATIENT,
+            actor_id=patient_id,
+            action="read_thread",
+            resource_type="conversation",
+            resource_id=thread[0].conversation_id,
+            patient_id=patient_id,
+            doctor_id=doctor_id,
+            detail={"messages": len(thread)},
+        )
+    return [_message(m) for m in thread]
 
 
 @router.get("/patients/{patient_id}/dialect-suggestion")

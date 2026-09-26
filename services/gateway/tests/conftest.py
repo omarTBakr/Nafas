@@ -16,6 +16,7 @@ from nafas_core.clients.conversation import ConversationClient, set_conversation
 from nafas_core.clients.identity import IdentityClient, set_identity
 from nafas_core.clients.scheduling import SchedulingClient, set_scheduling
 from nafas_core.db import session_scope
+from nafas_gateway.limits import limiter
 from nafas_gateway.main import app as gateway
 from nafas_identity.api import app as identity_app
 from nafas_identity.logic.accounts import create_doctor_account
@@ -65,6 +66,14 @@ async def doctor_id(database, monkeypatch):
     set_identity(None)
     set_scheduling(None)
     set_conversation(None)
+
+
+@pytest.fixture(autouse=True)
+def fresh_limits():
+    """Every test starts with empty rate-limit windows."""
+    limiter.reset()
+    yield
+    limiter.reset()
 
 
 def browser() -> httpx.AsyncClient:

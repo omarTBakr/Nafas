@@ -79,11 +79,11 @@ function ActionCard({ action, timezone, onChange }: { action: ChatAction; timezo
  * appointments: the slot picker, "my appointments" and this card all act on the same rows.
  */
 export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId: string; timezone: string; onBookingChange: () => void }) {
-  const { t } = useI18n();
+  const { t, reason } = useI18n();
   const [lines, setLines] = useState<Line[] | null>(null);
   const [draft, setDraft] = useState("");
   const [typing, setTyping] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<boolean | "rate_limited">(false);
   const [recording, setRecording] = useState(false);
   const [micDenied, setMicDenied] = useState(false);
   const recorder = useRef<MediaRecorder | null>(null);
@@ -133,7 +133,7 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
       if (reply.actions.length > 0) onBookingChange();
     } catch (e) {
       if (e instanceof ApiError && e.reason === "consent_required") setMissing(["data_processing", "ai_chat"]);
-      else setFailed(true);
+      else setFailed(e instanceof ApiError && e.reason === "rate_limited" ? "rate_limited" : true);
       onFail();
       setLines((current) => (current ?? []).filter((l) => l.id !== pending.id));
     } finally {
@@ -229,7 +229,7 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
       </div>
       {failed && (
         <p className="notice warn" role="alert">
-          {t("chatUnavailable")}
+          {failed === "rate_limited" ? reason("rate_limited") : t("chatUnavailable")}
         </p>
       )}
       {micDenied && (

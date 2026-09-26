@@ -20,6 +20,7 @@ from nafas_core.interfaces.storage.base import patient_key
 from nafas_core.interfaces.storage.factory import get_storage
 from nafas_core.temporal import get_temporal_client
 from nafas_gateway.errors import Refusal
+from nafas_gateway.limits import limit_chat, limit_voice
 from nafas_gateway.sessions import current_patient
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -84,7 +85,7 @@ async def deliver(
     return asdict(reply)
 
 
-@router.post("/{doctor_id}/messages")
+@router.post("/{doctor_id}/messages", dependencies=[Depends(limit_chat)])
 async def send(
     doctor_id: uuid.UUID,
     message: MessageIn,
@@ -96,7 +97,7 @@ async def send(
     return await deliver(sender, patient, doctor_id, message.text)
 
 
-@router.post("/{doctor_id}/voice")
+@router.post("/{doctor_id}/voice", dependencies=[Depends(limit_voice)])
 async def send_voice(
     doctor_id: uuid.UUID,
     audio: UploadFile = File(...),

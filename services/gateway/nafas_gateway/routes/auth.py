@@ -1,12 +1,13 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 
 from nafas_core.clients.identity import Account, get_identity
 from nafas_core.config import get_setting
 from nafas_core.enums.dialect import SpokenDialect, VoiceGender
 from nafas_core.enums.identity import Language
+from nafas_gateway.limits import LOGIN_PER_ADDRESS, LOGIN_PER_EMAIL, client_address, limit_sign_up, limiter
 from nafas_gateway.sessions import COOKIE_NAME, current_account, issue_token
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -62,8 +63,11 @@ def _start_session(response: Response, account: Account) -> None:
 
 
 @router.post("/login", response_model=Me)
-async def login(credentials: Login, response: Response) -> Me:
+async def login(credentials: Login, response: Response, request: Request) -> Me:
     """Sets the session cookie. One answer for every kind of failure, so it says nothing about who has an account."""
+    # per address and per account: guessing one password from many addresses is slowed too
+    limiter.hit(LOGIN_PER_ADDRESS, client_address(request))
+    limiter.hit(LOGIN_PER_EMAIL, credentials.email.strip().lower())
     account = await get_identity().verify(credentials.email, credentials.password)
     if account is None:
         raise HTTPException(status_code=401, detail="email or password is wrong")
@@ -72,7 +76,7 @@ async def login(credentials: Login, response: Response) -> Me:
     return _me(account)
 
 
-@router.post("/register", response_model=Me, status_code=201)
+@router.post("/register", response_model=Me, status_code=201, dependencies=[Depends(limit_sign_up)])
 async def register(form: SignUp, response: Response) -> Me:
     """Patient self sign-up, logged in straight away. Doctors are never created here."""
     fields = form.model_dump(mode="json", exclude={"accept_data_processing", "consent_version"})

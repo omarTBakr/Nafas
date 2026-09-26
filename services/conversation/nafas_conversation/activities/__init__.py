@@ -24,6 +24,7 @@ from nafas_conversation.schemas import (
     TurnRequest,
     TurnResult,
 )
+from nafas_core import audit
 from nafas_core.clients.identity import IdentityClient
 from nafas_core.clients.scheduling import SchedulingClient
 from nafas_core.interfaces.llm import LLM
@@ -68,7 +69,20 @@ class ConversationActivities:
     async def answer(self, request: TurnRequest) -> TurnResult:
         """The assistant's reply to the thread as stored; it may hold, confirm or cancel on the way."""
         patient_id = uuid.UUID(request.patient_id)
-        history = messages.model_history(await messages.recent_messages(patient_id, uuid.UUID(request.conversation_id)))
+        stored = await messages.recent_messages(patient_id, uuid.UUID(request.conversation_id))
+        # the model reads the patient's words: audited like a person's read
+        await audit.record(
+            service="conversation",
+            actor=audit.Actor.MODEL,
+            actor_id=None,
+            action="read_thread",
+            resource_type="conversation",
+            resource_id=request.conversation_id,
+            patient_id=patient_id,
+            doctor_id=uuid.UUID(request.doctor_id),
+            detail={"messages": len(stored), "models": [self._models.classifier, self._models.chat]},
+        )
+        history = messages.model_history(stored)
         turn = await answer_turn(
             self._llm,
             self._identity,

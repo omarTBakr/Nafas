@@ -1,5 +1,6 @@
 import logging
 
+from nafas_core import redaction
 from nafas_core.config import get_setting
 
 _configured = False
@@ -16,6 +17,9 @@ def setup_logging() -> None:
     global _configured
     if _configured:
         return
+
+    # before anything logs: patient data never reaches a handler
+    redaction.install()
 
     level = get_setting().log_level.upper()
 

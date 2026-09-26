@@ -4,6 +4,8 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
 from temporalio.worker import Worker
 
 from nafas_conversation.activities import ConversationActivities
@@ -155,7 +157,7 @@ async def test_a_failing_lookup_becomes_an_apology_in_their_language():
     assert result.reply.text == APOLOGIES["en"]
 
 
-async def test_a_conversation_end_to_end(parties, temporal, task_queue):
+async def test_a_conversation_end_to_end(parties, temporal, task_queue, database):
     llm = FakeLLM([classified("booking"), "أهلاً! تحب تيجي إمتى؟", classified("booking"), "تمام، هشوف الأربعاء."])
     directory = FakeDirectory()
     activities = ConversationActivities(llm, directory, directory, MODELS)
@@ -176,3 +178,16 @@ async def test_a_conversation_end_to_end(parties, temporal, task_queue):
     assert (stored[1].model, stored[1].prompt_version) == ("fake", PROMPT_VERSION)
     # both sides of each turn carry its intent
     assert {m.intent for m in stored} == {Intent.BOOKING}
+
+    # each time the model read the thread, the audit log says so
+    owner = create_async_engine(database)
+    try:
+        async with owner.connect() as connection:
+            reads = (
+                await connection.execute(
+                    text("SELECT actor_type, action, patient_id FROM audit.audit_log WHERE service = 'conversation'")
+                )
+            ).all()
+    finally:
+        await owner.dispose()
+    assert [tuple(r) for r in reads] == [("model", "read_thread", parties.patient_id)] * 2

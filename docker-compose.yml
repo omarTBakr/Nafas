@@ -81,6 +81,9 @@ services:
       JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-me-in-any-real-deployment}
       # plain http on a laptop
       SESSION_COOKIE_SECURE: "false"
+      # the gateway keys rate limits on the client address from X-Forwarded-For;
+      # on a laptop any sender is trusted, in production only the web proxy
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
     ports:
       - "8000:8000"
     depends_on:

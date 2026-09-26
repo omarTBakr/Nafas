@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     """
 
     api_host: str = Field("0.0.0.0", description="Host the FastAPI server binds to")
+    forwarded_allow_ips: str = Field(
+        "127.0.0.1", description="Proxies whose X-Forwarded-For the gateway trusts for the client's address"
+    )
     api_port: int = Field(8000, description="Port the FastAPI server listens on")
 
     temporal_host: str = Field("localhost:7234", description="host:port of the Temporal frontend service")

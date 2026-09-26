@@ -39,7 +39,8 @@ async def upstream_refusal(request: Request, exc: UpstreamRefusal) -> JSONRespon
 
 @app.exception_handler(Refusal)
 async def refusal(request: Request, exc: Refusal) -> JSONResponse:
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail, "reason": exc.reason})
+    headers = {"Retry-After": str(exc.retry_after)} if exc.retry_after else None
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail, "reason": exc.reason}, headers=headers)
 
 
 @app.exception_handler(ProviderError)
@@ -67,7 +68,14 @@ def main() -> None:
     # no sessions without a signing secret: refuse to start rather than fail every login
     signing_secret()
     settings = get_setting()
-    uvicorn.run(app, host=settings.api_host, port=settings.api_port)
+    # the client's address from X-Forwarded-For, trusted only from the web proxy: rate limits key on it
+    uvicorn.run(
+        app,
+        host=settings.api_host,
+        port=settings.api_port,
+        proxy_headers=True,
+        forwarded_allow_ips=settings.forwarded_allow_ips,
+    )
 
 
 if __name__ == "__main__":

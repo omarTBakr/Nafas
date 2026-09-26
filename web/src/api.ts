@@ -74,7 +74,8 @@ export type Unavailable =
   | "not_bookable"
   | "hold_expired"
   | "invalid_transition"
-  | "consent_required";
+  | "consent_required"
+  | "rate_limited";
 
 export interface CheckResult {
   bookable: boolean;

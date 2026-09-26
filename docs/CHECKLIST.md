@@ -56,9 +56,9 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 
 **Phase 3b: Before any patient's medical data** (moved up from Phase 9 on review, 2026-09-26)
 - [x] Consent: data processing recorded at sign-up (platform-wide, the box is required), AI chat per doctor before the first message; chat and voice refused with `consent_required` without both; shown and revocable on the profile; each records the wording's version as its evidence
-- [ ] Rate limits on login, sign-up, chat and voice notes
-- [ ] PHI kept out of logs: a redacting log filter in every service (emails, phone numbers, message text)
-- [ ] Append-only audit log of every clinical read, by a person or the model
+- [x] Rate limits on login (per address and per account), sign-up (per address), chat and voice notes (per patient), answered 429 with Retry-After; the client address comes from X-Forwarded-For, trusted only from FORWARDED_ALLOW_IPS
+- [x] PHI kept out of logs: every record from every logger is cleaned as it is made, tracebacks included (SQL parameters, emails, phone numbers, Arabic text); ids, dates and times are kept
+- [x] Append-only audit log of every clinical read, by a person or the model (`audit.audit_log`: services may insert, never read, change or delete); today a doctor reading patient names, a patient reading a thread, the model reading one to answer; later phases add their reads
 - [ ] Cross-doctor isolation sweep: every table under row-level security is checked, doctor B sees none of doctor A's rows and patient B none of patient A's
 - [ ] Email beside the in-app notices, for confirmations, reminders and a doctor's cancellation (in-app alone reaches no one who is not looking)
 - [ ] One-command scripts for the checks that need the GPU or a person: STT WER per dialect, tts dialect support, the v2/v3 listening test page, the normaliser review sheet
