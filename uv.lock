@@ -1485,11 +1485,17 @@ name = "nafas-scheduling"
 version = "0.1.0"
 source = { editable = "services/scheduling" }
 dependencies = [
+    { name = "fastapi" },
     { name = "nafas-core" },
+    { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "nafas-core", editable = "packages/core" }]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.141.1" },
+    { name = "nafas-core", editable = "packages/core" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.52.4" },
+]
 
 [[package]]
 name = "nexus-rpc"

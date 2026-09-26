@@ -5,7 +5,9 @@ description = "Doctors' hours and appointments, checked to the minute"
 license = "PolyForm-Noncommercial-1.0.0"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.141.1",
     "nafas-core",
+    "uvicorn[standard]>=0.52.4",
 ]
 
 [tool.uv.sources]

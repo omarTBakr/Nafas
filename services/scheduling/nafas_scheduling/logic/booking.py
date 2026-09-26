@@ -221,3 +221,47 @@ async def cancel(session: AsyncSession, appointment_id: uuid.UUID) -> Appointmen
     await session.flush()
 
     return appointment
+
+
+async def patient_appointments(session: AsyncSession) -> list[Appointment]:
+    """
+    The current patient's appointments with every doctor, soonest first.
+
+    Needs a patient scope (session_scope(patient_id=...)): the patient policy
+    is what makes exactly these rows visible.
+    """
+    return list((await session.scalars(select(Appointment).order_by(Appointment.starts_at))).all())
+
+
+async def doctor_appointments(
+    session: AsyncSession, doctor_id: uuid.UUID, start: datetime, end: datetime, now: datetime
+) -> list[Appointment]:
+    """What occupies the doctor's calendar in [start, end): confirmed visits and live holds."""
+    return list(
+        (
+            await session.scalars(
+                select(Appointment)
+                .where(
+                    Appointment.doctor_id == doctor_id,
+                    Appointment.starts_at < end,
+                    Appointment.ends_at > start,
+                    or_(
+                        Appointment.status.in_(
+                            [AppointmentStatus.CONFIRMED, AppointmentStatus.COMPLETED, AppointmentStatus.NO_SHOW]
+                        ),
+                        and_(Appointment.status == AppointmentStatus.HELD, Appointment.hold_expires_at > now),
+                    ),
+                )
+                .order_by(Appointment.starts_at)
+            )
+        ).all()
+    )
+
+
+async def find_visible_appointment(session: AsyncSession, appointment_id: uuid.UUID) -> Appointment:
+    """An appointment as the current scope (patient or doctor) sees it; AppointmentNotFoundError if it is not theirs."""
+    appointment = await session.get(Appointment, appointment_id)
+    if appointment is None:
+        raise AppointmentNotFoundError(str(appointment_id))
+
+    return appointment

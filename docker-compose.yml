@@ -72,6 +72,7 @@ services:
       S3_ENDPOINT_URL: http://s3:8333
       DIALECT_ROUTER_URL: http://dialect-router:8410
       IDENTITY_URL: http://identity:8010
+      SCHEDULING_URL: http://scheduling:8030
       # laptop only; production injects a real secret
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-dev-internal-token}
       JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-me-in-any-real-deployment}
@@ -96,6 +97,21 @@ services:
     # reachable from the other services and nothing else
     ports:
       - "8010:8010"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  scheduling:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        PACKAGE: nafas-scheduling
+        MODULE: nafas_scheduling.main
+    image: nafas/scheduling:dev
+    environment: *service-env
+    ports:
+      - "8030:8030"
     depends_on:
       postgres:
         condition: service_healthy

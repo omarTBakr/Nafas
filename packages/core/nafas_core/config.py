@@ -65,6 +65,7 @@ class Settings(BaseSettings):
         SecretStr(""), description="Shared secret on service-to-service calls; empty refuses them all"
     )
     identity_url: str = Field("http://localhost:8010", description="Base URL of the identity service's internal API")
+    scheduling_url: str = Field("http://localhost:8030", description="Base URL of the scheduling service's internal API")
 
     jwt_secret: SecretStr = Field(SecretStr(""), description="Signs doctor dashboard sessions; required before auth runs")
     jwt_ttl_minutes: int = Field(720, description="Lifetime of a dashboard session")
