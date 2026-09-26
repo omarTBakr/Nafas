@@ -32,3 +32,23 @@ def enable_doctor_isolation(table: str, using: str = "doctor_id = nafas_current_
     """
     op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
     op.execute(f"CREATE POLICY doctor_isolation ON {table} TO {APP_ROLE} USING ({using}) WITH CHECK ({using})")
+
+
+def enable_patient_isolation(table: str, patient_column: str = "patient_id") -> None:
+    """
+    Row-level security for a table reached through a patient rather than a doctor.
+
+    A doctor sees and changes a row only when its patient is linked to them in
+    identity.doctor_patients. Inserting is open, because a new patient exists
+    before the link that makes them visible (onboarding creates both in one
+    transaction); until linked, the row is invisible to everyone.
+    """
+    linked = (
+        "EXISTS (SELECT 1 FROM identity.doctor_patients dp"
+        f" WHERE dp.patient_id = {patient_column} AND dp.doctor_id = nafas_current_doctor())"
+    )
+    op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+    op.execute(f"CREATE POLICY linked_doctor_reads ON {table} FOR SELECT TO {APP_ROLE} USING ({linked})")
+    op.execute(f"CREATE POLICY linked_doctor_updates ON {table} FOR UPDATE TO {APP_ROLE} USING ({linked}) WITH CHECK ({linked})")
+    op.execute(f"CREATE POLICY linked_doctor_deletes ON {table} FOR DELETE TO {APP_ROLE} USING ({linked})")
+    op.execute(f"CREATE POLICY anyone_inserts ON {table} FOR INSERT TO {APP_ROLE} WITH CHECK (true)")

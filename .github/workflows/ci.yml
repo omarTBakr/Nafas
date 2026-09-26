@@ -50,6 +50,12 @@ jobs:
       - name: Run tests
         run: uv run pytest
 
+      # a model changed without a migration, or the reverse, fails here
+      - name: Migrations match the models
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
+
       # GPU services keep their own environment; their API suite needs no GPU
       # and no model runtime
       - name: Run dialect-router tests

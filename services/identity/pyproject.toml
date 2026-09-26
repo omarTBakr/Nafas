@@ -1,0 +1,22 @@
+[project]
+name = "nafas-identity"
+version = "0.1.0"
+description = "Who is who in Nafas: accounts, doctors and their specializations, patients, consents"
+license = "PolyForm-Noncommercial-1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "argon2-cffi>=25.1.0",
+    "fastapi>=0.141.1",
+    "nafas-core",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[tool.uv.sources]
+nafas-core = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""

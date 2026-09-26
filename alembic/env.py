@@ -24,7 +24,9 @@ from nafas_core.db.base import Base
 # Every service's ORM module. Autogenerate only sees tables whose classes are
 # imported by the time it reads Base.metadata, so a service's models module is
 # added here in the same commit that creates the service.
-MODEL_MODULES: list[str] = []
+MODEL_MODULES: list[str] = [
+    "nafas_identity.models",
+]
 
 for module in MODEL_MODULES:
     importlib.import_module(module)
@@ -37,6 +39,19 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 
+def include_name(name, type_, parent_names) -> bool:
+    """Compare only the service schemas the models declare; leave public and Postgres's own alone."""
+    if type_ == "schema":
+        return name in {table.schema for table in target_metadata.tables.values()}
+
+    return True
+
+
+# every service keeps its tables in a schema of its own, which autogenerate
+# only looks at when asked
+COMPARE_OPTIONS = {"include_schemas": True, "include_name": include_name}
+
+
 def database_url() -> str:
     """A URL set on the Config (the test suite does this) wins over DATABASE_OWNER_URL."""
     return config.get_main_option("sqlalchemy.url") or get_setting().database_owner_url
@@ -47,6 +62,7 @@ def run_migrations_offline() -> None:
     context.configure(
         url=database_url(),
         target_metadata=target_metadata,
+        **COMPARE_OPTIONS,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
     )
@@ -56,7 +72,7 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
+    context.configure(connection=connection, target_metadata=target_metadata, **COMPARE_OPTIONS)
 
     with context.begin_transaction():
         context.run_migrations()

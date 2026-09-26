@@ -31,6 +31,9 @@ db-roles:  ## create the database roles on a volume made before they existed
 migrate:  ## apply database migrations (against the stack's Postgres on :5433)
 	uv run alembic upgrade head
 
+seed:  ## create or update the specializations
+	uv run python -m nafas_identity.cli seed
+
 storage:  ## create the S3 bucket
 	uv run python -m scripts.init_storage
 
