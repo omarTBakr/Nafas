@@ -29,6 +29,7 @@ from nafas_identity.logic.accounts import create_doctor_account, register_patien
 from nafas_identity.logic.directory import ensure_care_link
 from nafas_identity.logic.patients import register_patient
 from nafas_identity.logic.seed import seed_specializations
+from nafas_identity.models import PatientChannel
 from nafas_scheduling.enums import AppointmentMode, NotificationKind
 from nafas_scheduling.logic import booking, notifications
 from nafas_scheduling.models import AvailabilityRule, BookingSettings, TimeOff
@@ -148,6 +149,12 @@ async def clinic_a(database):
         )
         await consultations.create(session, doctor_id=doctor_a, patient_id=patient_a, consent_id=recording.id)
 
+    # doctor B is a working doctor with a patient of their own (patient B, with a channel):
+    # a policy that only checks "this doctor has some patient" must not let them see A's
+    async with session_scope(doctor_id=doctor_b) as session:
+        await ensure_care_link(session, doctor_id=doctor_b, patient_id=patient_b)
+        session.add(PatientChannel(patient_id=patient_b, channel=Channel.TELEGRAM, external_id="b-1"))
+
     return {"doctor_a": doctor_a, "doctor_b": doctor_b, "patient_a": patient_a, "patient_b": patient_b}
 
 
@@ -180,9 +187,10 @@ async def test_no_one_but_doctor_a_sees_doctor_as_rows(database, clinic_a):
 
     for table in isolated:
         assert await visible(table, doctor_id=clinic_a["doctor_a"]) > 0, f"doctor A cannot see their own {table}"
-        assert await visible(table, doctor_id=clinic_a["doctor_b"]) == 0, f"doctor B sees doctor A's {table}"
-        # patient B may see their own rows (their consent, their record); nobody else's
+        # patient B may see their own rows (their consent, their record), and so may their
+        # doctor, B; nobody may see anyone else's
         others = f"{patient_columns[table]} <> :b" if table in patient_columns else "true"
+        assert await visible(table, others, doctor_id=clinic_a["doctor_b"]) == 0, f"doctor B sees doctor A's {table}"
         assert await visible(table, others, patient_id=clinic_a["patient_b"]) == 0, f"patient B sees another's {table}"
         assert await visible(table) == 0, f"{table} is visible without any scope"
 

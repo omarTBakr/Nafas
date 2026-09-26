@@ -54,6 +54,20 @@ def enable_doctor_isolation(table: str, using: str = "doctor_id = nafas_current_
     op.execute(f"CREATE POLICY doctor_isolation ON {table} TO {APP_ROLE} USING ({using}) WITH CHECK ({using})")
 
 
+def linked_to_current_doctor(table: str, patient_column: str = "patient_id") -> str:
+    """
+    The row's patient is under the current doctor's care. The column is
+    qualified with its table: unqualified, `patient_id` inside the subquery
+    would mean doctor_patients' own column, and the check would pass for any
+    doctor with any patient (found by the isolation sweep, 2026-09-26).
+    """
+    relation = table.split(".")[-1]
+    return (
+        "EXISTS (SELECT 1 FROM identity.doctor_patients dp"
+        f" WHERE dp.patient_id = {relation}.{patient_column} AND dp.doctor_id = nafas_current_doctor())"
+    )
+
+
 def enable_patient_isolation(table: str, patient_column: str = "patient_id") -> None:
     """
     Row-level security for a table reached through a patient rather than a doctor.
@@ -63,10 +77,7 @@ def enable_patient_isolation(table: str, patient_column: str = "patient_id") -> 
     before the link that makes them visible (onboarding creates both in one
     transaction); until linked, the row is invisible to everyone.
     """
-    linked = (
-        "EXISTS (SELECT 1 FROM identity.doctor_patients dp"
-        f" WHERE dp.patient_id = {patient_column} AND dp.doctor_id = nafas_current_doctor())"
-    )
+    linked = linked_to_current_doctor(table, patient_column)
     op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
     op.execute(f"CREATE POLICY linked_doctor_reads ON {table} FOR SELECT TO {APP_ROLE} USING ({linked})")
     op.execute(f"CREATE POLICY linked_doctor_updates ON {table} FOR UPDATE TO {APP_ROLE} USING ({linked}) WITH CHECK ({linked})")
