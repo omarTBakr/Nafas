@@ -97,15 +97,16 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [ ] Egress recording to S3 that triggers `ConsultationWorkflow`
 
 **Phase 9: Hardening and launch** (the production-readiness gates in PLAN.md §6b)
-- [ ] Reproducible config: every model pinned (HF sha, Claude model ID plus prompt version on each trace), images pinned by digest, config reported on `/health`
-- [ ] dev / staging / prod environments; eval gates in CI; staging replay; canary rollout with automatic rollback bounds; a promotion log
-- [ ] Prometheus `/metrics` on every service, Grafana dashboards and alerts (system and behavioural), and drift alerts
-- [ ] Feedback store and pipeline (summary edits, escalation answers, thumbs, low-confidence dialect items) into de-identified eval and training datasets
-- [ ] Written SLOs per service, a capacity plan including GPU, load tests that prove them, and horizontal scaling per service and queue
-- [ ] Rate limits and the audit log shared across replicas (Phase 3b's are per process and per database)
-- [ ] Observability (structured logs, Temporal UI, error tracking)
-- [ ] Chosen low-hanging-fruit features
-- [ ] Deployment (compose → VM or k8s), backups, runbook
+- [x] Reproducible config: Claude model IDs and prompt versions on every service's `/health` with the environment and commit (baked into each image), third-party and base images pinned by digest, the STT model pinned; bge-m3 still to pin (see Needs you)
+- [x] dev / staging / prod: `ENVIRONMENT`, and start-up checks that refuse laptop secrets, open proxies, insecure cookies, per-process limits, unversioned builds and cloud tracing with prompts visible; `docker-compose.prod.yml` requiring every secret and publishing only the web proxy; promotion with its gates (CI including the safety eval, staging release check, load test, eval, a person's walk-through), rollback by image tag with additive migrations, a promotion log (docs/operations/deploy.md)
+- [x] Prometheus `/metrics` on every service (requests by route template, model calls and tokens, gate verdicts, escalations, bookings, visit-note outcomes, reply ratings, workflow failures), a Grafana dashboard, system and behavioural alerts with promtool tests in CI
+- [x] Feedback: thumbs on the assistant's replies; an optional `service_improvement` consent; `make export-feedback` writes de-identified rated replies, escalations with the doctor's answers, visit notes (draft against approved) and eval candidates, for human review; the run is audited
+- [x] SLOs and a capacity plan from a real load test (docs/operations/slo.md, capacity.md); it found and fixed database pool churn (throughput doubled, p95 down 4-5x), argon2 on the event loop, and identity asked on every request; `make load-test` gates on the SLOs
+- [x] Rate limits shared across replicas in Postgres (the gateway's own `edge` schema, keys hashed); the audit log was already one table
+- [x] Observability: JSON logs (`LOG_FORMAT=json`), redacted as before; metrics and alerts above; the Temporal UI; error tracking through the error-ratio alerts and logs rather than a third-party service
+- [x] Low-hanging fruit: patients open the documents shared with them; "My records"; notes to review counted in the doctor's badge; `disable-account` / `enable-account`
+- [x] Deployment on one compose host, backups (database and objects, checksums, encrypted with `age`), a restore drill that was run, a runbook for every alert, secret rotation, a release check
+- [x] Browser recording and the image build are proven here only up to what the sandbox allows; CI builds an image for real
 
 **Later: messaging channels** (deferred 2026-09-26; everything is in the web app for now)
 - [ ] Telegram bot (shared bot, per-doctor deep links), voice notes through the same STT pipeline
@@ -113,6 +114,9 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [ ] WhatsApp
 
 **Needs you** (cannot be done from a cloud session)
+- [ ] Before real patients: a lawyer's and a clinician's read of the consent texts (data processing, AI chat, recording, service improvement), the retention periods, and the breach procedure the runbook points to
+- [ ] A staging host and a production host (GPU for stt, tts and the dialect-router), their secrets, and a first promotion recorded in docs/operations/promotions.md
+- [ ] Measure the stt service's real-time factor on the GPU (`make check-stt` now reports it): it sizes the card for recorded visits
 - [ ] Decide how long consultation audio is kept after approval (kept for now; deleted on discard) and whether the approved note should be locked or amendable with an audit trail
 - [ ] Merge PR #1; after it, one PR per phase
 - [ ] Add `ANTHROPIC_API_KEY` as an environment secret, so the prompts run against real Arabic dialect messages, not only a scripted model

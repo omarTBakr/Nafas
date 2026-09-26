@@ -7,7 +7,7 @@ export GIT_SHA ?= $(shell git rev-parse --short HEAD 2>/dev/null)
 
 COMPOSE := docker compose
 
-.PHONY: up up-cpu down ps logs build db-roles migrate seed storage test test-web web-dev test-gpu-services gpu-check monitoring export-feedback load-test
+.PHONY: up up-cpu down ps logs build images db-roles migrate seed storage test test-web web-dev test-gpu-services gpu-check monitoring export-feedback load-test backup restore-drill release-check
 
 up:  ## the whole stack, GPU services on the GPU
 	$(COMPOSE) up -d --build
@@ -26,6 +26,9 @@ logs:
 
 build:
 	$(COMPOSE) build
+
+images:  ## every image tagged with this commit (IMAGE_TAG=$(GIT_SHA)), for a release
+	IMAGE_TAG=$(GIT_SHA) $(COMPOSE) build
 
 db-roles:  ## create the database roles on a volume made before they existed
 	$(COMPOSE) exec -T postgres psql -U nafas -d nafas -v ON_ERROR_STOP=1 < deploy/postgres/roles.sql
@@ -58,6 +61,15 @@ test-gpu-services:
 
 monitoring:  ## Prometheus on :9090 and Grafana on :3000 beside the stack
 	$(COMPOSE) --profile monitoring up -d prometheus grafana
+
+release-check:  ## every service up, in ENVIRONMENT, on IMAGE_TAG: run on the deploy host after `up`
+	$(COMPOSE) -f docker-compose.yml -f docker-compose.prod.yml exec -T gateway python /app/release_check.py --expect $(IMAGE_TAG) --environment $(ENVIRONMENT)
+
+backup:  ## the database and every stored object into backups/<stamp> (encrypted with AGE_RECIPIENT)
+	scripts/backup.sh
+
+restore-drill:  ## restore a backup into a scratch database and check it: make restore-drill BACKUP=backups/<stamp>
+	scripts/restore_drill.sh $(BACKUP)
 
 load-test:  ## 50 simulated patients for a minute against the gateway; fails on a missed SLO
 	uv run python -m scripts.load_test --users 50 --seconds 60

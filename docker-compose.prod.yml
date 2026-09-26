@@ -1,0 +1,144 @@
+# Staging and production, on one host, over docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file /etc/nafas/prod.env up -d
+#
+# Every secret is required (a missing one stops `up` before anything
+# starts), nothing but the web proxy is published, logs are JSON, and each
+# service refuses to start on laptop defaults (nafas_core.startup). Build the
+# images with GIT_SHA set (`make images`) so /health names the commit.
+# docs/operations/deploy.md walks through a first deploy and a promotion.
+
+x-production: &production
+  ENVIRONMENT: ${ENVIRONMENT:?staging or prod}
+  LOG_FORMAT: json
+  SESSION_COOKIE_SECURE: "true"
+  RATE_LIMITS_SHARED: "true"
+  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?}
+  JWT_SECRET: ${JWT_SECRET:?}
+  METRICS_TOKEN: ${METRICS_TOKEN:?}
+  S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-http://s3:8333}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:?}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:?}
+  S3_BUCKET: ${S3_BUCKET:-nafas}
+  # the web proxy, and only it, may say who the client is
+  FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:?the web proxy's address}
+  WEB_URL: ${WEB_URL:?}
+  SMTP_HOST: ${SMTP_HOST:?}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_STARTTLS: "true"
+  SMTP_FROM: ${SMTP_FROM:?}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?}
+  # prompts carry patient data: traces stay off unless a self-hosted LangSmith is named
+  LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
+  LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  postgres:
+    <<: *restart
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?}
+    # 7 services x (pool 20 + overflow 10) at one replica each, with room for jobs (docs/operations/capacity.md)
+    command: ["postgres", "-c", "max_connections=300"]
+    ports: !reset []
+
+  temporal:
+    <<: *restart
+    ports: !reset []
+
+  s3:
+    <<: *restart
+    ports: !reset []
+    # the S3 keys, from the secret store, in the shape of deploy/seaweedfs/s3.json
+    # (or point S3_ENDPOINT_URL at a managed S3 and drop this service)
+    volumes:
+      - ${S3_CONFIG_FILE:?path to the S3 identities file}:/etc/seaweedfs/s3.json:ro
+
+  gateway:
+    <<: *restart
+    environment:
+      <<: *production
+      DATABASE_URL: postgresql+asyncpg://nafas_edge_svc:${EDGE_DB_PASSWORD:?}@postgres:5432/nafas
+    ports: !reset []
+
+  identity:
+    <<: *restart
+    environment:
+      <<: *production
+      DATABASE_URL: postgresql+asyncpg://nafas_identity_svc:${IDENTITY_DB_PASSWORD:?}@postgres:5432/nafas
+    ports: !reset []
+
+  scheduling:
+    <<: *restart
+    environment:
+      <<: *production
+      DATABASE_URL: postgresql+asyncpg://nafas_scheduling_svc:${SCHEDULING_DB_PASSWORD:?}@postgres:5432/nafas
+    ports: !reset []
+
+  conversation:
+    <<: *restart
+    environment:
+      <<: *production
+      DATABASE_URL: postgresql+asyncpg://nafas_conversation_svc:${CONVERSATION_DB_PASSWORD:?}@postgres:5432/nafas
+    ports: !reset []
+
+  clinical-records:
+    <<: *restart
+    environment:
+      <<: *production
+      DATABASE_URL: postgresql+asyncpg://nafas_clinical_svc:${CLINICAL_DB_PASSWORD:?}@postgres:5432/nafas
+    ports: !reset []
+
+  consultation:
+    <<: *restart
+    environment:
+      <<: *production
+      DATABASE_URL: postgresql+asyncpg://nafas_consultation_svc:${CONSULTATION_DB_PASSWORD:?}@postgres:5432/nafas
+    ports: !reset []
+
+  doctor-assistant:
+    <<: *restart
+    environment:
+      <<: *production
+      DATABASE_URL: ""
+    ports: !reset []
+
+  dialect-router:
+    <<: *restart
+    ports: !reset []
+
+  stt:
+    <<: *restart
+    ports: !reset []
+
+  tts:
+    <<: *restart
+    ports: !reset []
+
+  embeddings:
+    <<: *restart
+    ports: !reset []
+
+  # the one published port: TLS ends in front of it (docs/operations/deploy.md)
+  web:
+    <<: *restart
+
+  # emails go to the real SMTP server; the laptop's mail catcher never runs here
+  mailpit:
+    profiles: [laptop]
+
+  # a one-off job, before each release: `docker compose ... run --rm migrate`
+  migrate:
+    profiles: [deploy]
+    image: nafas/identity:${IMAGE_TAG:-dev}
+    environment:
+      DATABASE_OWNER_URL: postgresql+asyncpg://nafas:${POSTGRES_OWNER_PASSWORD:?}@postgres:5432/nafas
+      DATABASE_URL: postgresql+asyncpg://nafas:${POSTGRES_OWNER_PASSWORD:?}@postgres:5432/nafas
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy

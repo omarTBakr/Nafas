@@ -167,3 +167,16 @@ async def get_user(session: AsyncSession, user_id: uuid.UUID) -> AuthenticatedUs
     doctor_id, patient_id = await _person_ids(session, user)
 
     return AuthenticatedUser(user_id=user.id, email=user.email, role=user.role, doctor_id=doctor_id, patient_id=patient_id)
+
+
+async def set_active(session: AsyncSession, email: str, active: bool) -> bool:
+    """
+    Turns an account off or on again; False when there is no such account. A
+    disabled account cannot log in, and its sessions end at the gateway's next
+    check with identity (within SESSION_CHECK_SECONDS). Nothing is deleted.
+    """
+    user = await session.scalar(select(User).where(func.lower(User.email) == email.strip().lower()))
+    if user is None:
+        return False
+    user.is_active = active
+    return True

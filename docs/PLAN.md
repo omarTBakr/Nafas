@@ -330,6 +330,10 @@ Changes agreed after the booking chat and voice landed:
 - **Found by the isolation sweep:** every service logged in as `nafas_service`, whose group could read every schema, including the password hashes in `identity.users`. Each service now logs in as `nafas_<service>_svc`, which holds its own schema through `nafas_<service>_access` and no other. `nafas_app` is still the role the row-level security policies name, so every login is in it, but it holds no tables. "A service reads and writes only its own schema" is now enforced by the database, not only by convention.
 - **Found while building tts:** the base OmniVoice package drops a language name it does not know and speaks language-agnostic. Whether the Lahgtna fine-tune registers names like `"egyptian lahgtna"` can only be seen with the weights, so the service reports it per dialect on `/health` and refuses a dialect it does not know.
 
+- **Found in Phase 9:** the load test showed each process opening a new database connection (TLS and SCRAM) for most requests under load, because the default pool closes its overflow after one use; pools are now sized per process, and Postgres or PgBouncer must be sized for them (docs/operations/capacity.md). Password hashing ran on the event loop; it runs in a thread. The gateway asked identity about the account on every request; it now trusts a confirmed account for 30 s, so disabling an account takes effect within that.
+- **Found in Phase 9:** the sign-up consent does not cover using patients' data to improve the assistant, so the feedback export reads only patients who gave a separate, optional `service_improvement` consent, and de-identifies what it writes for a person to review.
+- **Decided in Phase 9:** one compose host per environment for v1, with promotion through staging on the same images and rollback by image tag; migrations are additive so an image rollback never meets a schema it cannot read.
+
 ## 7. Execution checklist
 
 Tracked in [CHECKLIST.md](CHECKLIST.md). Each item is ticked in the same commit that completes it.

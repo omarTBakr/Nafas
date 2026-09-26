@@ -3,8 +3,10 @@ Word error rate of the stt service on our own labelled clips, per dialect,
 beside the model card's published figures. `make check-stt CLIPS=path/to/clips`.
 
 The clips directory holds audio files and a manifest.csv with columns
-file, dialect (eg, sa, ... or en), reference (what was said). English clips
-answer the Phase 3 question: did the fine-tune keep English? Writes
+file, dialect (eg, sa, ... or en), reference (what was said), and optionally
+seconds (the clip's length; else the last segment's end). English clips
+answer the Phase 3 question: did the fine-tune keep English? The report also
+gives the real-time factor, which sizes the GPU for recorded visits. Writes
 report.md next to the manifest; audio and text stay on this machine.
 """
 
@@ -12,6 +14,7 @@ import argparse
 import asyncio
 import csv
 import mimetypes
+import time
 from collections import defaultdict
 from pathlib import Path
 
@@ -49,6 +52,17 @@ def report(rows: list[dict]) -> str:
         lines.append(f"| {dialect} | {clips} | {wer:.3f} | {shown} | {verdict} |")
     overall = total_edits / total_words if total_words else 0.0
     lines.append(f"| all | {len(rows)} | {overall:.3f} | {PUBLISHED_WER['all']:.3f} | |")
+    timed = [r for r in rows if r.get("audio_seconds")]
+    if timed:
+        audio = sum(r["audio_seconds"] for r in timed)
+        took = sum(r["took_seconds"] for r in timed)
+        factor = took / audio
+        lines += [
+            "",
+            f"Speed: {audio:.0f} s of audio in {took:.1f} s, real-time factor {factor:.3f}. "
+            f"A 20-minute visit would take about {20 * 60 * factor:.0f} s to transcribe "
+            "(objective: the draft within 300 s, docs/operations/slo.md).",
+        ]
     if "en" in by_dialect:
         edits, words, _ = by_dialect["en"]
         wer = edits / words
@@ -70,9 +84,15 @@ async def main() -> None:
             audio = (args.clips / entry["file"]).read_bytes()
             mime = mimetypes.guess_type(entry["file"])[0] or "audio/wav"
             language = "en" if entry["dialect"] == "en" else "ar"
+            started = time.perf_counter()
             transcript = await stt.transcribe(audio, mime, language_hint=language)
+            took = time.perf_counter() - started
             edits, words = word_errors(entry["reference"], transcript.text)
-            rows.append({"dialect": entry["dialect"], "edits": edits, "words": words})
+            # the clip's length: from the manifest when given, else where the last segment ends
+            seconds = float(entry.get("seconds") or 0) or max((s.end_seconds for s in transcript.segments), default=0.0)
+            rows.append(
+                {"dialect": entry["dialect"], "edits": edits, "words": words, "audio_seconds": seconds, "took_seconds": took}
+            )
             print(f"{entry['file']}: {edits}/{words}")
 
     out = args.clips / "report.md"

@@ -142,3 +142,19 @@ jobs:
           docker run --rm --entrypoint promtool -v "$PWD/deploy/prometheus:/p" -w /p prom/prometheus:v3.5.0 test rules alerts_test.yml
       - name: The dashboard is valid JSON
         run: python3 -m json.tool deploy/grafana/dashboards/nafas-overview.json > /dev/null
+      - name: The production compose file resolves, and refuses to without its secrets
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file deploy/ci/placeholder.env config -q
+          ! docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q 2>/dev/null
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: A service image builds from its pinned bases and reports its commit
+        run: |
+          docker build -f docker/service.Dockerfile \
+            --build-arg PACKAGE=nafas-gateway --build-arg MODULE=nafas_gateway.main \
+            --build-arg GIT_SHA="${GITHUB_SHA::7}" -t nafas/gateway:ci .
+          test "$(docker run --rm nafas/gateway:ci printenv GIT_SHA)" = "${GITHUB_SHA::7}"
+          docker run --rm nafas/gateway:ci test -f /app/release_check.py

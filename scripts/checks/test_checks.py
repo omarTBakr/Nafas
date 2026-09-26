@@ -28,6 +28,17 @@ def test_the_report_flags_a_dialect_worse_than_published_and_decides_english():
     assert "fall back to base turbo for English patients" in table
 
 
+def test_the_report_gives_the_speed_that_sizes_the_gpu():
+    table = report(
+        [
+            {"dialect": "eg", "edits": 1, "words": 10, "audio_seconds": 60.0, "took_seconds": 3.0},
+            {"dialect": "eg", "edits": 1, "words": 10, "audio_seconds": 60.0, "took_seconds": 3.0},
+        ]
+    )
+
+    assert "real-time factor 0.050" in table and "about 60 s to transcribe" in table
+
+
 def test_the_listening_score_reads_the_key_and_decides():
     assert score(["A", "B", "A"], ["A", "B", "same"]) == {
         "v3": 2,

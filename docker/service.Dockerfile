@@ -49,6 +49,8 @@ COPY --from=build /app/.venv /app/.venv
 # migrations ship with every image, so any service can run them as a one-off job
 COPY alembic.ini /app/alembic.ini
 COPY alembic /app/alembic
+# checks every service's /health after a deploy, from inside the network (make release-check)
+COPY scripts/release_check.py /app/release_check.py
 WORKDIR /app
 
 RUN useradd --system --uid 10001 app

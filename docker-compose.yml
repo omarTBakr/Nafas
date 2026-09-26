@@ -69,7 +69,7 @@ services:
         GIT_SHA: ${GIT_SHA:-}
         PACKAGE: nafas-gateway
         MODULE: nafas_gateway.main
-    image: nafas/gateway:dev
+    image: nafas/gateway:${IMAGE_TAG:-dev}
     environment: &service-env
       # the gateway's own login: the edge schema (shared rate limits) and nothing else;
       # every other service names its own below
@@ -119,7 +119,7 @@ services:
         GIT_SHA: ${GIT_SHA:-}
         PACKAGE: nafas-identity
         MODULE: nafas_identity.main
-    image: nafas/identity:dev
+    image: nafas/identity:${IMAGE_TAG:-dev}
     environment:
       <<: *service-env
       # its own login: this service's schema and no other (deploy/postgres/roles.sql)
@@ -140,7 +140,7 @@ services:
         GIT_SHA: ${GIT_SHA:-}
         PACKAGE: nafas-scheduling
         MODULE: nafas_scheduling.main
-    image: nafas/scheduling:dev
+    image: nafas/scheduling:${IMAGE_TAG:-dev}
     environment:
       <<: *service-env
       # its own login: this service's schema and no other (deploy/postgres/roles.sql)
@@ -161,7 +161,7 @@ services:
         GIT_SHA: ${GIT_SHA:-}
         PACKAGE: nafas-conversation
         MODULE: nafas_conversation.main
-    image: nafas/conversation:dev
+    image: nafas/conversation:${IMAGE_TAG:-dev}
     environment:
       <<: *service-env
       DATABASE_URL: postgresql+asyncpg://nafas_conversation_svc:nafas@postgres:5432/nafas
@@ -182,7 +182,7 @@ services:
     # the built app behind nginx; for development with hot reload, run
     # `npm run dev` in web/ instead (port 5173, proxying /api the same way)
     build: ./web
-    image: nafas/web:dev
+    image: nafas/web:${IMAGE_TAG:-dev}
     ports:
       - "8088:80"
     depends_on:
@@ -192,7 +192,7 @@ services:
     # GPU: needs the NVIDIA container toolkit's CDI devices, which the native
     # engine has and Docker Desktop does not. Without a GPU, `make up-cpu`.
     build: ./services/dialect_router
-    image: nafas/dialect-router:dev
+    image: nafas/dialect-router:${IMAGE_TAG:-dev}
     ports:
       - "8410:8410"
     devices:
@@ -201,7 +201,7 @@ services:
   stt:
     # GPU, like the dialect-router; `make up-cpu` runs it on the CPU instead
     build: ./services/stt
-    image: nafas/stt:dev
+    image: nafas/stt:${IMAGE_TAG:-dev}
     ports:
       - "8420:8420"
     devices:
@@ -210,7 +210,7 @@ services:
   tts:
     # GPU; speaks booking and admin messages only, in the patient's dialect
     build: ./services/tts
-    image: nafas/tts:dev
+    image: nafas/tts:${IMAGE_TAG:-dev}
     ports:
       - "8440:8440"
     devices:
@@ -225,7 +225,7 @@ services:
         GIT_SHA: ${GIT_SHA:-}
         PACKAGE: nafas-doctor-assistant
         MODULE: nafas_doctor_assistant.main
-    image: nafas/doctor-assistant:dev
+    image: nafas/doctor-assistant:${IMAGE_TAG:-dev}
     environment:
       <<: *service-env
       # no database: it reads through the services that own the data
@@ -237,7 +237,7 @@ services:
   embeddings:
     # bge-m3 on the CPU: the GPU is spent on stt, the dialect-router and tts
     build: ./services/embeddings
-    image: nafas/embeddings:dev
+    image: nafas/embeddings:${IMAGE_TAG:-dev}
     ports:
       - "8430:8430"
 
@@ -251,7 +251,7 @@ services:
         MODULE: nafas_clinical.main
         # scanned pages and images are read by OCR, in Arabic and English
         SYSTEM_PACKAGES: tesseract-ocr tesseract-ocr-ara tesseract-ocr-eng
-    image: nafas/clinical-records:dev
+    image: nafas/clinical-records:${IMAGE_TAG:-dev}
     environment:
       <<: *service-env
       DATABASE_URL: postgresql+asyncpg://nafas_clinical_svc:nafas@postgres:5432/nafas
@@ -274,7 +274,7 @@ services:
         GIT_SHA: ${GIT_SHA:-}
         PACKAGE: nafas-consultation
         MODULE: nafas_consultation.main
-    image: nafas/consultation:dev
+    image: nafas/consultation:${IMAGE_TAG:-dev}
     environment:
       <<: *service-env
       DATABASE_URL: postgresql+asyncpg://nafas_consultation_svc:nafas@postgres:5432/nafas

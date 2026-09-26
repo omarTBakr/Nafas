@@ -2,6 +2,7 @@
 
     uv run python -m nafas_identity.cli seed
     uv run python -m nafas_identity.cli create-doctor --email ... --name-en ... --name-ar ... --specialization cardiology
+    uv run python -m nafas_identity.cli disable-account --email ...   (and enable-account)
 
 Doctor accounts are only ever made here: there is no sign-up.
 """
@@ -13,7 +14,7 @@ import sys
 
 from nafas_core.db import session_scope
 from nafas_core.exceptions.base import NafasError
-from nafas_identity.logic.accounts import create_doctor_account
+from nafas_identity.logic.accounts import create_doctor_account, set_active
 from nafas_identity.logic.seed import seed_specializations
 from nafas_identity.specializations import SPECIALIZATIONS
 
@@ -39,6 +40,13 @@ async def create_doctor(args: argparse.Namespace) -> None:
     print("next: give them booking hours with `python -m nafas_scheduling.cli`")
 
 
+async def set_account(email: str, active: bool) -> bool:
+    async with session_scope() as session:
+        found = await set_active(session, email, active)
+    print(f"{email}: {'enabled' if active else 'disabled'}" if found else f"no account for {email}")
+    return found
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="nafas_identity.cli")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -53,9 +61,21 @@ def main(argv: list[str] | None = None) -> int:
     # for scripts; interactively, leave it out and type it at the prompt
     doctor.add_argument("--password")
 
+    for name, doing in (
+        ("disable-account", "turn an account off: no login, sessions end"),
+        ("enable-account", "turn it on again"),
+    ):
+        command = commands.add_parser(name, help=doing)
+        command.add_argument("--email", required=True)
+
     args = parser.parse_args(argv)
     try:
-        asyncio.run(seed() if args.command == "seed" else create_doctor(args))
+        if args.command == "seed":
+            asyncio.run(seed())
+        elif args.command == "create-doctor":
+            asyncio.run(create_doctor(args))
+        elif not asyncio.run(set_account(args.email, args.command == "enable-account")):
+            return 1
     except NafasError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1

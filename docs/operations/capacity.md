@@ -53,10 +53,13 @@ second is what one replica of each service holds on shared hardware.
   workflows. Transcription and drafting are bound by the stt GPU and by
   Claude, not by the worker.
 - **GPU.** One 8 GB card holds stt, the dialect-router and tts v2 (PLAN.md
-  §6c). A visit of 20 minutes is 20 one-minute parts; at the stt service's
-  measured speed on the card that is well under the 5-minute drafting
-  objective for one visit at a time. Several clinics recording at once queue
-  on the card: that is the first thing to buy more of.
+  §6c). A 20-minute visit is 20 one-minute parts, transcribed one after
+  another. The stt service's speed on the card is **not yet measured** (it
+  needs the GPU: `make check-stt` reports the real-time factor and what it
+  means for a 20-minute visit), so whether one visit drafts
+  inside the 5-minute objective, and how many clinics can record at once
+  before the card queues, is the first number to take on real hardware.
+
 - **Model spend.** `nafas_llm_tokens_total` by model is on the dashboard;
   the classifiers (Haiku) run on every patient message, the chat model on
   each answer, the summary model (Opus) once per visit.

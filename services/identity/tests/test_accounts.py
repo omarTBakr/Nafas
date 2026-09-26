@@ -77,3 +77,17 @@ async def test_a_doctor_needs_a_known_specialization(database):
                 full_name_ar="د. س",
                 specialization_code="astrology",
             )
+
+
+async def test_a_disabled_account_cannot_log_in_and_can_be_enabled_again(two_doctors):
+    from nafas_identity.logic.accounts import authenticate, set_active
+
+    async with session_scope() as session:
+        assert await set_active(session, " Heart@example.com", False)
+        assert not await set_active(session, "nobody@example.com", False)
+    async with session_scope() as session:
+        assert await authenticate(session, "heart@example.com", PASSWORD) is None
+    async with session_scope() as session:
+        await set_active(session, "heart@example.com", True)
+    async with session_scope() as session:
+        assert await authenticate(session, "heart@example.com", PASSWORD) is not None
