@@ -9,6 +9,7 @@ export default function ProfilePage() {
   const [dialect, setDialect] = useState<SpokenDialect | "">("");
   const [voice, setVoice] = useState<VoiceGender | "">("");
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [suggested, setSuggested] = useState<SpokenDialect | null>(null);
 
   useEffect(() => {
     api
@@ -19,6 +20,11 @@ export default function ProfilePage() {
         setVoice(p.voice ?? "");
       })
       .catch(() => setState("error"));
+    // a suggestion from what the patient has written; offered, never applied by itself
+    api
+      .dialectSuggestion()
+      .then((s) => setSuggested(s.dialect))
+      .catch(() => setSuggested(null));
   }, []);
 
   async function save(event: FormEvent) {
@@ -41,6 +47,16 @@ export default function ProfilePage() {
       <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0 }}>
         <legend style={{ fontWeight: 600 }}>{t("dialect")}</legend>
         <p className="hint">{t("dialectHint")}</p>
+        {suggested && !profile.dialect && dialect === "" && (
+          <p className="notice info row spread">
+            <span>
+              {t("suggestedDialect")} {t(`dialect_${suggested}`)}
+            </span>
+            <button type="button" className="secondary" onClick={() => setDialect(suggested)}>
+              {t("useSuggestion")}
+            </button>
+          </p>
+        )}
         <div className="chips">
           {DIALECTS.map((d) => (
             <button key={d} type="button" className="chip" aria-pressed={dialect === d} onClick={() => setDialect(d)}>

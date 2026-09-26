@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { api, ApiError, type Appointment, type ChatAction, type ChatMessage } from "../../api";
+import { api, ApiError, type Appointment, type ChatAction, type ChatMessage, type ChatReply } from "../../api";
 import { useI18n } from "../../i18n";
 import { clinicClock, clinicDay } from "../../time";
 
@@ -9,10 +9,18 @@ interface Line {
   role: ChatMessage["role"];
   text: string;
   actions?: ChatAction[];
+  // this message has a voice note or a spoken reply to play
+  audio?: boolean;
 }
 
 function fromThread(m: ChatMessage): Line {
-  return { id: m.message_id, role: m.role, text: m.content };
+  return { id: m.message_id, role: m.role, text: m.content, audio: Boolean(m.audio_key) };
+}
+
+/** The browser's recorder, in whichever container it supports; MediaRecorder picks when none is named. */
+function recorderType(): string | undefined {
+  const preferred = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"];
+  return typeof MediaRecorder !== "undefined" ? preferred.find((t) => MediaRecorder.isTypeSupported?.(t)) : undefined;
 }
 
 /** A hold, confirmation or cancellation the assistant made, as a card; a hold can be confirmed right here. */
@@ -76,6 +84,9 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
   const [draft, setDraft] = useState("");
   const [typing, setTyping] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [micDenied, setMicDenied] = useState(false);
+  const recorder = useRef<MediaRecorder | null>(null);
   const end = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -89,30 +100,69 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
     end.current?.scrollIntoView?.({ block: "end" });
   }, [lines, typing]);
 
+  /** Sends one message, typed or spoken, and shows the patient's side at once and the reply when it comes. */
+  async function deliver(pendingText: string, voice: boolean, run: () => Promise<ChatReply>, onFail: () => void) {
+    setFailed(false);
+    const pending: Line = { id: `pending-${Date.now()}`, role: "patient", text: pendingText };
+    setLines((current) => [...(current ?? []), pending]);
+    setTyping(true);
+    try {
+      const reply = await run();
+      setLines((current) => [
+        ...(current ?? []).filter((l) => l.id !== pending.id),
+        {
+          id: reply.patient_message_id ?? `${reply.message_id}-patient`,
+          role: "patient",
+          text: reply.patient_text,
+          audio: voice && Boolean(reply.patient_message_id),
+        },
+        { id: reply.message_id, role: "assistant", text: reply.text, actions: reply.actions, audio: Boolean(reply.audio_key) },
+      ]);
+      if (reply.actions.length > 0) onBookingChange();
+    } catch {
+      setFailed(true);
+      onFail();
+      setLines((current) => (current ?? []).filter((l) => l.id !== pending.id));
+    } finally {
+      setTyping(false);
+    }
+  }
+
   async function send(e: React.FormEvent) {
     e.preventDefault();
     const text = draft.trim();
     if (!text || typing) return;
     setDraft("");
-    setFailed(false);
-    const pending: Line = { id: `pending-${Date.now()}`, role: "patient", text };
-    setLines((current) => [...(current ?? []), pending]);
-    setTyping(true);
+    await deliver(text, false, () => api.chatSend(doctorId, text), () => setDraft(text));
+  }
+
+  async function startRecording() {
+    setMicDenied(false);
+    let stream: MediaStream;
     try {
-      const reply = await api.chatSend(doctorId, text);
-      setLines((current) => [
-        ...(current ?? []).filter((l) => l.id !== pending.id),
-        { ...pending, id: `${reply.message_id}-patient` },
-        { id: reply.message_id, role: "assistant", text: reply.text, actions: reply.actions },
-      ]);
-      if (reply.actions.length > 0) onBookingChange();
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      setFailed(true);
-      setDraft(text);
-      setLines((current) => (current ?? []).filter((l) => l.id !== pending.id));
-    } finally {
-      setTyping(false);
+      setMicDenied(true);
+      return;
     }
+    const type = recorderType();
+    const rec = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+    const chunks: Blob[] = [];
+    rec.ondataavailable = (event) => chunks.push(event.data);
+    rec.onstop = () => {
+      stream.getTracks().forEach((track) => track.stop());
+      const note = new Blob(chunks, { type: rec.mimeType || type || "audio/webm" });
+      if (note.size > 0) void deliver(t("voiceNote"), true, () => api.chatVoice(doctorId, note), () => undefined);
+    };
+    recorder.current = rec;
+    rec.start();
+    setRecording(true);
+  }
+
+  function stopRecording() {
+    recorder.current?.stop();
+    recorder.current = null;
+    setRecording(false);
   }
 
   if (lines === null) return <p className="muted">{t("loading")}</p>;
@@ -129,6 +179,7 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
                 {line.role === "patient" ? t("you") : line.role === "doctor" ? t("doctorReply") : t("assistant")}
               </span>
               <p>{line.text}</p>
+              {line.audio && <audio controls preload="none" src={api.audioUrl(doctorId, line.id)} aria-label={t("voiceNote")} />}
             </div>
             {line.actions?.map((action) => (
               <ActionCard
@@ -148,6 +199,11 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
           {t("chatUnavailable")}
         </p>
       )}
+      {micDenied && (
+        <p className="notice warn" role="alert">
+          {t("micDenied")}
+        </p>
+      )}
       <form className="row composer" onSubmit={send}>
         <input
           aria-label={t("messagePlaceholder")}
@@ -156,8 +212,18 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
           maxLength={4000}
           onChange={(e) => setDraft(e.target.value)}
         />
-        <button disabled={typing || !draft.trim()}>{t("send")}</button>
+        <button disabled={typing || recording || !draft.trim()}>{t("send")}</button>
+        {recording ? (
+          <button type="button" className="danger" onClick={stopRecording} aria-live="polite">
+            {t("stopRecording")}
+          </button>
+        ) : (
+          <button type="button" className="secondary" onClick={startRecording} disabled={typing} aria-label={t("record")}>
+            🎙
+          </button>
+        )}
       </form>
+      {recording && <p className="muted small">{t("recording")}</p>}
     </section>
   );
 }

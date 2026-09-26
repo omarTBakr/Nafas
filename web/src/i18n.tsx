@@ -114,6 +114,13 @@ const STRINGS = {
     notice_reminder: "تذكير بموعدك",
     notice_cancelled_by_doctor: "الطبيب ألغى موعدك",
     markNoShow: "لم يحضر",
+    record: "سجّل رسالة صوتية",
+    stopRecording: "إيقاف وإرسال",
+    recording: "جارٍ التسجيل…",
+    voiceNote: "رسالة صوتية",
+    micDenied: "مش قادرين نوصل للميكروفون، اسمح بيه من إعدادات المتصفح",
+    suggestedDialect: "يبدو إنك بتكتب باللهجة",
+    useSuggestion: "استخدمها",
   },
   en: {
     brand: "Nafas",
@@ -224,6 +231,13 @@ const STRINGS = {
     notice_reminder: "Reminder of your appointment",
     notice_cancelled_by_doctor: "The doctor cancelled your appointment",
     markNoShow: "No-show",
+    record: "Record a voice note",
+    stopRecording: "Stop and send",
+    recording: "Recording…",
+    voiceNote: "Voice note",
+    micDenied: "The microphone is not available; allow it in the browser's settings",
+    suggestedDialect: "You seem to write in",
+    useSuggestion: "Use it",
   },
 } as const;
 

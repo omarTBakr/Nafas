@@ -59,6 +59,8 @@ class ChatReply:
     patient_text: str = ""
     # the reply read aloud, when it is an admin message and the patient spoke
     audio_key: str | None = None
+    # the patient's own message as stored (its voice note plays from it)
+    patient_message_id: str | None = None
 
 
 async def send_patient_message(

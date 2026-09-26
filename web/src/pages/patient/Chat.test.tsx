@@ -93,3 +93,60 @@ describe("the chat panel", () => {
     expect(input).toHaveValue("hello");
   });
 });
+
+describe("voice notes", () => {
+  it("records, sends the note, and plays back both sides", async () => {
+    const stop = vi.fn();
+    class FakeRecorder {
+      static isTypeSupported = (type: string) => type === "audio/webm;codecs=opus";
+      mimeType = "audio/webm;codecs=opus";
+      ondataavailable: ((e: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      start() {}
+      stop() {
+        this.ondataavailable?.({ data: new Blob(["opus-bytes"], { type: this.mimeType }) });
+        this.onstop?.();
+      }
+    }
+    vi.stubGlobal("MediaRecorder", FakeRecorder);
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop }] })) },
+    });
+    const sent: FormData[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/api/chat/d1/voice") {
+          sent.push(init?.body as FormData);
+          return json({
+            conversation_id: "c1",
+            message_id: "reply-1",
+            text: "العيادة في المعادي",
+            actions: [],
+            intent: "admin",
+            patient_text: "العيادة فين؟",
+            audio_key: "doctor/d1/patient/p1/voice/reply-1.wav",
+            patient_message_id: "note-1",
+          });
+        }
+        return json([]);
+      }),
+    );
+    renderChat();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Record a voice note" }));
+    await userEvent.click(screen.getByRole("button", { name: "Stop and send" }));
+
+    expect(await screen.findByText("العيادة في المعادي")).toBeInTheDocument();
+    expect(screen.getByText("العيادة فين؟")).toBeInTheDocument();
+    expect((sent[0].get("audio") as Blob).type).toBe("audio/webm;codecs=opus");
+    // the microphone is released once the note is recorded
+    expect(stop).toHaveBeenCalled();
+    const players = screen.getAllByLabelText("Voice note");
+    expect(players.map((p) => p.getAttribute("src"))).toEqual([
+      "/api/chat/d1/messages/note-1/audio",
+      "/api/chat/d1/messages/reply-1/audio",
+    ]);
+  });
+});

@@ -153,7 +153,14 @@ class PatientConversationWorkflow:
 
             self._turns += 1
             return ChatReply(
-                conversation_id, reply_id, result.text, result.actions, result.intent, patient_text=text, audio_key=audio_key
+                conversation_id,
+                reply_id,
+                result.text,
+                result.actions,
+                result.intent,
+                patient_text=text,
+                audio_key=audio_key,
+                patient_message_id=message_id,
             )
 
     @send_message.validator

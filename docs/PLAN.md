@@ -226,7 +226,7 @@ Every feature is its own deployable service, and all of them live in one reposit
 - Booking is done by the scheduling service *on the patient's behalf*, inside the doctor's scope, because checking a slot means reading the doctor's whole calendar. The patient only ever receives their own appointment back. The care link to the doctor is created on the first booking.
 
 **Rules**
-- A service reads and writes only its own schema.
+- A service reads and writes only its own schema. The one exception is appending to `audit.audit_log` (§6c).
 - It gets anything else by calling the owning service: a Temporal activity on that service's queue, or its internal API.
 - The one allowed coupling is foreign keys to `identity` (doctor_id, patient_id), so row-level security and referential integrity still hold.
 - There is one Alembic history, at the repository root, covering every schema. This means migrations never race each other across services.
@@ -309,6 +309,23 @@ Here "model" means anything whose behaviour is learned or prompted: the dialect-
    - Each service has written SLOs, for example booking replies at p95 under 5 s, voice-note transcription at p95 under 10 s, 99.5 % availability, and escalations reaching the doctor in under 1 min.
    - A capacity plan sets requests per doctor and the GPU memory and throughput each GPU service needs. This dev machine has one RTX 4060 with 8 GB.
    - Load tests prove the SLOs. Services scale horizontally: stateless APIs and workers scale by replica count, and each Temporal queue scales by adding workers.
+
+## 6c. Review, 2026-09-26 (after Phase 3)
+
+Changes agreed after the booking chat and voice landed:
+
+- **Safety work moves before medical data.** Consent, rate limits, PHI-free logs, the audit log and a cross-doctor isolation sweep move from Phase 9 to a new Phase 3b, ahead of Phase 4, because Phase 4 is where a patient's own history first reaches the model.
+  - Consent is two records: `data_processing` once at sign-up, platform-wide (so `consents.doctor_id` becomes nullable), and `ai_chat` per doctor before the first chat message. The chat refuses a patient without it.
+  - The audit log lives in its own `audit` schema that every service may append to and none may read or change. It is the one exception to "a service writes only its own schema", like the foreign keys into `identity`: an audit trail a service could edit would prove nothing.
+  - Rate limits in 3b are per process; limits shared across replicas come with scaling in Phase 9.
+- **Reminders also go by email.** In-app notices reach only patients who open the app, so confirmations, reminders and a doctor's cancellation are also emailed (SMTP). Email booking stays deferred.
+- **A minimal escalations inbox ships with Phase 4**, so an escalation can be tested end to end; Phase 5 extends it.
+- **No token streaming in the patient chat.** A reply is one workflow update, and the booking agent calls tools before it answers; replies arrive whole with a typing indicator. Doctor chat (Phase 5) is request/response and can stream over SSE as planned.
+- **Online sessions move after v1.** LiveKit adds a media server, egress and TURN for what the first clinics do not need yet.
+- **GPU budget.** The 8 GB card holds stt, the dialect-router and tts v2. Egyptian v3 loads only if it wins the listening test, and embeddings (bge-m3) run on the CPU by default.
+- **Open decision, Phase 7:** the diarization backend. pyannote's weights are gated on Hugging Face; compare it with a pyannote-free option on our own recordings before choosing.
+- **Checks only a person or the GPU can do** get one-command scripts: STT WER per dialect on labelled clips, the tts service's dialect support, a v2/v3 listening page, and a review sheet of the normaliser's number and time words for native speakers.
+- **Found while building tts:** the base OmniVoice package drops a language name it does not know and speaks language-agnostic. Whether the Lahgtna fine-tune registers names like `"egyptian lahgtna"` can only be seen with the weights, so the service reports it per dialect on `/health` and refuses a dialect it does not know.
 
 ## 7. Execution checklist
 

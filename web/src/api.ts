@@ -114,6 +114,7 @@ export interface ChatReply {
   intent: Intent | null;
   patient_text: string;
   audio_key: string | null;
+  patient_message_id: string | null;
 }
 
 export type NotificationKind = "confirmed" | "hold_expired" | "reminder" | "cancelled_by_doctor";
@@ -163,11 +164,13 @@ function validationFields(detail: unknown): Record<string, string> {
 }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
+  // a FormData body (a voice note) sets its own multipart content type
+  const form = body instanceof FormData;
   const response = await fetch(path, {
     method,
     credentials: "same-origin",
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: body === undefined || form ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : form ? body : JSON.stringify(body),
   });
   if (response.status === 204) return undefined as T;
 
@@ -219,6 +222,13 @@ export const api = {
 
   chatThread: (doctorId: string) => call<ChatMessage[]>("GET", `/api/chat/${doctorId}/messages`),
   chatSend: (doctorId: string, text: string) => call<ChatReply>("POST", `/api/chat/${doctorId}/messages`, { text }),
+  chatVoice: (doctorId: string, audio: Blob) => {
+    const form = new FormData();
+    form.append("audio", audio, "voice-note");
+    return call<ChatReply>("POST", `/api/chat/${doctorId}/voice`, form);
+  },
+  audioUrl: (doctorId: string, messageId: string) => `/api/chat/${doctorId}/messages/${messageId}/audio`,
+  dialectSuggestion: () => call<{ dialect: SpokenDialect | null }>("GET", "/api/me/dialect-suggestion"),
 
   notifications: (unreadOnly = false) =>
     call<AppNotification[]>("GET", `/api/notifications?${query({ unread_only: String(unreadOnly) })}`),

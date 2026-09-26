@@ -38,42 +38,57 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [x] The booking tool loop on Claude: a versioned prompt; tools that only reach scheduling (`interpret_time` resolves and checks what the model extracted, then hold, confirm, cancel, my appointments), bound to one patient and doctor, times in clinic time; tested with a scripted model
 - [x] Intent routing: an emergency keyword gate (AR/EN, code only) before a Haiku classifier; booking, admin and small talk to the agent, emergencies and medical questions to fixed replies until phase 4
 - [x] Chat panel in the patient portal; chat and slot picker share the same holds (a hold made in chat is confirmed on its card, in the picker or under my appointments); in-app notifications page with an unread count; verified in a real browser against the real services with a scripted model
-- [ ] Token-streamed replies: a reply is one workflow update and the agent calls tools before it answers, so streaming needs a side channel (SSE from the activity); replies arrive whole with a typing indicator until then
+- [x] Replies arrive whole with a typing indicator (decided 2026-09-26: no token streaming for the patient chat; a reply is one workflow update and the agent calls tools before it answers, so streaming would need a side channel for little gain)
 - [x] `BookingWorkflow`: hold expiry and in-app reminders (T-24h, T-1h), completion or a doctor's no-show, notices when a doctor cancels; tests on the time-skipping server, or in seconds on a real Temporal where it cannot be fetched
 - [x] Patient dialect and voice: `dialect` (13 Lahgtna codes) and `voice` (male/female) on the patient, chosen at sign-up or on the profile page (`/api/me/profile`, patient scope)
-- [ ] The dialect-router suggests a default from a patient's first chat messages (with the conversation service)
+- [x] The dialect-router suggests a default from a patient's first chat messages: confident readings are stored on each message, three or more mostly agreeing suggest a dialect on the profile page, which the patient may accept; it never overrides a choice
 - [x] `stt` GPU service: `whisper-large-v3-turbo-arabic-dialectal-v2` pinned in a CUDA image with ffmpeg, `/health` config, `/metrics` (incl. realtime factor), and the `interfaces/stt` HTTP client; runs on the RTX 4060 at ~12× realtime, and the card's Egyptian and Iraqi samples (wav and browser webm/opus) come back within a word or two of their references
-- [ ] Voice input: record in the browser → STT → the same pipeline; audio in S3, transcript on the message; check English voice notes and fall back to base turbo for English patients if the fine-tune lost English
+- [x] Voice input: record in the browser → S3 → STT → the same pipeline, transcript on the message, a voice note that says nothing asked again; played back from a short-lived link only its patient can open; verified in Chromium with its fake microphone against the real gateway and S3
+- [ ] On the GPU: check English voice notes, and fall back to base turbo for English patients if the fine-tune lost English (the language hint already reaches the stt service)
 - [ ] Validate STT on our own labelled samples per dialect against the published WER
-- [ ] `tts` GPU service: Lahgtna OmniVoice v2 (13 dialects, built-in voices, `language` = the patient's dialect) pinned in a CUDA image, `/health` config, `/metrics`, and the `interfaces/tts` client and fake
+- [x] `tts` GPU service: Lahgtna OmniVoice v2 (13 dialects, built-in voices, `language` = the patient's dialect) pinned in a CUDA image, Egyptian v3 behind a flag, `/health` config and per-dialect support, `/metrics`, and the `interfaces/tts` client and fake (written against omnivoice 0.2.1's `generate`; not yet run on the GPU)
 - [ ] Egyptian: side-by-side listening test of v2 and `lahgtna-omnivoice-egyptian-v3` (its default voices); use v3 for Egyptian only if it wins
-- [ ] Text normaliser before TTS: numbers, dates and times to words in the patient's dialect; refuse text with Latin script or clinical content
-- [ ] Voice replies in the patient's chosen dialect and voice, on admin messages only, always shown with the text
+- [x] Text normaliser before TTS: numbers, dates and times to words in the patient's dialect; refuse text with Latin script or clinical content; a time without am/pm is not given a part of the day
+- [x] Voice replies in the patient's chosen dialect and voice, on booking, admin and small-talk replies to a voice note only, never before the patient chooses a dialect, always shown with the text
 - [ ] Before any commercial deployment: clear the licences of the voice models' training audio (v2 has none declared; v3's voices come from YouTube creators)
+- [ ] On the GPU: confirm the Lahgtna fine-tune knows its dialect names (`GET /health` on the tts service lists each; the base OmniVoice drops unknown names to language-agnostic)
+- [ ] Native speakers review the normaliser's number and time words per dialect (Egyptian and a near-formal set today; Maghrebi and Levantine counting not covered)
+
+**Phase 3b: Before any patient's medical data** (moved up from Phase 9 on review, 2026-09-26)
+- [ ] Consent: data processing recorded at sign-up (platform-wide), AI chat per doctor before the first message; chat refused without it; both shown and revocable on the profile
+- [ ] Rate limits on login, sign-up, chat and voice notes
+- [ ] PHI kept out of logs: a redacting log filter in every service (emails, phone numbers, message text)
+- [ ] Append-only audit log of every clinical read, by a person or the model
+- [ ] Cross-doctor isolation sweep: every table under row-level security is checked, doctor B sees none of doctor A's rows and patient B none of patient A's
+- [ ] Email beside the in-app notices, for confirmations, reminders and a doctor's cancellation (in-app alone reaches no one who is not looking)
+- [ ] One-command scripts for the checks that need the GPU or a person: STT WER per dialect, tts dialect support, the v2/v3 listening test page, the normaliser review sheet
 
 **Phase 4: Patient medical chat and escalation**
 - [ ] Evaluate the dialect-router on our labelled AR samples; tag messages with the dialect if it holds up
 - [ ] Gates: emergency, scope, sensitivity and output guard (prompts plus the conversation service's safety logic)
 - [ ] Patient-visible RAG retrieval
 - [ ] `EscalationWorkflow` and the escalations table; the doctor's answer appears in the patient's chat
-- [ ] Safety eval set (~150 AR/EN prompts covering in-scope, out-of-scope, sensitive and emergency) run in CI with threshold assertions
+- [ ] Minimal escalations inbox for the doctor, so escalation is testable end to end (moved from Phase 5, which extends it)
+- [ ] Safety eval set (~150 AR/EN prompts covering in-scope, out-of-scope, sensitive and emergency) run in CI with threshold assertions; drafted here, signed off by a clinician before it gates anything
 
 **Phase 5: Doctor dashboard** (creates `doctor_assistant`)
 - [ ] The next-patient card
 - [ ] Patient list and timeline (history, documents, consultations)
-- [ ] Escalations inbox with a reply that appears in the patient's chat
+- [ ] Escalations inbox, extended: filters, history, and answering from the patient's timeline (the minimal inbox ships in Phase 4)
 - [ ] Doctor chat (SSE streaming, patient-scoped RAG and tools)
 
 **Phase 6: Documents and RAG** (creates `clinical_records`)
 - [ ] Upload route (presigned PUT) → `DocumentIngestionWorkflow`
 - [ ] PDF text, OCR and image vision description; chunk, embed, hybrid search
+- [ ] Embeddings: bge-m3 on the CPU by default (decided 2026-09-26: the 8 GB GPU is spent on stt, the dialect-router and tts), behind the Protocol so a GPU or hosted model can replace it
 - [ ] Visibility toggle per document
 
 **Phase 7: In-person session recording** (creates `consultation`)
+- [ ] Decide the diarization backend for consultations (open: pyannote's weights are gated on Hugging Face; compare it with a pyannote-free option on our own recordings)
 - [ ] Browser recorder with chunked upload and a recording-consent checkbox
 - [ ] `ConsultationWorkflow`: diarized transcript → SOAP draft → doctor review/edit UI → approve → history and embeddings → optional patient summary
 
-**Phase 8: Online sessions**
+**After v1: Online sessions** (moved out of v1 on review, 2026-09-26: LiveKit is a lot of infrastructure for what the first clinics need)
 - [ ] LiveKit room per online appointment, with the link sent in the confirmation
 - [ ] Egress recording to S3 that triggers `ConsultationWorkflow`
 
@@ -83,8 +98,7 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [ ] Prometheus `/metrics` on every service, Grafana dashboards and alerts (system and behavioural), and drift alerts
 - [ ] Feedback store and pipeline (summary edits, escalation answers, thumbs, low-confidence dialect items) into de-identified eval and training datasets
 - [ ] Written SLOs per service, a capacity plan including GPU, load tests that prove them, and horizontal scaling per service and queue
-- [ ] RLS policies verified by tests (doctor A cannot read doctor B's rows)
-- [ ] Audit log, PHI log redaction, rate limiting on login, sign-up and chat
+- [ ] Rate limits and the audit log shared across replicas (Phase 3b's are per process and per database)
 - [ ] Observability (structured logs, Temporal UI, error tracking)
 - [ ] Chosen low-hanging-fruit features
 - [ ] Deployment (compose → VM or k8s), backups, runbook
@@ -93,3 +107,9 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [ ] Telegram bot (shared bot, per-doctor deep links), voice notes through the same STT pipeline
 - [ ] Email booking (inbound parse, SMTP out, `.ics` invites)
 - [ ] WhatsApp
+
+**Needs you** (cannot be done from a cloud session)
+- [ ] Merge PR #1; after it, one PR per phase
+- [ ] Add `ANTHROPIC_API_KEY` as an environment secret, so the prompts run against real Arabic dialect messages, not only a scripted model
+- [ ] Run `uv lock` in `services/tts` where download.pytorch.org is reachable
+- [ ] Run the GPU checks and the listening test (Phase 3b's scripts), a clinician's sign-off on the safety eval set, a native speakers' pass on the normaliser
