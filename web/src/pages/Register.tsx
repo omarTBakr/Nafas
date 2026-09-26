@@ -18,6 +18,7 @@ export default function Register() {
     preferred_language: lang as Lang,
     dialect: "" as SpokenDialect | "",
   });
+  const [consented, setConsented] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -41,7 +42,7 @@ export default function Register() {
     setBusy(true);
     setError(null);
     try {
-      await register({ ...form, phone: form.phone || undefined, dialect: form.dialect || undefined });
+      await register({ ...form, phone: form.phone || undefined, dialect: form.dialect || undefined, accept_data_processing: true });
       navigate(params.get("next") ?? "/", { replace: true });
     } catch (e) {
       setError(explain(e));
@@ -87,12 +88,16 @@ export default function Register() {
           ))}
         </select>
       </label>
+      <label className="consent">
+        <input type="checkbox" required checked={consented} onChange={(e) => setConsented(e.target.checked)} />
+        <span>{t("consentDataProcessing")}</span>
+      </label>
       {error && (
         <p className="notice error" role="alert">
           {error}
         </p>
       )}
-      <button disabled={busy}>{t("register")}</button>
+      <button disabled={busy || !consented}>{t("register")}</button>
       <p className="small muted">
         {t("haveAccount")} <Link to={`/login${params.get("next") ? `?next=${encodeURIComponent(params.get("next")!)}` : ""}`}>{t("login")}</Link>
       </p>

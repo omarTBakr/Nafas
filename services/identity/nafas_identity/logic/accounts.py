@@ -5,9 +5,12 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from nafas_core.db import enter_scope
 from nafas_core.enums.dialect import SpokenDialect, VoiceGender
 from nafas_core.enums.identity import Language, UserRole
+from nafas_identity.enums import ConsentKind
 from nafas_identity.exceptions import AccountExistsError, UnknownSpecializationError
+from nafas_identity.logic import consents
 from nafas_identity.logic.passwords import DUMMY_HASH, hash_password, needs_rehash, verify_password
 from nafas_identity.models import Doctor, Patient, Specialization, User
 
@@ -76,9 +79,12 @@ async def register_patient_account(
     phone: str | None = None,
     dialect: SpokenDialect | None = None,
     voice: VoiceGender | None = None,
+    consent_evidence: str | None = None,
 ) -> AuthenticatedUser:
     """
-    Self sign-up: a patient's login and their patient record, together.
+    Self sign-up: a patient's login and their patient record, together, and
+    their consent to data processing when `consent_evidence` says what they
+    agreed to (the web app's consent text version).
 
     The patient belongs to no doctor yet; the care link is made when they
     first book (scheduling asks identity for it).
@@ -101,6 +107,11 @@ async def register_patient_account(
     )
     session.add(patient)
     await session.flush()
+
+    if consent_evidence is not None:
+        # as the new patient: consents are written in the patient's own scope
+        await enter_scope(session, patient_id=patient.id)
+        await consents.grant(session, patient_id=patient.id, kind=ConsentKind.DATA_PROCESSING, evidence=consent_evidence)
 
     return AuthenticatedUser(user_id=user.id, email=user.email, role=user.role, doctor_id=None, patient_id=patient.id)
 

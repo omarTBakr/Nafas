@@ -121,6 +121,18 @@ const STRINGS = {
     micDenied: "مش قادرين نوصل للميكروفون، اسمح بيه من إعدادات المتصفح",
     suggestedDialect: "يبدو إنك بتكتب باللهجة",
     useSuggestion: "استخدمها",
+    consentDataProcessing:
+      "أوافق على أن تحفظ نَفَس بياناتي وتعالجها لتنظيم مواعيدي ومحادثاتي مع الطبيب، ولا تشاركها إلا مع الأطباء الذين أحجز معهم.",
+    consentAiChat:
+      "أوافق على التحدث مع مساعد آلي باسم هذا الطبيب. المساعد ليس طبيبًا، ويمكن للطبيب قراءة المحادثة.",
+    agree: "أوافق",
+    consents: "الموافقات",
+    consent_data_processing: "معالجة البيانات",
+    consent_ai_chat: "المحادثة مع المساعد",
+    consent_session_recording: "تسجيل الجلسة",
+    revoke: "سحب الموافقة",
+    revokeHint: "سحب موافقة المحادثة يوقف المساعد مع هذا الطبيب. سحب معالجة البيانات يوقف كل المحادثات.",
+    reason_consent_required: "لازم توافق الأول قبل المحادثة",
   },
   en: {
     brand: "Nafas",
@@ -238,6 +250,18 @@ const STRINGS = {
     micDenied: "The microphone is not available; allow it in the browser's settings",
     suggestedDialect: "You seem to write in",
     useSuggestion: "Use it",
+    consentDataProcessing:
+      "I agree that Nafas stores and processes my data to run my appointments and chats with doctors, and shares it only with the doctors I book.",
+    consentAiChat:
+      "I agree to chat with an AI assistant on this doctor's behalf. The assistant is not a doctor, and the doctor can read the chat.",
+    agree: "I agree",
+    consents: "Consents",
+    consent_data_processing: "Data processing",
+    consent_ai_chat: "Chat with the assistant",
+    consent_session_recording: "Session recording",
+    revoke: "Withdraw consent",
+    revokeHint: "Withdrawing chat consent stops the assistant for that doctor. Withdrawing data processing stops every chat.",
+    reason_consent_required: "Please agree first, then chat",
   },
 } as const;
 

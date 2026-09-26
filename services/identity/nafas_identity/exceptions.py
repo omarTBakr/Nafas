@@ -15,3 +15,7 @@ class UnknownSpecializationError(IdentityError):
 
 class WeakPasswordError(IdentityError):
     """The password is too short to protect patient records."""
+
+
+class ConsentNotFoundError(IdentityError):
+    """No such consent for this patient."""

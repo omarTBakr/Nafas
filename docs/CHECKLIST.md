@@ -55,7 +55,7 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [ ] Native speakers review the normaliser's number and time words per dialect (Egyptian and a near-formal set today; Maghrebi and Levantine counting not covered)
 
 **Phase 3b: Before any patient's medical data** (moved up from Phase 9 on review, 2026-09-26)
-- [ ] Consent: data processing recorded at sign-up (platform-wide), AI chat per doctor before the first message; chat refused without it; both shown and revocable on the profile
+- [x] Consent: data processing recorded at sign-up (platform-wide, the box is required), AI chat per doctor before the first message; chat and voice refused with `consent_required` without both; shown and revocable on the profile; each records the wording's version as its evidence
 - [ ] Rate limits on login, sign-up, chat and voice notes
 - [ ] PHI kept out of logs: a redacting log filter in every service (emails, phone numbers, message text)
 - [ ] Append-only audit log of every clinical read, by a person or the model

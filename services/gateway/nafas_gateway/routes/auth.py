@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, EmailStr, Field
 
@@ -23,6 +25,9 @@ class SignUp(BaseModel):
     phone: str | None = Field(default=None, max_length=32)
     dialect: SpokenDialect | None = None
     voice: VoiceGender | None = None
+    # the box the patient ticked, and which wording of the consent it was
+    accept_data_processing: Literal[True]
+    consent_version: Literal["consent-v1"] = "consent-v1"
 
 
 class Me(BaseModel):
@@ -70,7 +75,8 @@ async def login(credentials: Login, response: Response) -> Me:
 @router.post("/register", response_model=Me, status_code=201)
 async def register(form: SignUp, response: Response) -> Me:
     """Patient self sign-up, logged in straight away. Doctors are never created here."""
-    account = await get_identity().sign_up_patient(form.model_dump(mode="json"))
+    fields = form.model_dump(mode="json", exclude={"accept_data_processing", "consent_version"})
+    account = await get_identity().sign_up_patient(fields | {"data_processing_consent": f"web:{form.consent_version}"})
     _start_session(response, account)
     return _me(account)
 

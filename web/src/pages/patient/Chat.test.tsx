@@ -16,6 +16,11 @@ const HELD = {
   reason_for_visit: null,
 };
 
+const CONSENTED = [
+  { consent_id: "c1", kind: "data_processing", doctor_id: null, granted_at: "2026-09-26T00:00:00Z", evidence: "web:consent-v1" },
+  { consent_id: "c2", kind: "ai_chat", doctor_id: "d1", granted_at: "2026-09-26T00:00:00Z", evidence: "web:consent-v1" },
+];
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
@@ -42,6 +47,7 @@ describe("the chat panel", () => {
       "fetch",
       vi.fn(async (url: string, init?: RequestInit) => {
         calls.push(`${init?.method ?? "GET"} ${url}`);
+        if (url === "/api/me/consents") return json(CONSENTED);
         if (url === "/api/chat/d1/messages" && init?.method === "POST")
           return json({
             conversation_id: "c1",
@@ -79,8 +85,12 @@ describe("the chat panel", () => {
   it("keeps the draft and says so when the assistant cannot answer", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (_url: string, init?: RequestInit) =>
-        init?.method === "POST" ? json({ detail: "the assistant is unavailable" }, 503) : json([]),
+      vi.fn(async (url: string, init?: RequestInit) =>
+        url === "/api/me/consents"
+          ? json(CONSENTED)
+          : init?.method === "POST"
+            ? json({ detail: "the assistant is unavailable" }, 503)
+            : json([]),
       ),
     );
     renderChat();
@@ -117,6 +127,7 @@ describe("voice notes", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/api/me/consents") return json(CONSENTED);
         if (url === "/api/chat/d1/voice") {
           sent.push(init?.body as FormData);
           return json({
@@ -148,5 +159,31 @@ describe("voice notes", () => {
       "/api/chat/d1/messages/note-1/audio",
       "/api/chat/d1/messages/reply-1/audio",
     ]);
+  });
+});
+
+describe("consent", () => {
+  it("asks for what is missing before the chat opens, and records it", async () => {
+    const granted: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/api/me/consents" && init?.method === "POST") {
+          granted.push(JSON.parse(String(init.body)));
+          return json(CONSENTED[1], 201);
+        }
+        if (url === "/api/me/consents") return json([CONSENTED[0]]);
+        return json([]);
+      }),
+    );
+    renderChat();
+
+    expect(await screen.findByText(/I agree to chat with an AI assistant/)).toBeInTheDocument();
+    // data processing was already given: only the chat consent is asked for
+    expect(screen.queryByText(/stores and processes my data/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "I agree" }));
+
+    expect(await screen.findByLabelText("Type your message")).toBeInTheDocument();
+    expect(granted).toEqual([{ kind: "ai_chat", doctor_id: "d1" }]);
   });
 });

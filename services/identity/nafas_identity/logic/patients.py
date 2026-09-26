@@ -39,7 +39,7 @@ async def register_patient(
 async def record_consent(
     session: AsyncSession,
     *,
-    doctor_id: uuid.UUID,
+    doctor_id: uuid.UUID | None,
     patient_id: uuid.UUID,
     kind: ConsentKind,
     channel: Channel | None = None,

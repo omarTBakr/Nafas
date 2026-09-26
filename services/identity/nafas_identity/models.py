@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime
 
 from sqlalchemy import (
     ARRAY,
+    CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
@@ -157,12 +158,20 @@ class DoctorPatient(Base):
 
 
 class Consent(Base):
+    """
+    A patient's consent. Data processing is given once, to the platform
+    (no doctor); AI chat and session recording are given to one doctor.
+    """
+
     __tablename__ = "consents"
-    __table_args__ = {"schema": SCHEMA}
+    __table_args__ = (
+        CheckConstraint("(kind = 'data_processing') = (doctor_id IS NULL)", name="doctor_only_where_needed"),
+        {"schema": SCHEMA},
+    )
 
     id: Mapped[uuid.UUID] = _id()
     patient_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(f"{SCHEMA}.patients.id", ondelete="CASCADE"), index=True)
-    doctor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey(f"{SCHEMA}.doctors.id"))
+    doctor_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey(f"{SCHEMA}.doctors.id"))
     kind: Mapped[ConsentKind] = mapped_column(_enum(ConsentKind, "consent_kind"))
     granted_at: Mapped[datetime] = _created_at()
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

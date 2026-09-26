@@ -1,15 +1,23 @@
 import { useEffect, useState, type FormEvent } from "react";
 
-import { api, DIALECTS, type Profile, type SpokenDialect, type VoiceGender } from "../../api";
+import { api, DIALECTS, type Consent, type Doctor, type Profile, type SpokenDialect, type VoiceGender } from "../../api";
 import { useI18n } from "../../i18n";
 
 export default function ProfilePage() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [dialect, setDialect] = useState<SpokenDialect | "">("");
   const [voice, setVoice] = useState<VoiceGender | "">("");
   const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [suggested, setSuggested] = useState<SpokenDialect | null>(null);
+  const [consents, setConsents] = useState<Consent[]>([]);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+
+  const loadConsents = () =>
+    api
+      .consents()
+      .then(setConsents)
+      .catch(() => setConsents([]));
 
   useEffect(() => {
     api
@@ -25,6 +33,11 @@ export default function ProfilePage() {
       .dialectSuggestion()
       .then((s) => setSuggested(s.dialect))
       .catch(() => setSuggested(null));
+    loadConsents();
+    api
+      .doctors()
+      .then(setDoctors)
+      .catch(() => setDoctors([]));
   }, []);
 
   async function save(event: FormEvent) {
@@ -88,6 +101,32 @@ export default function ProfilePage() {
         </p>
       )}
       <button disabled={state === "saving"}>{t("save")}</button>
+
+      <section className="stack" aria-label={t("consents")}>
+        <h3>{t("consents")}</h3>
+        <p className="hint">{t("revokeHint")}</p>
+        {consents.map((c) => {
+          const doctor = doctors.find((d) => d.doctor_id === c.doctor_id);
+          return (
+            <div key={c.consent_id} className="row spread">
+              <span>
+                {t(`consent_${c.kind}`)}
+                {doctor && ` · ${lang === "ar" ? doctor.full_name_ar : doctor.full_name_en}`}
+              </span>
+              <button
+                type="button"
+                className="secondary"
+                onClick={async () => {
+                  await api.revokeConsent(c.consent_id);
+                  loadConsents();
+                }}
+              >
+                {t("revoke")}
+              </button>
+            </div>
+          );
+        })}
+      </section>
     </form>
   );
 }

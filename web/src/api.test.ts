@@ -15,7 +15,7 @@ describe("api errors", () => {
       detail: [{ type: "value_error", loc: ["body", "email"], msg: "value is not a valid email address" }],
     });
 
-    const error = await api.register({ email: "x@y.local", password: "p", full_name: "n", preferred_language: "ar" }).catch((e) => e);
+    const error = await api.register({ email: "x@y.local", password: "p", full_name: "n", preferred_language: "ar", accept_data_processing: true }).catch((e) => e);
 
     expect(error).toBeInstanceOf(ApiError);
     expect(error.fields).toEqual({ email: "value is not a valid email address" });

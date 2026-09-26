@@ -22,7 +22,7 @@ async def heart_patient(two_doctors):
         patient = await register_patient(
             session, doctor_id=heart_id, full_name="منى علي", channel=Channel.TELEGRAM, external_id="1001"
         )
-        await record_consent(session, doctor_id=heart_id, patient_id=patient.id, kind=ConsentKind.DATA_PROCESSING)
+        await record_consent(session, doctor_id=heart_id, patient_id=patient.id, kind=ConsentKind.AI_CHAT)
 
     return patient.id
 

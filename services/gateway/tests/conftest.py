@@ -73,4 +73,13 @@ def browser() -> httpx.AsyncClient:
 
 
 async def sign_up(client, email="sara@example.com", name="سارة"):
-    return await client.post("/api/auth/register", json={"email": email, "password": PATIENT_PASSWORD, "full_name": name})
+    return await client.post(
+        "/api/auth/register",
+        json={"email": email, "password": PATIENT_PASSWORD, "full_name": name, "accept_data_processing": True},
+    )
+
+
+async def consent_to_chat(client, doctor_id):
+    """What the chat panel's consent card does: agree to AI chat with this doctor."""
+    response = await client.post("/api/me/consents", json={"kind": "ai_chat", "doctor_id": str(doctor_id)})
+    assert response.status_code == 201

@@ -10,6 +10,6 @@ still cannot see another doctor's rows.
 """
 
 from nafas_core.db.base import Base
-from nafas_core.db.session import get_engine, get_sessionmaker, session_scope
+from nafas_core.db.session import enter_scope, get_engine, get_sessionmaker, session_scope
 
-__all__ = ["Base", "get_engine", "get_sessionmaker", "session_scope"]
+__all__ = ["Base", "enter_scope", "get_engine", "get_sessionmaker", "session_scope"]

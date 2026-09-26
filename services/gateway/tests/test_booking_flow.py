@@ -109,7 +109,13 @@ async def test_a_patient_chooses_their_dialect_and_voice(doctor_id):
     async with browser() as sara:
         signed_up = await sara.post(
             "/api/auth/register",
-            json={"email": "sara@example.com", "password": PATIENT_PASSWORD, "full_name": "سارة", "dialect": "lb"},
+            json={
+                "email": "sara@example.com",
+                "password": PATIENT_PASSWORD,
+                "full_name": "سارة",
+                "dialect": "lb",
+                "accept_data_processing": True,
+            },
         )
         assert signed_up.status_code == 201
         assert (await sara.get("/api/me/profile")).json()["dialect"] == "lb"

@@ -1,6 +1,7 @@
 """The identity service's internal API: reached by other services only, behind the internal token."""
 
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query
 from pydantic import BaseModel
@@ -10,7 +11,9 @@ from nafas_core.db import session_scope
 from nafas_core.enums.dialect import SpokenDialect, VoiceGender
 from nafas_core.enums.identity import Language, UserRole
 from nafas_core.internal_api import require_internal_token
-from nafas_identity.exceptions import AccountExistsError, WeakPasswordError
+from nafas_identity.enums import ConsentKind
+from nafas_identity.exceptions import AccountExistsError, ConsentNotFoundError, WeakPasswordError
+from nafas_identity.logic import consents
 from nafas_identity.logic.accounts import AuthenticatedUser, authenticate, get_user, register_patient_account
 from nafas_identity.logic.directory import DoctorCard, ensure_care_link, list_doctors, list_specializations
 from nafas_identity.logic.profile import PatientProfile, get_profile, update_profile
@@ -38,6 +41,8 @@ class PatientSignUp(BaseModel):
     phone: str | None = None
     dialect: SpokenDialect | None = None
     voice: VoiceGender | None = None
+    # what the patient agreed to (the consent text's version); sign-up needs it
+    data_processing_consent: str
 
 
 class ProfileOut(BaseModel):
@@ -120,6 +125,7 @@ async def sign_up_patient(form: PatientSignUp) -> Account:
                 phone=form.phone,
                 dialect=form.dialect,
                 voice=form.voice,
+                consent_evidence=form.data_processing_consent,
             )
     except AccountExistsError as exc:
         raise HTTPException(status_code=409, detail="an account with this email already exists") from exc
@@ -153,6 +159,60 @@ async def change_profile(patient_id: uuid.UUID, changes: ProfileChanges) -> Prof
         raise HTTPException(status_code=404, detail="no such patient")
 
     return _profile(profile)
+
+
+class ConsentIn(BaseModel):
+    kind: ConsentKind
+    doctor_id: uuid.UUID | None = None
+    evidence: str | None = None
+
+
+class ConsentOut(BaseModel):
+    consent_id: uuid.UUID
+    kind: ConsentKind
+    doctor_id: uuid.UUID | None
+    granted_at: datetime
+    evidence: str | None
+
+
+def _consent(c) -> ConsentOut:
+    return ConsentOut(consent_id=c.id, kind=c.kind, doctor_id=c.doctor_id, granted_at=c.granted_at, evidence=c.evidence)
+
+
+@router.get("/patients/{patient_id}/consents", response_model=list[ConsentOut])
+async def patient_consents(patient_id: uuid.UUID) -> list[ConsentOut]:
+    """The patient's consents in force, in their own scope."""
+    async with session_scope(patient_id=patient_id) as session:
+        return [_consent(c) for c in await consents.in_force(session, patient_id)]
+
+
+@router.post("/patients/{patient_id}/consents", response_model=ConsentOut, status_code=201)
+async def grant_consent(patient_id: uuid.UUID, consent: ConsentIn) -> ConsentOut:
+    try:
+        async with session_scope(patient_id=patient_id) as session:
+            return _consent(
+                await consents.grant(
+                    session, patient_id=patient_id, kind=consent.kind, doctor_id=consent.doctor_id, evidence=consent.evidence
+                )
+            )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/patients/{patient_id}/consents/{consent_id}/revoke", status_code=204)
+async def revoke_consent(patient_id: uuid.UUID, consent_id: uuid.UUID) -> None:
+    try:
+        async with session_scope(patient_id=patient_id) as session:
+            await consents.revoke(session, patient_id, consent_id)
+    except ConsentNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="no such consent") from exc
+
+
+@router.get("/patients/{patient_id}/may-chat/{doctor_id}")
+async def may_chat(patient_id: uuid.UUID, doctor_id: uuid.UUID) -> dict:
+    """Whether the patient's consents let the assistant of this doctor talk with them."""
+    async with session_scope(patient_id=patient_id) as session:
+        return {"allowed": await consents.may_chat(session, patient_id, doctor_id)}
 
 
 @router.get("/users/{user_id}", response_model=Account)

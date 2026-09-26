@@ -76,6 +76,19 @@ class IdentityClient(InternalClient):
         )
         return {row["patient_id"]: row["full_name"] for row in response.json()}
 
+    async def consents(self, patient_id: uuid.UUID) -> list[dict]:
+        return (await self.request("GET", f"/internal/v1/patients/{patient_id}/consents")).json()
+
+    async def grant_consent(self, patient_id: uuid.UUID, kind: str, doctor_id: uuid.UUID | None, evidence: str) -> dict:
+        body = {"kind": kind, "doctor_id": str(doctor_id) if doctor_id else None, "evidence": evidence}
+        return (await self.request("POST", f"/internal/v1/patients/{patient_id}/consents", json=body)).json()
+
+    async def revoke_consent(self, patient_id: uuid.UUID, consent_id: uuid.UUID) -> None:
+        await self.request("POST", f"/internal/v1/patients/{patient_id}/consents/{consent_id}/revoke")
+
+    async def may_chat(self, patient_id: uuid.UUID, doctor_id: uuid.UUID) -> bool:
+        return (await self.request("GET", f"/internal/v1/patients/{patient_id}/may-chat/{doctor_id}")).json()["allowed"]
+
     async def ensure_care_link(self, doctor_id: uuid.UUID, patient_id: uuid.UUID) -> None:
         await self.request("POST", "/internal/v1/care-links", json={"doctor_id": str(doctor_id), "patient_id": str(patient_id)})
 

@@ -26,7 +26,7 @@ from nafas_core.interfaces.tts.fake import FakeTTS
 from nafas_gateway.main import app as gateway
 from nafas_gateway.routes.chat import chat_sender
 
-from .conftest import browser, next_wednesday, sign_up
+from .conftest import browser, consent_to_chat, next_wednesday, sign_up
 
 
 def classified(intent: str):
@@ -70,6 +70,7 @@ async def test_a_time_held_in_chat_is_confirmed_with_the_slot_picker(doctor_id, 
 
     async with conversation(llm), browser() as sara:
         await sign_up(sara)
+        await consent_to_chat(sara, doctor_id)
         sent = await sara.post(f"/api/chat/{doctor_id}/messages", json={"text": "عايز الأربعاء ٥:٤٠"})
         assert sent.status_code == 200
         reply = sent.json()
@@ -95,6 +96,7 @@ async def test_a_time_held_in_chat_is_confirmed_with_the_slot_picker(doctor_id, 
 async def test_chat_is_for_patients_and_known_doctors(doctor_id, conversation):
     async with conversation(FakeLLM()), browser() as sara, browser() as anonymous:
         await sign_up(sara)
+        await consent_to_chat(sara, doctor_id)
         unknown = await sara.post("/api/chat/00000000-0000-0000-0000-000000000000/messages", json={"text": "hi"})
         empty = await sara.post(f"/api/chat/{doctor_id}/messages", json={"text": ""})
         stranger = await anonymous.post(f"/api/chat/{doctor_id}/messages", json={"text": "hi"})
@@ -114,6 +116,7 @@ async def test_a_voice_note_is_answered_aloud_and_only_its_patient_can_play_it(d
     try:
         async with conversation(llm, voice), browser() as sara, browser() as omar:
             await sign_up(sara)
+            await consent_to_chat(sara, doctor_id)
             await sara.patch("/api/me/profile", json={"dialect": "eg", "voice": "female"})
             await sign_up(omar, email="omar@example.com", name="عمر")
 
@@ -143,3 +146,38 @@ async def test_a_voice_note_is_answered_aloud_and_only_its_patient_can_play_it(d
     assert stolen.status_code == 404
     # one reading is not enough to suggest anything
     assert suggestion.json() == {"dialect": None}
+
+
+async def test_chat_waits_for_consent_and_stops_when_it_is_revoked(doctor_id, conversation):
+    llm = FakeLLM([classified("smalltalk"), "أهلاً"])
+    async with conversation(llm), browser() as sara:
+        await sign_up(sara)
+        before = await sara.post(f"/api/chat/{doctor_id}/messages", json={"text": "أهلاً"})
+
+        await consent_to_chat(sara, doctor_id)
+        # consenting twice gives the same consent, not a second one
+        await consent_to_chat(sara, doctor_id)
+        given = (await sara.get("/api/me/consents")).json()
+        allowed = await sara.post(f"/api/chat/{doctor_id}/messages", json={"text": "أهلاً"})
+
+        ai_chat = next(c for c in given if c["kind"] == "ai_chat")
+        await sara.post(f"/api/me/consents/{ai_chat['consent_id']}/revoke")
+        after = await sara.post(f"/api/chat/{doctor_id}/messages", json={"text": "أهلاً"})
+
+    assert (before.status_code, before.json()["reason"]) == (403, "consent_required")
+    assert sorted((c["kind"], c["evidence"]) for c in given) == [
+        ("ai_chat", "web:consent-v1"),
+        ("data_processing", "web:consent-v1"),
+    ]
+    assert allowed.status_code == 200
+    assert (after.status_code, after.json()["reason"]) == (403, "consent_required")
+
+
+async def test_signing_up_needs_the_data_processing_box(doctor_id):
+    async with browser() as sara:
+        refused = await sara.post(
+            "/api/auth/register",
+            json={"email": "sara@example.com", "password": "patient password 123", "full_name": "سارة"},
+        )
+
+    assert refused.status_code == 422

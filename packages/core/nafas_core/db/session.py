@@ -62,7 +62,18 @@ async def session_scope(doctor_id: UUID | None = None, patient_id: UUID | None =
     RLS instead of weakening this.
     """
     async with get_sessionmaker()() as session, session.begin():
-        for name, value in ((CURRENT_DOCTOR_SETTING, doctor_id), (CURRENT_PATIENT_SETTING, patient_id)):
-            if value is not None:
-                await session.execute(text("SELECT set_config(:name, :value, true)"), {"name": name, "value": str(value)})
+        await enter_scope(session, doctor_id=doctor_id, patient_id=patient_id)
         yield session
+
+
+async def enter_scope(session: AsyncSession, doctor_id: UUID | None = None, patient_id: UUID | None = None) -> None:
+    """
+    Narrows an open transaction to a doctor or a patient, for the rest of it.
+
+    For a transaction that creates the person it then acts as: sign-up makes
+    the patient, then records their consent as that patient, so the row goes
+    through the same policy as the patient's own later writes.
+    """
+    for name, value in ((CURRENT_DOCTOR_SETTING, doctor_id), (CURRENT_PATIENT_SETTING, patient_id)):
+        if value is not None:
+            await session.execute(text("SELECT set_config(:name, :value, true)"), {"name": name, "value": str(value)})

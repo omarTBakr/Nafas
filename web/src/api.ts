@@ -3,6 +3,17 @@
 
 export type Role = "doctor" | "patient" | "admin" | "staff";
 
+/** The wording of the consent texts shown (i18n consentDataProcessing, consentAiChat); recorded with each consent. */
+export const CONSENT_VERSION = "consent-v1";
+
+export interface Consent {
+  consent_id: string;
+  kind: "data_processing" | "ai_chat" | "session_recording";
+  doctor_id: string | null;
+  granted_at: string;
+  evidence: string | null;
+}
+
 export interface Me {
   user_id: string;
   email: string;
@@ -62,7 +73,8 @@ export type Unavailable =
   | "taken"
   | "not_bookable"
   | "hold_expired"
-  | "invalid_transition";
+  | "invalid_transition"
+  | "consent_required";
 
 export interface CheckResult {
   bookable: boolean;
@@ -199,7 +211,8 @@ export const api = {
     preferred_language: "ar" | "en";
     phone?: string;
     dialect?: SpokenDialect;
-  }) => call<Me>("POST", "/api/auth/register", form),
+    accept_data_processing: true;
+  }) => call<Me>("POST", "/api/auth/register", { consent_version: CONSENT_VERSION, ...form }),
   profile: () => call<Profile>("GET", "/api/me/profile"),
   updateProfile: (changes: Partial<Omit<Profile, "patient_id">>) => call<Profile>("PATCH", "/api/me/profile", changes),
   logout: () => call<void>("POST", "/api/auth/logout"),
@@ -228,6 +241,10 @@ export const api = {
     return call<ChatReply>("POST", `/api/chat/${doctorId}/voice`, form);
   },
   audioUrl: (doctorId: string, messageId: string) => `/api/chat/${doctorId}/messages/${messageId}/audio`,
+  consents: () => call<Consent[]>("GET", "/api/me/consents"),
+  grantConsent: (kind: "data_processing" | "ai_chat", doctorId?: string) =>
+    call<Consent>("POST", "/api/me/consents", { kind, doctor_id: doctorId ?? null }),
+  revokeConsent: (id: string) => call<void>("POST", `/api/me/consents/${id}/revoke`),
   dialectSuggestion: () => call<{ dialect: SpokenDialect | null }>("GET", "/api/me/dialect-suggestion"),
 
   notifications: (unreadOnly = false) =>

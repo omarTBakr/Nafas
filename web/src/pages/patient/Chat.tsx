@@ -87,9 +87,21 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
   const [recording, setRecording] = useState(false);
   const [micDenied, setMicDenied] = useState(false);
   const recorder = useRef<MediaRecorder | null>(null);
+  // which consents this chat still needs; null while checking
+  const [missing, setMissing] = useState<("data_processing" | "ai_chat")[] | null>(null);
   const end = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    api
+      .consents()
+      .then((given) => {
+        const has = (kind: string, doctor: string | null) => given.some((c) => c.kind === kind && c.doctor_id === doctor);
+        setMissing([
+          ...(has("data_processing", null) ? [] : (["data_processing"] as const)),
+          ...(has("ai_chat", doctorId) ? [] : (["ai_chat"] as const)),
+        ]);
+      })
+      .catch(() => setMissing([]));
     api
       .chatThread(doctorId)
       .then((thread) => setLines(thread.map(fromThread)))
@@ -119,8 +131,9 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
         { id: reply.message_id, role: "assistant", text: reply.text, actions: reply.actions, audio: Boolean(reply.audio_key) },
       ]);
       if (reply.actions.length > 0) onBookingChange();
-    } catch {
-      setFailed(true);
+    } catch (e) {
+      if (e instanceof ApiError && e.reason === "consent_required") setMissing(["data_processing", "ai_chat"]);
+      else setFailed(true);
       onFail();
       setLines((current) => (current ?? []).filter((l) => l.id !== pending.id));
     } finally {
@@ -165,7 +178,27 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
     setRecording(false);
   }
 
-  if (lines === null) return <p className="muted">{t("loading")}</p>;
+  if (lines === null || missing === null) return <p className="muted">{t("loading")}</p>;
+
+  if (missing.length > 0) {
+    return (
+      <section className="card stack chat" aria-label={t("consents")}>
+        <p className="notice info small">{t("aiLabel")}</p>
+        {missing.includes("data_processing") && <p>{t("consentDataProcessing")}</p>}
+        <p>{t("consentAiChat")}</p>
+        <div>
+          <button
+            onClick={async () => {
+              for (const kind of missing) await api.grantConsent(kind, kind === "ai_chat" ? doctorId : undefined);
+              setMissing([]);
+            }}
+          >
+            {t("agree")}
+          </button>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="card stack chat" aria-label={t("tabChat")}>

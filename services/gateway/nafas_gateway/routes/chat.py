@@ -19,6 +19,7 @@ from nafas_core.exceptions.workflow import TemporalConnectionError
 from nafas_core.interfaces.storage.base import patient_key
 from nafas_core.interfaces.storage.factory import get_storage
 from nafas_core.temporal import get_temporal_client
+from nafas_gateway.errors import Refusal
 from nafas_gateway.sessions import current_patient
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -57,9 +58,11 @@ class MessageIn(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
 
 
-async def _known_doctor(doctor_id: uuid.UUID) -> None:
-    # 404 through UpstreamRefusal when there is no such doctor
+async def _may_chat(patient: Account, doctor_id: uuid.UUID) -> None:
+    """The doctor exists (404 otherwise), and the patient consented to data processing and to AI chat with them."""
     await get_identity().doctor(doctor_id)
+    if not await get_identity().may_chat(patient.patient_id, doctor_id):
+        raise Refusal(403, "consent_required", "consent to data processing and AI chat is needed first")
 
 
 async def deliver(
@@ -89,7 +92,7 @@ async def send(
     sender: ChatSender = Depends(chat_sender),
 ) -> dict:
     """The assistant's reply, with any appointment it held, confirmed or cancelled on the way."""
-    await _known_doctor(doctor_id)
+    await _may_chat(patient, doctor_id)
     return await deliver(sender, patient, doctor_id, message.text)
 
 
@@ -110,7 +113,7 @@ async def send_voice(
     if len(data) > MAX_VOICE_BYTES:
         raise HTTPException(status_code=413, detail="the voice note is too large")
 
-    await _known_doctor(doctor_id)
+    await _may_chat(patient, doctor_id)
     key = patient_key(doctor_id, patient.patient_id, "voice", f"{uuid.uuid4()}.{VOICE_TYPES[mime]}")
     await get_storage().put(key, data, mime)
     return await deliver(sender, patient, doctor_id, "", key, mime)
