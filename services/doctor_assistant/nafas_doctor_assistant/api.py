@@ -22,6 +22,7 @@ from nafas_core.clients.scheduling import get_scheduling
 from nafas_core.config import get_setting
 from nafas_core.health import health_info
 from nafas_core.interfaces.llm import get_llm
+from nafas_core.interfaces.search import get_web_search
 from nafas_core.internal_api import require_internal_token
 from nafas_core.metrics import instrument
 from nafas_doctor_assistant.logic.chat import run_doctor_chat
@@ -64,6 +65,7 @@ async def chat(doctor_id: uuid.UUID, body: ChatIn):
 
     doctor = await identity.doctor(doctor_id)
     timezone = (await get_scheduling().booking_info(doctor_id))["timezone"]
+    web = get_web_search() if get_setting().web_search_doctor else None
     tools = DoctorTools(
         doctor_id=doctor_id,
         patient_id=body.patient_id,
@@ -72,6 +74,7 @@ async def chat(doctor_id: uuid.UUID, body: ChatIn):
         scheduling=get_scheduling(),
         clinical=get_clinical(),
         conversation=get_conversation(),
+        web=web,
     )
     patient_line = (
         doctor_chat.PATIENT.format(name=patient["full_name"], patient_id=patient["patient_id"])
@@ -82,6 +85,7 @@ async def chat(doctor_id: uuid.UUID, body: ChatIn):
         doctor_name=doctor["full_name_en"],
         specialization=doctor["specialization_en"],
         patient_line=patient_line,
+        web_line=doctor_chat.WEB if web else doctor_chat.NO_WEB,
         timezone=timezone,
         now=datetime.now(UTC).astimezone(ZoneInfo(timezone)).strftime("%A %d %B %Y, %H:%M"),
     )
@@ -93,7 +97,7 @@ async def chat(doctor_id: uuid.UUID, body: ChatIn):
             tools,
             model=get_setting().llm_chat_model,
             system=system,
-            tool_definitions=doctor_chat.TOOLS,
+            tool_definitions=doctor_chat.tools(web is not None),
             prompt_version=doctor_chat.PROMPT_VERSION,
             history=history,
         ):

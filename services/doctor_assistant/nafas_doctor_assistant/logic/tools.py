@@ -9,16 +9,28 @@ from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from nafas_core.clients.timeline import timeline_items
+from nafas_core.exceptions.providers import SearchError
 
 TIMELINE_LIMIT = 30
+WEB_RESULTS = 5
 LATE_GRACE = timedelta(minutes=20)
 
 
 class DoctorTools:
     def __init__(
-        self, *, doctor_id: uuid.UUID, patient_id: uuid.UUID | None, timezone: str, identity, scheduling, clinical, conversation
+        self,
+        *,
+        doctor_id: uuid.UUID,
+        patient_id: uuid.UUID | None,
+        timezone: str,
+        identity,
+        scheduling,
+        clinical,
+        conversation,
+        web=None,
     ):
         self.doctor_id, self.patient_id = doctor_id, patient_id
+        self._web = web
         self._zone = ZoneInfo(timezone)
         self._identity, self._scheduling, self._clinical, self._conversation = identity, scheduling, clinical, conversation
 
@@ -100,6 +112,16 @@ class DoctorTools:
             }
         }
 
+    async def search_web(self, query: str) -> dict | list:
+        """General sources for the doctor: guidelines, drug information, literature. Never the record."""
+        if self._web is None:
+            return {"error": "web search is not available here"}
+        try:
+            found = await self._web.search(query, max_results=WEB_RESULTS)
+        except SearchError:
+            return {"error": "web search failed just now; answer without it and say so"}
+        return [{"title": r.title, "url": r.url, "text": r.content} for r in found]
+
     async def run(self, name: str, arguments: dict):
         match name:
             case "get_patient_timeline":
@@ -110,4 +132,6 @@ class DoctorTools:
                 return await self.get_today_schedule()
             case "get_next_patient":
                 return await self.get_next_patient()
+            case "search_web":
+                return await self.search_web(str(arguments.get("query", "")))
         return {"error": f"no tool named {name}"}

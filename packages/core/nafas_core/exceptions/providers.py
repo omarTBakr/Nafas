@@ -21,6 +21,10 @@ class TTSError(ProviderError):
     """The text-to-speech service failed or refused."""
 
 
+class SearchError(ProviderError):
+    """Web search failed or refused; an answer then goes on without it."""
+
+
 class EmailError(ProviderError):
     """The mail server refused a message or could not be reached."""
 

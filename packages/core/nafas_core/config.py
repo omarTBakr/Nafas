@@ -67,6 +67,24 @@ class Settings(BaseSettings):
     llm_classifier_model: str = Field("claude-haiku-4-5", description="Model for intent and safety classifiers")
     llm_summary_model: str = Field("claude-opus-5-5", description="Model for consultation summaries")
 
+    tavily_api_key: SecretStr = Field(SecretStr(""), description="Tavily web search; empty turns web grounding off")
+    web_search_doctor: bool = Field(True, description="The doctor assistant may search the web (with a Tavily key)")
+    web_search_patient: bool = Field(
+        False, description="Patients' general medical answers may draw on trusted medical sites (with a Tavily key)"
+    )
+    web_search_domains: list[str] = Field(
+        default_factory=lambda: [
+            "who.int",
+            "cdc.gov",
+            "nhs.uk",
+            "medlineplus.gov",
+            "mayoclinic.org",
+            "nih.gov",
+            "clevelandclinic.org",
+        ],
+        description="The only sites patients' answers are grounded in",
+    )
+
     # LangSmith reads these from the process environment, not from this object;
     # utils.tracing.configure_tracing copies them there at startup
     langsmith_tracing: bool = Field(False, description="Send traces of every model call to LangSmith")

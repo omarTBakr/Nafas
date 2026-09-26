@@ -109,6 +109,12 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [x] Deployment on one compose host, backups (database and objects, checksums, encrypted with `age`), a restore drill that was run, a runbook for every alert, secret rotation, a release check
 - [x] Browser recording and the image build are proven here only up to what the sandbox allows; CI builds an image for real
 
+**Web search grounding** (added on request, 2026-09-26)
+- [x] `TAVILY_API_KEY` in `.env.example` and the settings; web search off without it
+- [x] The doctor assistant's `search_web` tool: results cited by title and URL, never mixed with the record; off with `WEB_SEARCH_DOCTOR=false`
+- [x] Patients' general answers grounded in trusted medical sites only, behind `WEB_SEARCH_PATIENT`, after every gate, the output guard reading the result; the query a de-identified rewrite of the question
+- [ ] Needs you: paste the Tavily key into `.env`, and decide whether patients' answers should use it (`WEB_SEARCH_PATIENT`)
+
 **Later: messaging channels** (deferred 2026-09-26; everything is in the web app for now)
 - [ ] Telegram bot (shared bot, per-doctor deep links), voice notes through the same STT pipeline
 - [ ] Email booking (inbound parse, SMTP out, `.ics` invites)

@@ -12,7 +12,9 @@ from datetime import datetime
 from typing import Protocol
 from zoneinfo import ZoneInfo
 
+from nafas_conversation.prompts import web as web_prompt
 from nafas_core.clients.scheduling import SchedulingClient
+from nafas_core.exceptions.providers import LLMError, SearchError
 from nafas_core.tracing import step
 
 ACTIVE = ("confirmed", "completed")
@@ -65,3 +67,54 @@ class ClinicalContext:
             source = passage["details"].get("filename") or passage["details"].get("kind") or "record"
             facts.append(f"From the patient's record ({source}): {passage['content']}")
         return facts
+
+
+# a query is short; anything longer is likely the question pasted back, details and all
+MAX_QUERY_WORDS = 16
+WEB_RESULTS = 3
+
+
+async def general_query(llm, model: str, question: str) -> str | None:
+    """The general topic of the question, as a search query with nothing of the patient in it; None for none."""
+    try:
+        response = await llm.create(
+            model=model,
+            system=web_prompt.SYSTEM,
+            tools=[web_prompt.TOOL],
+            tool_choice={"type": "tool", "name": web_prompt.TOOL["name"]},
+            messages=[{"role": "user", "content": question}],
+            max_tokens=64,
+        )
+    except LLMError:
+        return None
+    query = next((b.input.get("query") for b in response.content if b.type == "tool_use"), None)
+    if not isinstance(query, str) or not query.strip() or len(query.split()) > MAX_QUERY_WORDS:
+        return None
+    return query.strip()
+
+
+class WebGroundedContext:
+    """
+    What the record says, then what trusted medical sites say about the
+    question in general. Only for general answers, after every gate: the
+    output guard still reads the draft. The search query is a de-identified
+    rewrite of the question; the question itself never leaves.
+    """
+
+    def __init__(self, inner, web, llm, model: str, domains: list[str]):
+        self._inner, self._web, self._llm, self._model, self._domains = inner, web, llm, model, domains
+
+    async def visits(self, patient_id: uuid.UUID, doctor_id: uuid.UUID) -> list[dict]:
+        return await self._inner.visits(patient_id, doctor_id)
+
+    @step("conversation.web_context", run_type="retriever")
+    async def for_patient(self, patient_id: uuid.UUID, doctor_id: uuid.UUID, question: str) -> list[str]:
+        facts = await self._inner.for_patient(patient_id, doctor_id, question)
+        query = await general_query(self._llm, self._model, question)
+        if query is None:
+            return facts
+        try:
+            found = await self._web.search(query, max_results=WEB_RESULTS, domains=self._domains)
+        except SearchError:
+            return facts
+        return facts + [f"General information from {r.title} ({r.url}): {r.content}" for r in found]

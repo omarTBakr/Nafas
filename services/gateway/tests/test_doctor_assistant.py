@@ -8,6 +8,7 @@ from nafas_core.interfaces.embeddings.factory import set_embeddings
 from nafas_core.interfaces.embeddings.fake import FakeEmbeddings
 from nafas_core.interfaces.llm.factory import set_llm
 from nafas_core.interfaces.llm.fake import FakeLLM, tool_use_message
+from nafas_doctor_assistant.prompts import doctor_chat
 
 from .conftest import DOCTOR_PASSWORD, browser, sign_up
 from .test_records_flow import booked
@@ -52,7 +53,7 @@ async def test_an_answer_streams_after_reading_the_patients_record(doctor_id, sc
         "".join(e["text"] for e in streamed if e["type"] == "text")
         == "She was started on bisoprolol for palpitations (note, today)."
     )
-    assert streamed[-1]["type"] == "done" and streamed[-1]["prompt_version"] == "doctor-chat-v1"
+    assert streamed[-1]["type"] == "done" and streamed[-1]["prompt_version"] == doctor_chat.PROMPT_VERSION
 
     # the model was told who is selected, and the tool read that patient's record
     first, second = llm.requests

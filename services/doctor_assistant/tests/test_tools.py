@@ -164,3 +164,50 @@ async def test_the_model_can_only_call_the_tools_that_exist():
     assert await t.run("search_patient_docs", {"query": "x"}) == []
     assert await t.run("delete_patient", {}) == {"error": "no tool named delete_patient"}
     assert await t.run("get_next_patient", {}) == {"next": None}
+
+
+async def test_web_search_is_offered_only_when_on_and_its_sources_come_back_cited():
+    from nafas_core.interfaces.search.base import WebResult
+    from nafas_core.interfaces.search.fake import FakeWebSearch
+    from nafas_doctor_assistant.prompts import doctor_chat
+
+    web = FakeWebSearch([WebResult("ESC 2024 hypertension guideline", "https://escardio.org/htn", "Target below 130/80.")])
+    t = DoctorTools(
+        doctor_id=DOCTOR,
+        patient_id=PATIENT,
+        timezone="UTC",
+        identity=None,
+        scheduling=None,
+        clinical=None,
+        conversation=None,
+        web=web,
+    )
+
+    found = await t.run("search_web", {"query": "hypertension target in adults under 65"})
+
+    assert found == [
+        {"title": "ESC 2024 hypertension guideline", "url": "https://escardio.org/htn", "text": "Target below 130/80."}
+    ]
+    assert web.queries == [("hypertension target in adults under 65", None)]
+    assert "search_web" in [tool["name"] for tool in doctor_chat.tools(True)]
+    assert "search_web" not in [tool["name"] for tool in doctor_chat.tools(False)]
+    assert "never put a patient's name" in doctor_chat.WEB
+
+
+async def test_without_web_search_or_when_it_fails_the_model_is_told_not_crashed():
+    from nafas_core.interfaces.search.fake import FakeWebSearch
+
+    off = tools(Services())
+    down = DoctorTools(
+        doctor_id=DOCTOR,
+        patient_id=PATIENT,
+        timezone="UTC",
+        identity=None,
+        scheduling=None,
+        clinical=None,
+        conversation=None,
+        web=FakeWebSearch(fails=True),
+    )
+
+    assert await off.run("search_web", {"query": "x"}) == {"error": "web search is not available here"}
+    assert "failed just now" in (await down.run("search_web", {"query": "x"}))["error"]

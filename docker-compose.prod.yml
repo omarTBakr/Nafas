@@ -30,6 +30,10 @@ x-production: &production
   SMTP_STARTTLS: "true"
   SMTP_FROM: ${SMTP_FROM:?}
   ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:?}
+  # optional: web search grounding; patients' answers only with WEB_SEARCH_PATIENT=true
+  TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+  WEB_SEARCH_DOCTOR: ${WEB_SEARCH_DOCTOR:-true}
+  WEB_SEARCH_PATIENT: ${WEB_SEARCH_PATIENT:-false}
   # prompts carry patient data: traces stay off unless a self-hosted LangSmith is named
   LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
   LANGSMITH_ENDPOINT: ${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
