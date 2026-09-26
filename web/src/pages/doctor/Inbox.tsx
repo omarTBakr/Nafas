@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 
-import { api, type Escalation } from "../../api";
+import { api, type Consultation, type Escalation } from "../../api";
 import { useI18n } from "../../i18n";
 
 function Question({ item, onAnswered }: { item: Escalation; onAnswered: () => void }) {
@@ -62,10 +62,24 @@ const FILTERS = [
 ] as const;
 
 export default function Inbox() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [filter, setFilter] = useState<(typeof FILTERS)[number][0]>("open");
   const [open, setOpen] = useState<Escalation[] | null>(null);
   const [answered, setAnswered] = useState<Escalation[]>([]);
+  const [drafts, setDrafts] = useState<Consultation[]>([]);
+  const [names, setNames] = useState<Record<string, string>>({});
+
+  // visit notes waiting for review sit above the questions: they are the doctor's own work to finish
+  useEffect(() => {
+    api
+      .consultationsToReview()
+      .then(setDrafts)
+      .catch(() => setDrafts([]));
+    api
+      .patients()
+      .then((all) => setNames(Object.fromEntries(all.map((p) => [p.patient_id, p.full_name]))))
+      .catch(() => undefined);
+  }, []);
 
   const load = useCallback(() => {
     api
@@ -95,6 +109,20 @@ export default function Inbox() {
           ))}
         </div>
       </div>
+      {drafts.length > 0 && (
+        <section className="stack" aria-label={t("notesToReview")}>
+          <h2>{t("notesToReview")}</h2>
+          {drafts.map((d) => (
+            <article key={d.consultation_id} className="card row spread">
+              <span>
+                <strong>{names[d.patient_id] ?? t("unknownPatient")}</strong>{" "}
+                <span className="muted small">{new Date(d.started_at).toLocaleString(locale)}</span>
+              </span>
+              <a href={`/doctor/consultations/${d.consultation_id}`}>{t("reviewNote")}</a>
+            </article>
+          ))}
+        </section>
+      )}
       {open.length === 0 && <p className="muted">{t("inboxEmpty")}</p>}
       {open.map((item) => (
         <Question key={item.escalation_id} item={item} onAnswered={load} />

@@ -85,6 +85,11 @@ async def my_records(patient: Account = Depends(current_patient)) -> dict:
     }
 
 
+@router.get("/me/documents/{document_id}/download")
+async def open_mine(document_id: uuid.UUID, patient: Account = Depends(current_patient)) -> dict:
+    return await get_clinical().patient_download(patient.patient_id, document_id)
+
+
 @router.get("/me/documents")
 async def shared_with_me(patient: Account = Depends(current_patient)) -> list[dict]:
     """What the patient's doctors shared with them."""

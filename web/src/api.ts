@@ -175,6 +175,7 @@ export interface PatientCard {
 export interface DocumentRecord {
   document_id: string;
   patient_id: string;
+  doctor_id: string;
   kind: string;
   filename: string;
   mime: string;
@@ -190,18 +191,69 @@ export interface DocumentRecord {
 
 export interface HistoryRecord {
   entry_id: string;
+  doctor_id: string;
   kind: string;
   content: string;
   visibility: Visibility;
   source_type: string | null;
+  source_id?: string | null;
   occurred_at: string;
+}
+
+export type ConsultationStatus =
+  | "recording"
+  | "transcribing"
+  | "summarizing"
+  | "draft_ready"
+  | "filing"
+  | "approved"
+  | "discarded"
+  | "failed";
+
+export interface Consultation {
+  consultation_id: string;
+  patient_id: string;
+  appointment_id: string | null;
+  status: ConsultationStatus;
+  error: string | null;
+  part_count: number;
+  share_with_patient: boolean;
+  started_at: string;
+  approved_at: string | null;
+  created_at: string;
+}
+
+export interface VisitNote {
+  subjective: string;
+  objective: string;
+  assessment: string;
+  plan: string;
+  diagnoses: { name: string; status: "new" | "known" | "suspected" }[];
+  medications: { name: string; dose: string; frequency: string; change: "started" | "stopped" | "changed" | "continued" }[];
+  allergies: { substance: string; reaction: string }[];
+  patient_summary: string;
+  uncertain: string[];
+}
+
+export interface ConsultationDetail extends Consultation {
+  transcript: { start: number; end: number; text: string }[] | null;
+  draft: VisitNote | null;
+  approved: VisitNote | null;
+  model: string | null;
+  prompt_version: string | null;
+}
+
+export interface MyRecords {
+  history: HistoryRecord[];
+  documents: DocumentRecord[];
 }
 
 export type TimelineItem =
   | ({ type: "appointment"; at: string } & Appointment)
   | ({ type: "history"; at: string } & HistoryRecord)
   | ({ type: "document"; at: string } & DocumentRecord)
-  | ({ type: "escalation"; at: string } & Escalation);
+  | ({ type: "escalation"; at: string } & Escalation)
+  | ({ type: "consultation"; at: string } & Consultation);
 
 export interface Timeline {
   patient: PatientCard;
@@ -396,6 +448,20 @@ export const api = {
   setVisibility: (sourceType: "document" | "history", id: string, visibility: Visibility) =>
     call<void>("PATCH", `/api/doctor/records/${sourceType}/${id}/visibility`, { visibility }),
   documentLink: (documentId: string) => call<{ url: string }>("GET", `/api/doctor/documents/${documentId}/download`),
+
+  startConsultation: (patientId: string, evidence: string) =>
+    call<Consultation>("POST", `/api/doctor/patients/${patientId}/consultations`, { evidence }),
+  consultationPart: (id: string, part: { index: number; mime: string; offset_seconds: number; size_bytes: number }) =>
+    call<{ index: number; upload_url: string; content_type: string }>("POST", `/api/doctor/consultations/${id}/parts`, part),
+  finishConsultation: (id: string) => call<Consultation>("POST", `/api/doctor/consultations/${id}/finish`),
+  consultationsToReview: () => call<Consultation[]>("GET", "/api/doctor/consultations"),
+  consultation: (id: string) => call<ConsultationDetail>("GET", `/api/doctor/consultations/${id}`),
+  approveConsultation: (id: string, note: VisitNote, shareWithPatient: boolean) =>
+    call<Consultation>("POST", `/api/doctor/consultations/${id}/approve`, { note, share_with_patient: shareWithPatient }),
+  discardConsultation: (id: string) => call<Consultation>("POST", `/api/doctor/consultations/${id}/discard`),
+
+  myRecords: () => call<MyRecords>("GET", "/api/me/records"),
+  myDocumentLink: (documentId: string) => call<{ url: string }>("GET", `/api/me/documents/${documentId}/download`),
 
   noShow: (appointmentId: string) => call<Appointment>("POST", `/api/doctor/appointments/${appointmentId}/no-show`),
 

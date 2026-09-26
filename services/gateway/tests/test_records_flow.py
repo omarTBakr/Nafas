@@ -2,24 +2,7 @@
 
 from datetime import time
 
-import pytest
-
-from nafas_core.interfaces.embeddings.factory import set_embeddings
-from nafas_core.interfaces.embeddings.fake import FakeEmbeddings
-from nafas_core.interfaces.storage.factory import set_storage
-from nafas_core.interfaces.storage.fake import InMemoryStorage
-
 from .conftest import DOCTOR_PASSWORD, browser, next_wednesday, sign_up
-
-
-@pytest.fixture
-def storage():
-    store = InMemoryStorage()
-    set_storage(store)
-    set_embeddings(FakeEmbeddings())
-    yield store
-    set_storage(None)
-    set_embeddings(None)
 
 
 async def booked(sara, doctor_id) -> str:
@@ -55,12 +38,16 @@ async def test_the_doctor_keeps_a_record_and_shares_part_of_it(doctor_id, storag
 
         history = (await doctor.get(f"/api/doctor/patients/{patient_id}/history")).json()
         mine = (await sara.get("/api/me/documents")).json()
+        opened = await sara.get(f"/api/me/documents/{document_id}/download")
+        await doctor.patch(f"/api/doctor/records/document/{document_id}/visibility", json={"visibility": "doctor_only"})
+        hidden = await sara.get(f"/api/me/documents/{document_id}/download")
         refused = await stranger.get(f"/api/doctor/patients/{patient_id}/history")
 
     assert shared.status_code == 201
     assert [e["content"] for e in history] == ["Consider anxiety component.", "Target blood pressure below 130/80."]
     assert finished.json()["status"] == "uploaded" and ingestion_events.uploaded_ids == [document_id]
     assert [d["filename"] for d in mine] == ["echo.pdf"]
+    assert opened.json()["url"].startswith("memory://get/") and hidden.status_code == 404
     assert refused.status_code == 403
 
 

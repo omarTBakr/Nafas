@@ -21,6 +21,10 @@ from nafas_core.clients.doctor_assistant import DoctorAssistantClient, set_docto
 from nafas_core.clients.identity import IdentityClient, set_identity
 from nafas_core.clients.scheduling import SchedulingClient, set_scheduling
 from nafas_core.db import session_scope
+from nafas_core.interfaces.embeddings.factory import set_embeddings
+from nafas_core.interfaces.embeddings.fake import FakeEmbeddings
+from nafas_core.interfaces.storage.factory import set_storage
+from nafas_core.interfaces.storage.fake import InMemoryStorage
 from nafas_doctor_assistant.api import app as assistant_app
 from nafas_gateway.limits import limiter
 from nafas_gateway.main import app as gateway
@@ -82,6 +86,17 @@ async def doctor_id(database, monkeypatch):
     set_identity(None)
     set_scheduling(None)
     set_conversation(None)
+
+
+@pytest.fixture
+def storage():
+    """Storage in memory and fake embeddings, for tests that upload."""
+    store = InMemoryStorage()
+    set_storage(store)
+    set_embeddings(FakeEmbeddings())
+    yield store
+    set_storage(None)
+    set_embeddings(None)
 
 
 @pytest.fixture(autouse=True)

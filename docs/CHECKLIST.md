@@ -87,8 +87,10 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 **Phase 7: In-person session recording** (creates `consultation`)
 - [x] Diarization for v1: none. Timed transcript parts, the summary model tells speakers apart by content, the doctor approves every draft (PLAN.md §6c); a backend can be added behind the stt interface later
 - [x] Consent to record, asked afresh for every recording and recorded by the patient's own doctor
-- [ ] Browser recorder with chunked upload and a recording-consent checkbox
-- [ ] `ConsultationWorkflow`: diarized transcript → SOAP draft → doctor review/edit UI → approve → history and embeddings → optional patient summary
+- [x] Browser recorder: the doctor confirms consent, parts of 60 s each PUT straight to storage with their offset (retried), discard at any point before filing
+- [x] `ConsultationWorkflow` on its own queue: transcript in visit time → Opus SOAP draft as a forced tool call (the model's doubts listed for the doctor) → review and edit page → approve → idempotent history entries, embedded, doctor-only → the patient's plain-language summary only if the doctor shares it; a discard deletes the audio, transcript and draft; silence or repeated failure marks it failed with the reason
+- [x] Recorded visits on the doctor's timeline and in the inbox ("notes to review", counted in the badge); the patient's "My records" page (shared entries and documents, which they can now open); the doctor assistant reads only approved entries, never drafts
+- [x] Browser check in Chromium against the real services (fake microphone, scripted STT and model): two parts, review with an edit, approval, the patient sees only the shared summary
 
 **After v1: Online sessions** (moved out of v1 on review, 2026-09-26: LiveKit is a lot of infrastructure for what the first clinics need)
 - [ ] LiveKit room per online appointment, with the link sent in the confirmation
@@ -111,6 +113,7 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [ ] WhatsApp
 
 **Needs you** (cannot be done from a cloud session)
+- [ ] Decide how long consultation audio is kept after approval (kept for now; deleted on discard) and whether the approved note should be locked or amendable with an audit trail
 - [ ] Merge PR #1; after it, one PR per phase
 - [ ] Add `ANTHROPIC_API_KEY` as an environment secret, so the prompts run against real Arabic dialect messages, not only a scripted model
 - [ ] Run `uv lock` in `services/tts` where download.pytorch.org is reachable

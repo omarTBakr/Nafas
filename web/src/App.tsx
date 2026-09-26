@@ -5,6 +5,7 @@ import { api, type Role } from "./api";
 import { useAuth } from "./auth";
 import { useI18n } from "./i18n";
 import AssistantPage from "./pages/doctor/Assistant";
+import ConsultationPage from "./pages/doctor/Consultation";
 import Inbox from "./pages/doctor/Inbox";
 import PatientPage from "./pages/doctor/Patient";
 import Patients from "./pages/doctor/Patients";
@@ -15,6 +16,7 @@ import Appointments from "./pages/patient/Appointments";
 import Book from "./pages/patient/Book";
 import Notifications from "./pages/patient/Notifications";
 import ProfilePage from "./pages/patient/Profile";
+import Records from "./pages/patient/Records";
 import Register from "./pages/Register";
 
 /** Renders its page only for the right role; otherwise to login, remembering where to come back to. */
@@ -52,7 +54,9 @@ function TopBar() {
   const { t, lang, setLang } = useI18n();
   const navigate = useNavigate();
   const unread = useUnread(me?.role === "patient", () => api.notifications(true).then((n) => n.length));
-  const waiting = useUnread(me?.role === "doctor", () => api.escalations(["open"]).then((e) => e.length));
+  const waiting = useUnread(me?.role === "doctor", () =>
+    Promise.all([api.escalations(["open"]), api.consultationsToReview()]).then(([e, c]) => e.length + c.length),
+  );
 
   return (
     <header className="topbar">
@@ -84,6 +88,7 @@ function TopBar() {
               {me?.role === "patient" && (
                 <>
                   <NavLink to="/appointments">{t("myAppointments")}</NavLink>
+                  <NavLink to="/records">{t("myRecords")}</NavLink>
                   <NavLink to="/notifications" className="bell">
                     {t("notifications")}
                     {unread > 0 && <span className="count">{unread}</span>}
@@ -149,6 +154,14 @@ export default function App() {
             }
           />
           <Route
+            path="/records"
+            element={
+              <RequireRole role="patient">
+                <Records />
+              </RequireRole>
+            }
+          />
+          <Route
             path="/profile"
             element={
               <RequireRole role="patient">
@@ -185,6 +198,16 @@ export default function App() {
             element={
               <RequireRole role="doctor">
                 <PatientPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/doctor/consultations/:consultationId"
+            element={
+              <RequireRole role="doctor">
+                <div className="narrow">
+                  <ConsultationPage />
+                </div>
               </RequireRole>
             }
           />

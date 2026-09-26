@@ -324,6 +324,15 @@ async def patient_documents(patient_id: uuid.UUID, doctor_id: uuid.UUID | None =
     return [_document(d) for d in found]
 
 
+@router.get("/patients/{patient_id}/documents/{document_id}/download")
+async def patient_download(patient_id: uuid.UUID, document_id: uuid.UUID) -> dict:
+    """A shared document, opened by its patient; the patient's scope hides one that is not shared."""
+    async with session_scope(patient_id=patient_id) as session:
+        document = await records.get_document(session, document_id)
+    await _read(audit.Actor.PATIENT, patient_id, "open_document", "document", document_id, patient_id, document.doctor_id)
+    return {"url": await get_storage().presigned_get_url(document.object_key, expires_seconds=300)}
+
+
 app = FastAPI(title="Nafas clinical records (internal)")
 app.include_router(router, dependencies=[Depends(require_internal_token)])
 

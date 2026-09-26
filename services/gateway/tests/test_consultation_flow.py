@@ -13,7 +13,7 @@ from nafas_core.interfaces.llm.fake import FakeLLM, tool_use_message
 from nafas_core.interfaces.stt.fake import FakeSTT
 
 from .conftest import DOCTOR_PASSWORD, browser, sign_up
-from .test_records_flow import booked, storage  # noqa: F401  (a fixture)
+from .test_records_flow import booked
 
 NOTE = {
     "subjective": "Chest tightness on stairs for a month.",
@@ -31,7 +31,7 @@ NOTE = {
 async def test_a_recorded_visit_reaches_the_record_only_once_the_doctor_approves(
     doctor_id,
     storage,
-    consultation_events,  # noqa: F811
+    consultation_events,
 ):
     async with browser() as sara, browser() as doctor, browser() as stranger:
         await sign_up(sara)

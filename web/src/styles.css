@@ -206,3 +206,18 @@ textarea { min-height: 80px; resize: vertical; }
 .timeline-item.escalation { border-inline-start: 4px solid var(--warn); }
 .next-patient ul { margin: 0; padding-inline-start: 18px; }
 .narrow { max-width: 720px; }
+
+/* recorded visits */
+.badge.draft_ready, .badge.failed { background: var(--warn-soft); color: var(--warn); }
+.badge.approved { background: var(--ok-soft); color: var(--ok); }
+.timeline-item.consultation { border-inline-start: 4px solid var(--ok); }
+.recording-dot { font-weight: 600; font-variant-numeric: tabular-nums; }
+.recording-dot::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--danger); margin-inline-end: 8px; animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .recording-dot::before { animation: none; } }
+.consultation-page textarea { min-height: 90px; }
+.consultation-page fieldset { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; }
+.note-row { flex-wrap: wrap; }
+.note-row input { flex: 1 1 140px; min-width: 0; }
+.transcript { padding-inline-start: 0; list-style: none; display: grid; gap: 6px; margin: 12px 0 0; }
+.notice.warn ul { margin: 6px 0 0; padding-inline-start: 20px; }

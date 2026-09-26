@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { api, ApiError, type Appointment, type ChatAction, type ChatMessage, type ChatReply } from "../../api";
 import { useI18n } from "../../i18n";
+import { recorderType } from "../../recorder";
 import { clinicClock, clinicDay } from "../../time";
 
 interface Line {
@@ -15,12 +16,6 @@ interface Line {
 
 function fromThread(m: ChatMessage): Line {
   return { id: m.message_id, role: m.role, text: m.content, audio: Boolean(m.audio_key) };
-}
-
-/** The browser's recorder, in whichever container it supports; MediaRecorder picks when none is named. */
-function recorderType(): string | undefined {
-  const preferred = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"];
-  return typeof MediaRecorder !== "undefined" ? preferred.find((t) => MediaRecorder.isTypeSupported?.(t)) : undefined;
 }
 
 /** A hold, confirmation or cancellation the assistant made, as a card; a hold can be confirmed right here. */

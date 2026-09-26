@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { api, type Timeline, type TimelineItem, uploadDocument, type Visibility } from "../../api";
-import { useI18n } from "../../i18n";
+import { type Key, useI18n } from "../../i18n";
 import { clinicClock, clinicDay } from "../../time";
 import Assistant from "./Assistant";
+import RecordVisit from "./RecordVisit";
 
 const KINDS = ["report", "lab", "xray", "ct", "mri", "ultrasound", "prescription", "other"];
 
@@ -57,7 +58,7 @@ function Item({ item, tz, reload }: { item: TimelineItem; tz: string; reload: ()
   return (
     <article className={`card stack timeline-item ${item.type}`}>
       <div className="row spread">
-        <strong>{t(`item_${item.type}`)}</strong>
+        <strong>{item.type === "history" ? t(`kind_${item.kind}` as Key) : t(`item_${item.type}`)}</strong>
         <span className="muted small">{when}</span>
       </div>
       {item.type === "appointment" && (
@@ -68,7 +69,7 @@ function Item({ item, tz, reload }: { item: TimelineItem; tz: string; reload: ()
       )}
       {item.type === "history" && (
         <>
-          <p className="question">{item.content}</p>
+          <p className="question" dir="auto">{item.content}</p>
           <Sharing item={item} onChange={reload} />
         </>
       )}
@@ -100,6 +101,12 @@ function Item({ item, tz, reload }: { item: TimelineItem; tz: string; reload: ()
           </div>
         </>
       )}
+      {item.type === "consultation" && (
+        <div className="row spread">
+          <span className={`badge ${item.status}`}>{t(`consultation_${item.status}` as Key)}</span>
+          <Link to={`/doctor/consultations/${item.consultation_id}`}>{item.status === "draft_ready" ? t("reviewNote") : t("open")}</Link>
+        </div>
+      )}
       {item.type === "escalation" && (
         <>
           <p className="question">{item.question}</p>
@@ -109,6 +116,13 @@ function Item({ item, tz, reload }: { item: TimelineItem; tz: string; reload: ()
       )}
     </article>
   );
+}
+
+function itemId(item: TimelineItem): string {
+  if ("document_id" in item) return item.document_id;
+  if ("entry_id" in item) return item.entry_id;
+  if ("consultation_id" in item) return item.consultation_id;
+  return "";
 }
 
 /** One patient's file: their timeline with this doctor, a note, an upload, what they may see, and the assistant beside it. */
@@ -156,6 +170,8 @@ export default function Patient() {
             {timeline.patient.phone ?? ""} {t("clinicTime")} ({timeline.timezone})
           </p>
         </header>
+
+        <RecordVisit patientId={patientId} onChange={load} />
 
         <form
           className="card stack"
@@ -214,7 +230,7 @@ export default function Patient() {
 
         <h2>{t("timeline")}</h2>
         {timeline.items.map((item) => (
-          <Item key={`${item.type}-${item.at}-${"document_id" in item ? item.document_id : "entry_id" in item ? item.entry_id : ""}`} item={item} tz={timeline.timezone} reload={load} />
+          <Item key={`${item.type}-${item.at}-${itemId(item)}`} item={item} tz={timeline.timezone} reload={load} />
         ))}
       </div>
       <aside>
