@@ -208,14 +208,17 @@ def mailpit() -> str:
 
 
 @pytest.fixture
-def s3_bucket(monkeypatch) -> str:
-    """A fresh bucket on the stack's S3 (SeaweedFS on :8333), for tests of real object storage."""
+def s3_prefix(monkeypatch) -> str:
+    """
+    The stack's S3 (SeaweedFS on :8333), in a test bucket, under a key prefix
+    of this test's own. One bucket for every test: SeaweedFS gives each bucket
+    storage volumes of its own, and a single node runs out of them.
+    """
     if not _reachable("localhost", 8333):
         _unavailable("no S3 for storage tests at localhost:8333 (`make up`)")
-    bucket = f"test-{uuid.uuid4().hex[:12]}"
-    monkeypatch.setenv("S3_BUCKET", bucket)
+    monkeypatch.setenv("S3_BUCKET", "nafas-test")
     nafas_core.config._settings_instance = None
-    return bucket
+    return f"test-{uuid.uuid4().hex[:12]}/"
 
 
 # --- database -------------------------------------------------------------

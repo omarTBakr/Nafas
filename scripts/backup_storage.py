@@ -25,12 +25,13 @@ def _client():
     return session.client("s3", endpoint_url=settings.s3_endpoint_url or None), settings.s3_bucket
 
 
-async def save(target: Path) -> int:
+async def save(target: Path, prefix: str = "") -> int:
+    """Every object under `prefix` (all of them by default) into `target`, at its key's path."""
     client, bucket = _client()
     count = 0
     async with client as s3:
         paginator = s3.get_paginator("list_objects_v2")
-        async for page in paginator.paginate(Bucket=bucket):
+        async for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
             for item in page.get("Contents", []):
                 path = target / item["Key"]
                 path.parent.mkdir(parents=True, exist_ok=True)
