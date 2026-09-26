@@ -17,6 +17,10 @@ class STTError(ProviderError):
     """Speech-to-text failed."""
 
 
+class TTSError(ProviderError):
+    """The text-to-speech service failed or refused."""
+
+
 class StorageError(ProviderError):
     """Object storage failed."""
 

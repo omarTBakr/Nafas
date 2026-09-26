@@ -43,6 +43,7 @@ class PatientMessage:
     text: str = ""
     # a voice note in object storage; the workflow transcribes it into `text`
     audio_key: str | None = None
+    audio_mime: str | None = None
 
 
 @dataclass
@@ -67,6 +68,7 @@ async def send_patient_message(
     doctor_id: str,
     text: str = "",
     audio_key: str | None = None,
+    audio_mime: str | None = None,
     task_queue: str = TaskQueue.CONVERSATION,
 ) -> ChatReply:
     """
@@ -82,7 +84,7 @@ async def send_patient_message(
         id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
     )
     return await client.execute_update_with_start_workflow(
-        SEND_MESSAGE, PatientMessage(text, audio_key), start_workflow_operation=start, result_type=ChatReply
+        SEND_MESSAGE, PatientMessage(text, audio_key, audio_mime), start_workflow_operation=start, result_type=ChatReply
     )
 
 
@@ -99,6 +101,9 @@ class ConversationClient(InternalClient):
             "GET", f"/internal/v1/patients/{patient_id}/conversations/{doctor_id}/messages", params={"limit": limit}
         )
         return response.json()
+
+    async def dialect_suggestion(self, patient_id: uuid.UUID) -> dict:
+        return (await self.request("GET", f"/internal/v1/patients/{patient_id}/dialect-suggestion")).json()
 
 
 _conversation: ConversationClient | None = None

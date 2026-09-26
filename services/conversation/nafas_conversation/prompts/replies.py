@@ -30,5 +30,11 @@ MEDICAL_NOT_YET = {
 }
 
 
+NOT_HEARD = {
+    "ar": "معلش، مقدرتش أسمع الرسالة الصوتية كويس. ممكن تسجلها تاني أو تكتبها؟",
+    "en": "Sorry, I could not make out that voice note. Could you record it again, or type it?",
+}
+
+
 def pick(replies: dict[str, str], language: str) -> str:
     return replies["en" if language == "en" else "ar"]

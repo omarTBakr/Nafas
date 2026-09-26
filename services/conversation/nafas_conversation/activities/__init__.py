@@ -11,20 +11,43 @@ from datetime import UTC, datetime
 from temporalio import activity
 
 from nafas_conversation.enums import Intent, Modality
-from nafas_conversation.logic import messages
+from nafas_conversation.logic import messages, voice
 from nafas_conversation.logic.turn import Models, answer_turn
-from nafas_conversation.schemas import ConversationStart, StoredMessage, StoredReply, TurnRequest, TurnResult
+from nafas_conversation.logic.voice import VoiceProviders
+from nafas_conversation.schemas import (
+    ConversationStart,
+    DialectRequest,
+    SpeakRequest,
+    StoredMessage,
+    StoredReply,
+    TranscribeRequest,
+    TurnRequest,
+    TurnResult,
+)
 from nafas_core.clients.identity import IdentityClient
 from nafas_core.clients.scheduling import SchedulingClient
 from nafas_core.interfaces.llm import LLM
 
 
 class ConversationActivities:
-    def __init__(self, llm: LLM, identity: IdentityClient, scheduling: SchedulingClient, models: Models):
+    def __init__(
+        self,
+        llm: LLM,
+        identity: IdentityClient,
+        scheduling: SchedulingClient,
+        models: Models,
+        voice: VoiceProviders | None = None,
+    ):
         self._llm = llm
         self._identity = identity
         self._scheduling = scheduling
         self._models = models
+        self._voice = voice
+
+    def _voice_providers(self) -> VoiceProviders:
+        if self._voice is None:
+            raise RuntimeError("this worker was built without voice providers")
+        return self._voice
 
     @activity.defn(name="conversation.open")
     async def open_conversation(self, start: ConversationStart) -> str:
@@ -77,5 +100,36 @@ class ConversationActivities:
             audio_key=reply.audio_key,
         )
 
+    @activity.defn(name="conversation.transcribe")
+    async def transcribe(self, request: TranscribeRequest) -> str:
+        return await voice.transcribe(
+            self._voice_providers(), self._identity, uuid.UUID(request.patient_id), request.audio_key, request.audio_mime
+        )
+
+    @activity.defn(name="conversation.tag_dialect")
+    async def tag_dialect(self, request: DialectRequest) -> str | None:
+        return await voice.tag_dialect(
+            self._voice_providers(), uuid.UUID(request.patient_id), uuid.UUID(request.message_id), request.text
+        )
+
+    @activity.defn(name="conversation.speak_reply")
+    async def speak_reply(self, request: SpeakRequest) -> str | None:
+        return await voice.speak_reply(
+            self._voice_providers(),
+            self._identity,
+            doctor_id=uuid.UUID(request.doctor_id),
+            patient_id=uuid.UUID(request.patient_id),
+            reply_id=uuid.UUID(request.reply_id),
+            text=request.text,
+        )
+
     def all(self) -> list:
-        return [self.open_conversation, self.save_patient_message, self.answer, self.save_reply]
+        return [
+            self.open_conversation,
+            self.save_patient_message,
+            self.answer,
+            self.save_reply,
+            self.transcribe,
+            self.tag_dialect,
+            self.speak_reply,
+        ]

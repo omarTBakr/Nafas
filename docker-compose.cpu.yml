@@ -5,3 +5,5 @@ services:
     devices: !reset []
   stt:
     devices: !reset []
+  tts:
+    devices: !reset []

@@ -18,15 +18,19 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ActivityError
 
 with workflow.unsafe.imports_passed_through():
     from nafas_conversation.activities import ConversationActivities
     from nafas_conversation.schemas import (
         ChatReply,
         ConversationStart,
+        DialectRequest,
         PatientMessage,
+        SpeakRequest,
         StoredMessage,
         StoredReply,
+        TranscribeRequest,
         TurnRequest,
     )
     from nafas_core.clients import conversation
@@ -38,6 +42,12 @@ STORE = {"start_to_close_timeout": timedelta(seconds=15), "retry_policy": RetryP
 # one attempt only: a turn may hold or confirm an appointment, and running it
 # twice would act twice; the turn itself turns failures into an apology
 TURN = {"start_to_close_timeout": timedelta(minutes=3), "retry_policy": RetryPolicy(maximum_attempts=1)}
+# transcription and speech: their activities never raise for a model failure, so
+# a retry only covers the worker itself failing
+VOICE = {"start_to_close_timeout": timedelta(minutes=2), "retry_policy": RetryPolicy(maximum_attempts=2)}
+OPTIONAL = {"start_to_close_timeout": timedelta(seconds=20), "retry_policy": RetryPolicy(maximum_attempts=2)}
+# read aloud only for these; clinical answers and emergencies stay text
+SPOKEN_INTENTS = {"booking", "admin", "smalltalk"}
 
 
 @workflow.defn(name=conversation.WORKFLOW)
@@ -79,21 +89,44 @@ class PatientConversationWorkflow:
                 self._conversation_id = await workflow.execute_activity_method(
                     ConversationActivities.open_conversation, self._start, **STORE
                 )
-            patient_id, conversation_id = self._start.patient_id, self._conversation_id
-            text = message.text.strip()
+            patient_id, doctor_id, conversation_id = self._start.patient_id, self._start.doctor_id, self._conversation_id
+
+            text, modality = message.text.strip(), "text"
+            if message.audio_key:
+                modality = "voice"
+                # an empty transcript is still a message: the turn answers "I could not hear that"
+                text = await workflow.execute_activity_method(
+                    ConversationActivities.transcribe,
+                    TranscribeRequest(patient_id, message.audio_key, message.audio_mime or "audio/webm"),
+                    **VOICE,
+                )
 
             message_id = str(workflow.uuid4())
             await workflow.execute_activity_method(
                 ConversationActivities.save_patient_message,
-                StoredMessage(message_id, conversation_id, patient_id, text),
+                StoredMessage(message_id, conversation_id, patient_id, text, modality, message.audio_key),
                 **STORE,
             )
+            # alongside the answer, not before it: a slow or absent dialect-router never delays a reply
+            tagging = (
+                workflow.start_activity_method(
+                    ConversationActivities.tag_dialect, DialectRequest(patient_id, message_id, text), **OPTIONAL
+                )
+                if text
+                else None
+            )
+
             result = await workflow.execute_activity_method(
-                ConversationActivities.answer,
-                TurnRequest(patient_id, self._start.doctor_id, conversation_id),
-                **TURN,
+                ConversationActivities.answer, TurnRequest(patient_id, doctor_id, conversation_id), **TURN
             )
             reply_id = str(workflow.uuid4())
+
+            audio_key = None
+            if modality == "voice" and result.intent in SPOKEN_INTENTS:
+                audio_key = await workflow.execute_activity_method(
+                    ConversationActivities.speak_reply, SpeakRequest(doctor_id, patient_id, reply_id, result.text), **VOICE
+                )
+
             await workflow.execute_activity_method(
                 ConversationActivities.save_reply,
                 StoredReply(
@@ -107,16 +140,26 @@ class PatientConversationWorkflow:
                     result.tokens_out,
                     intent=result.intent,
                     answers_message_id=message_id,
+                    audio_key=audio_key,
                 ),
                 **STORE,
             )
+            if tagging is not None:
+                try:
+                    await tagging
+                except ActivityError:
+                    # analytics only; the turn is complete without it
+                    pass
+
             self._turns += 1
-            return ChatReply(conversation_id, reply_id, result.text, result.actions, result.intent, patient_text=text)
+            return ChatReply(
+                conversation_id, reply_id, result.text, result.actions, result.intent, patient_text=text, audio_key=audio_key
+            )
 
     @send_message.validator
     def _check_message(self, message: PatientMessage) -> None:
         """Rejected here, a message never enters the history at all."""
-        if not message.text.strip():
+        if not message.text.strip() and not message.audio_key:
             raise ValueError("empty message")
         if len(message.text) > MAX_MESSAGE_CHARS:
             raise ValueError(f"message longer than {MAX_MESSAGE_CHARS} characters")

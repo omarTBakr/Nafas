@@ -70,6 +70,10 @@ jobs:
         working-directory: services/stt
         run: uv run pytest
 
+      - name: Run tts tests
+        working-directory: services/tts
+        run: uv run pytest
+
   web:
     runs-on: ubuntu-latest
     defaults:

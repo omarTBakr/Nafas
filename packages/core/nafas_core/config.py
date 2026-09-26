@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     langsmith_hide_outputs: bool = Field(False, description="Keep model outputs out of traces")
 
     dialect_router_url: str = Field("http://localhost:8410", description="Base URL of the dialect-router service")
+    tts_url: str = Field("http://localhost:8440", description="Base URL of the tts service")
 
     internal_api_token: SecretStr = Field(
         SecretStr(""), description="Shared secret on service-to-service calls; empty refuses them all"

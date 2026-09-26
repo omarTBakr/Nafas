@@ -1,0 +1,18 @@
+# The models this service serves, pinned. Changing any line here is a model
+# change: it goes through the eval gate and promotion (docs/PLAN.md §6b).
+
+# 13 dialects; the dialect is OmniVoice's `language` ("egyptian lahgtna")
+model_id = "oddadmix/lahgtna-omnivoice-v2"
+model_revision = "55c38a613e316499829eef60b006edc6da9499e2"
+model_dir = "/models/tts"
+
+# Egyptian only, with its two trained voices: served for "eg" only once it
+# wins the side-by-side listening test against v2 (docs/CHECKLIST.md)
+egyptian_model_id = "ehabnegm/lahgtna-omnivoice-egyptian-v3"
+egyptian_model_revision = "e859e1f49e2d45eb0d6dfc48e48e03697dfccc65"
+egyptian_model_dir = "/models/tts-egyptian"
+use_egyptian_model = false
+
+# a spoken booking or admin message, never a long answer
+max_chars = 600
+num_step = 32

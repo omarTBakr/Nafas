@@ -16,7 +16,7 @@ from nafas_core.db.session import dispose_engine
 
 # GPU services live outside the workspace with their own environment and
 # lockfile; `make test` runs their suites there (`cd services/X && uv run pytest`)
-collect_ignore_glob = ["services/dialect_router/*", "services/stt/*"]
+collect_ignore_glob = ["services/dialect_router/*", "services/stt/*", "services/tts/*"]
 
 
 @pytest.fixture(autouse=True)

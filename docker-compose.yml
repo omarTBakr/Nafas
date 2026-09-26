@@ -72,6 +72,7 @@ services:
       S3_ENDPOINT_URL: http://s3:8333
       DIALECT_ROUTER_URL: http://dialect-router:8410
       STT_URL: http://stt:8420
+      TTS_URL: http://tts:8440
       IDENTITY_URL: http://identity:8010
       SCHEDULING_URL: http://scheduling:8030
       CONVERSATION_URL: http://conversation:8040
@@ -169,6 +170,15 @@ services:
     image: nafas/stt:dev
     ports:
       - "8420:8420"
+    devices:
+      - nvidia.com/gpu=all
+
+  tts:
+    # GPU; speaks booking and admin messages only, in the patient's dialect
+    build: ./services/tts
+    image: nafas/tts:dev
+    ports:
+      - "8440:8440"
     devices:
       - nvidia.com/gpu=all
 

@@ -19,3 +19,4 @@ web/
 # GPU services build from their own directory with their own Dockerfile
 services/dialect_router/
 services/stt/
+services/tts/

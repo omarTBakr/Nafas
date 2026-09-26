@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, FastAPI, Query
 from pydantic import BaseModel
 
 from nafas_conversation.enums import Intent, MessageRole, Modality
-from nafas_conversation.logic import messages
+from nafas_conversation.logic import messages, voice
 from nafas_conversation.models import Message
 from nafas_core.internal_api import require_internal_token
 
@@ -47,6 +47,12 @@ async def patient_messages(
 ) -> list[MessageOut]:
     """The patient's thread with this doctor, oldest first, read in the patient's own scope."""
     return [_message(m) for m in await messages.patient_thread(patient_id, doctor_id, limit)]
+
+
+@router.get("/patients/{patient_id}/dialect-suggestion")
+async def dialect_suggestion(patient_id: uuid.UUID) -> dict:
+    """A spoken dialect to offer the patient, from what they have written; null when nothing is clear."""
+    return {"dialect": await voice.suggested_dialect(patient_id)}
 
 
 app = FastAPI(title="Nafas conversation (internal)")

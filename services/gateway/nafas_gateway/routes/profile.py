@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from nafas_core.clients.conversation import get_conversation
 from nafas_core.clients.identity import Account, get_identity
 from nafas_core.enums.dialect import SpokenDialect, VoiceGender
 from nafas_core.enums.identity import Language
@@ -27,3 +28,9 @@ async def profile(patient: Account = Depends(current_patient)) -> dict:
 @router.patch("/profile")
 async def change_profile(changes: ProfileChanges, patient: Account = Depends(current_patient)) -> dict:
     return await get_identity().update_profile(patient.patient_id, changes.model_dump(mode="json", exclude_unset=True))
+
+
+@router.get("/dialect-suggestion")
+async def dialect_suggestion(patient: Account = Depends(current_patient)) -> dict:
+    """What the assistant thinks the patient writes in; the web app offers it, never applies it by itself."""
+    return await get_conversation().dialect_suggestion(patient.patient_id)

@@ -15,9 +15,12 @@ from nafas_core.clients.conversation import ChatReply, ConversationStart, Patien
 __all__ = [
     "ChatReply",
     "ConversationStart",
+    "DialectRequest",
     "PatientMessage",
+    "SpeakRequest",
     "StoredMessage",
     "StoredReply",
+    "TranscribeRequest",
     "TurnRequest",
     "TurnResult",
 ]
@@ -67,3 +70,25 @@ class TurnResult:
     tokens_out: int = 0
     actions: list[dict] = field(default_factory=list)
     intent: str | None = None
+
+
+@dataclass
+class TranscribeRequest:
+    patient_id: str
+    audio_key: str
+    audio_mime: str
+
+
+@dataclass
+class DialectRequest:
+    patient_id: str
+    message_id: str
+    text: str
+
+
+@dataclass
+class SpeakRequest:
+    doctor_id: str
+    patient_id: str
+    reply_id: str
+    text: str

@@ -100,6 +100,15 @@ async def answer_turn(
     tool whose service is down), in the patient's language when it is known.
     """
     last = history[-1]["content"] if history else ""
+    if not last.strip():
+        # a voice note that transcribed to nothing: nothing to classify or answer
+        language = "ar"
+        try:
+            language = (await identity.profile(patient_id))["preferred_language"]
+        except Exception:
+            logger.exception("profile lookup failed for an unheard voice note; answering in Arabic")
+        return Turn(fixed(replies.pick(replies.NOT_HEARD, language)), Intent.UNCLEAR)
+
     # before anything that can fail: the emergency words do not depend on the profile
     if looks_like_emergency(last):
         language = "ar"
