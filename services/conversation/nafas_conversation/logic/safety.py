@@ -28,9 +28,11 @@ MEDICATION_PATTERNS = [
     r"(جرع(ه|ة)|جرعات|مجم|ملجم|ملغ|مليجرام|ملي\s*جرام|وحد(ه|ة)\s*انسولين)",
     r"\b(\d+\s*)?(mg|mcg|ml|units?)\b",
     r"\b(dose|dosage|doses)\b",
-    r"(اوقف|اقطع|ابطل|اسيب|ازود|اقلل|اغير|اوقّف)\s*(ال)?(دوا|دواء|علاج|حبوب|اقراص|حقن)",
+    r"(اوقف|اقطع|ابطل|اسيب|ازود|اقلل|اغير|غير|بدل|ابدل|نغير|اوقّف)\s*(ال)?(دوا|دواء|علاج|حبوب|اقراص|حقن)",
     r"(بطلت|وقفت|قطعت)\s*(ال)?(دوا|دواء|علاج|حبوب)",
-    r"\b(stop|quit|double|increase|decrease|reduce|skip|switch|change)\b.{0,20}\b(medicine|medication|meds|pills?|tablets?|insulin|dose)\b",
+    r"\b(stop|quit|double|increase|decrease|reduce|skip|switch|change|swap)\b.{0,20}"
+    r"\b(medicines?|medications?|meds|drugs?|pills?|tablets?|insulin|dose|blood\s*thinners?|statins?|beta[\s-]*blockers?|"
+    r"warfarin|aspirin|anticoagulants?|diuretics?|water\s*pills?)\b",
     r"\b(can|should)\s+i\s+take\b",
     r"(ينفع|اقدر|ممكن)\s*(اخد|اخذ|اشرب)",
 ]

@@ -74,6 +74,37 @@ jobs:
         working-directory: services/tts
         run: uv run pytest
 
+  # the safety eval set against the real model: on only once the repository
+  # has an ANTHROPIC_API_KEY secret; its plain-code checks run in `ci` anyway
+  safety-eval:
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      NAFAS_RUN_EVALS: "1"
+    steps:
+      - uses: actions/checkout@v4
+        if: env.ANTHROPIC_API_KEY != ''
+      - uses: astral-sh/setup-uv@v5
+        if: env.ANTHROPIC_API_KEY != ''
+        with:
+          enable-cache: true
+      - name: Run the safety eval
+        if: env.ANTHROPIC_API_KEY != ''
+        run: |
+          uv python install
+          uv sync --dev
+          uv run pytest services/conversation/tests/test_safety_eval.py -k real_model
+      - name: Keep the report
+        if: env.ANTHROPIC_API_KEY != '' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safety-eval
+          path: services/conversation/evals/last-run.json
+          if-no-files-found: ignore
+      - name: No key, no eval
+        if: env.ANTHROPIC_API_KEY == ''
+        run: echo "ANTHROPIC_API_KEY is not set for this repository; the model eval was skipped"
+
   web:
     runs-on: ubuntu-latest
     defaults:

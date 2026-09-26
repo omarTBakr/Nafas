@@ -51,3 +51,13 @@ def test_the_review_sheet_covers_every_dialect_and_keeps_clinical_text_out():
     assert {r["dialect"] for r in sheet} >= {"eg", "sa", "ma", "tn", "ye"}
     assert all(r["spoken"] for r in sheet)
     assert not any(ch.isdigit() for r in sheet for ch in r["spoken"] if r["spoken"] != "(not spoken)")
+
+
+def test_the_dialect_report_shows_confusions_and_what_the_flag_catches():
+    from scripts.checks.dialect_router import report
+
+    table = report([("eg", "eg", False), ("eg", "eg", False), ("sy", "ps", True), ("sy", "sy", False), ("sy", "ps", False)])
+
+    assert "| eg | 2 | 1.00 | - |" in table
+    assert "| sy | 3 | 0.33 | ps ×2 |" in table
+    assert "Of 2 wrong answers, the low-confidence flag caught 1; it also flagged 0 right ones." in table

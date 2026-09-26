@@ -65,12 +65,12 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [x] One-command scripts for the checks that need the GPU or a person: `make check-stt CLIPS=...` (WER per dialect beside the published figures, and the English fallback decision), `make check-tts` (dialect support and a sample each), `make listening-test` (a blind v2/v3 page with a separate key, then `score`), `make normaliser-sheet` (a CSV for native speakers); each run against the real services' code with fakes behind them
 
 **Phase 4: Patient medical chat and escalation**
-- [ ] Evaluate the dialect-router on our labelled AR samples; tag messages with the dialect if it holds up
+- [x] Evaluate the dialect-router on our labelled AR samples: `make check-dialects SAMPLES=...` (accuracy per dialect, confusions, what the low-confidence flag catches); messages are tagged only when it is confident, and the tag is never an input to safety
 - [x] Gates: emergency, scope, sensitivity and output guard (versioned prompts, forced tool verdicts, every gate fails closed; a plain-code rule sends any dose or change of medicine to the doctor); only for patients under the doctor's care with a confirmed or past visit; verdicts stored on each reply
 - [x] Patient-visible retrieval as a port: the patient's own visits with this doctor today; the patient-visible clinical record plugs in with Phase 6
 - [x] `EscalationWorkflow` and the escalations table; the patient is told in fixed words, nudged after a day, the question expires after three; the doctor's answer appears in the patient's chat as theirs; emergencies open one too
 - [x] Minimal escalations inbox for the doctor (open questions with the patient's name, emergencies marked, reply in place, a count in the top bar), tested end to end through the gateway
-- [ ] Safety eval set (~150 AR/EN prompts covering in-scope, out-of-scope, sensitive and emergency) run in CI with threshold assertions; drafted here, signed off by a clinician before it gates anything
+- [x] Safety eval set: 150 prompts (Egyptian, Gulf, Levantine, Maghrebi, formal Arabic and English; emergencies, diagnoses, medicines and doses, results, mental health, pregnancy and children, general, out of scope, not medical) with the outcome each must get. Its plain-code checks run in CI and found seven gaps in the keyword and medication rules, now fixed; the model run gates CI with thresholds (emergencies 100%, sensitive 98%) once `ANTHROPIC_API_KEY` is a repository secret
 
 **Phase 5: Doctor dashboard** (creates `doctor_assistant`)
 - [ ] The next-patient card
@@ -113,4 +113,5 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [ ] Merge PR #1; after it, one PR per phase
 - [ ] Add `ANTHROPIC_API_KEY` as an environment secret, so the prompts run against real Arabic dialect messages, not only a scripted model
 - [ ] Run `uv lock` in `services/tts` where download.pytorch.org is reachable
-- [ ] Run the GPU checks and the listening test (Phase 3b's scripts), a clinician's sign-off on the safety eval set, a native speakers' pass on the normaliser
+- [ ] Run the GPU checks and the listening test (Phase 3b's scripts), a clinician's sign-off on the safety eval set (`services/conversation/evals/safety.jsonl`) and its thresholds, a native speakers' pass on the normaliser
+- [ ] Labelled Arabic sentences for `make check-dialects`, to decide whether the dialect suggestion stays on

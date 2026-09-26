@@ -23,12 +23,13 @@ CONTEXT_MESSAGES = 6
 # Arabic across the dialects, with and without common spelling variants;
 # English as written in chats. Matched on normalised text (see _normalise).
 EMERGENCY_PATTERNS = [
-    # chest pain and heart attack
-    r"(الم|وجع|وجعني|بيوجعني)\s*(شديد\s*)?(في\s*)?(ال)?صدر",
+    # chest pain and heart attack; the intensifiers people actually use
+    r"(الم|وجع|وجعني|بيوجعني|يوجعني)\s*((شديد|جامد|جامده|قوي|كتير|بزاف|مره|فظيع)\s*)?(في\s*)?(ال)?صدر",
     r"(ذبح|ازم)(ه|ة)\s*صدري(ه|ة)",
     r"نوب(ه|ة)\s*قلبي(ه|ة)",
     r"chest\s*pain",
-    r"heart\s*attack",
+    # not "since my heart attack": a past one is history, not an emergency
+    r"(?<!since my )(?<!after my )(?<!had a )(?<!my last )heart\s*attack",
     # breathing
     r"(مش\s*قادر|مش\s*عارف|ما\s*اقدر|مقدرش|صعوب(ه|ة)|ضيق)\s*(في\s*)?(ا|ال)?(تنفس|اتنفس|نفس)",
     r"(can'?t|cannot|hard\s*to|trouble|difficulty)\s*breath",
@@ -43,7 +44,7 @@ EMERGENCY_PATTERNS = [
     r"(تشنج|تشنجات)",
     r"seizure",
     # self-harm
-    r"(انتحر|انتحار|اموت\s*نفسي|اقتل\s*نفسي|اأذي\s*نفسي|اذي\s*نفسي)",
+    r"(انتحر|انتحار|[اهحن]?موت\s*نفسي|[اهحن]?قتل\s*نفسي|[اهحن]?اذي\s*نفسي|[اهحن]?أذي\s*نفسي)",
     r"(kill\s*myself|suicid|end\s*my\s*life|hurt\s*myself|self[\s-]*harm)",
 ]
 _EMERGENCY = [re.compile(p) for p in EMERGENCY_PATTERNS]

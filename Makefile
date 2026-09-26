@@ -69,3 +69,6 @@ listening-test:  ## the blind v2/v3 Egyptian page: make listening-test V2_URL=..
 
 normaliser-sheet:  ## normaliser-review.csv for native speakers
 	uv run python -m scripts.checks.normaliser_sheet
+
+check-dialects:  ## the dialect-router on labelled sentences: make check-dialects SAMPLES=path/to/samples.csv
+	uv run python -m scripts.checks.dialect_router $(SAMPLES)
