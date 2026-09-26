@@ -1,4 +1,5 @@
 import asyncio
+import os
 import uuid
 from pathlib import Path
 
@@ -13,6 +14,17 @@ from temporalio.testing import WorkflowEnvironment
 import nafas_core.config
 from nafas_core.config import get_setting
 from nafas_core.db.session import dispose_engine
+
+# Where the stack must be there (CI, `make test`), a missing Postgres or
+# Temporal fails the run instead of quietly skipping a third of the suite.
+REQUIRE_SERVICES = os.environ.get("NAFAS_REQUIRE_SERVICES") == "1"
+
+
+def _unavailable(message: str):
+    if REQUIRE_SERVICES:
+        pytest.fail(f"{message} (NAFAS_REQUIRE_SERVICES=1)", pytrace=False)
+    pytest.skip(message)
+
 
 # GPU services live outside the workspace with their own environment and
 # lockfile; `make test` runs their suites there (`cd services/X && uv run pytest`)
@@ -162,7 +174,7 @@ async def temporal() -> Client:
     try:
         client = await asyncio.wait_for(Client.connect(host), timeout=3)
     except (TimeoutError, RuntimeError, OSError) as exc:
-        pytest.skip(f"no Temporal for workflow tests (test server unavailable, nothing at {host}): {exc}")
+        _unavailable(f"no Temporal for workflow tests (test server unavailable, nothing at {host}): {exc}")
     yield client
 
 
@@ -237,7 +249,7 @@ def migrated_database() -> tuple[str, str]:
     try:
         asyncio.run(asyncio.wait_for(_prepare_server(owner_url), timeout=5))
     except (OSError, TimeoutError) as exc:
-        pytest.skip(f"no Postgres for database tests at {make_url(owner_url).render_as_string()}: {exc}")
+        _unavailable(f"no Postgres for database tests at {make_url(owner_url).render_as_string()}: {exc}")
 
     config = Config("alembic.ini")
     config.set_main_option("sqlalchemy.url", owner_url)

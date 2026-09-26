@@ -52,6 +52,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-ara
 
       - name: Run tests
+        # the database and workflow tests must run here, never skip
+        env:
+          NAFAS_REQUIRE_SERVICES: "1"
         run: uv run pytest
 
       # a model changed without a migration, or the reverse, fails here
