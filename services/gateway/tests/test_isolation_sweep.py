@@ -15,7 +15,8 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from nafas_conversation.logic import messages
+from nafas_conversation.enums import EscalationReason
+from nafas_conversation.logic import escalations, messages
 from nafas_core.db import session_scope
 from nafas_core.enums.channel import Channel
 from nafas_identity.enums import ConsentKind
@@ -96,7 +97,17 @@ async def clinic_a(database):
     async with session_scope(patient_id=patient_a) as session:
         await consents.grant(session, patient_id=patient_a, kind=ConsentKind.AI_CHAT, doctor_id=doctor_a)
     conversation_id = await messages.open_conversation(patient_a, doctor_a)
-    await messages.add_patient_message(patient_a, uuid.uuid4(), conversation_id, "عايز أحجز")
+    question_id = uuid.uuid4()
+    await messages.add_patient_message(patient_a, question_id, conversation_id, "ينفع أزود الجرعة؟")
+    await escalations.open_escalation(
+        escalation_id=uuid.uuid4(),
+        patient_id=patient_a,
+        doctor_id=doctor_a,
+        conversation_id=conversation_id,
+        message_id=question_id,
+        reason=EscalationReason.SENSITIVE,
+        workflow_id="escalation-sweep",
+    )
 
     return {"doctor_a": doctor_a, "doctor_b": doctor_b, "patient_a": patient_a, "patient_b": patient_b}
 
