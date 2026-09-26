@@ -16,7 +16,7 @@ from nafas_core.db.session import dispose_engine
 
 # GPU services live outside the workspace with their own environment and
 # lockfile; `make test` runs their suites there (`cd services/X && uv run pytest`)
-collect_ignore_glob = ["services/dialect_router/*", "services/stt/*", "services/tts/*"]
+collect_ignore_glob = ["services/dialect_router/*", "services/stt/*", "services/tts/*", "services/embeddings/*"]
 
 
 @pytest.fixture(autouse=True)
@@ -85,6 +85,26 @@ def escalation_events():
     from nafas_conversation import events
 
     recorder = RecordingEscalationEvents()
+    events.set_events(recorder)
+    yield recorder
+    events.set_events(None)
+
+
+class RecordingIngestionEvents:
+    def __init__(self):
+        self.uploaded_ids: list[str] = []
+
+    async def uploaded(self, document_id, doctor_id):
+        self.uploaded_ids.append(document_id)
+        return True
+
+
+@pytest.fixture(autouse=True)
+def ingestion_events():
+    """No test starts an ingestion workflow through the clinical API by accident."""
+    from nafas_clinical import events
+
+    recorder = RecordingIngestionEvents()
     events.set_events(recorder)
     yield recorder
     events.set_events(None)

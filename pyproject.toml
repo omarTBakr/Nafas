@@ -13,6 +13,7 @@ dependencies = [
     "nafas-identity",
     "nafas-scheduling",
     "nafas-conversation",
+    "nafas-clinical-records",
 ]
 
 [tool.uv]
@@ -21,7 +22,7 @@ package = false
 [tool.uv.workspace]
 members = ["packages/*", "services/*"]
 # GPU services carry their own CUDA-pinned lockfile and never share this one
-exclude = ["services/dialect_router", "services/stt", "services/tts"]
+exclude = ["services/dialect_router", "services/stt", "services/tts", "services/embeddings"]
 
 [tool.uv.sources]
 nafas-core = { workspace = true }
@@ -29,6 +30,7 @@ nafas-gateway = { workspace = true }
 nafas-identity = { workspace = true }
 nafas-scheduling = { workspace = true }
 nafas-conversation = { workspace = true }
+nafas-clinical-records = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -53,7 +55,7 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.isort]
 # every workspace package, and the dev scripts
-known-first-party = ["nafas_*", "dialect_router", "stt", "tts", "scripts"]
+known-first-party = ["nafas_*", "dialect_router", "stt", "tts", "embeddings", "scripts"]
 
 # the migrations folder is named alembic/ too; without this the library is
 # filed as first-party

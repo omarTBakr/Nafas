@@ -78,11 +78,11 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [ ] Escalations inbox, extended: filters, history, and answering from the patient's timeline (the minimal inbox ships in Phase 4)
 - [ ] Doctor chat (SSE streaming, patient-scoped RAG and tools)
 
-**Phase 6: Documents and RAG** (creates `clinical_records`)
-- [ ] Upload route (presigned PUT) → `DocumentIngestionWorkflow`
-- [ ] PDF text, OCR and image vision description; chunk, embed, hybrid search
-- [ ] Embeddings: bge-m3 on the CPU by default (decided 2026-09-26: the 8 GB GPU is spent on stt, the dialect-router and tts), behind the Protocol so a GPU or hosted model can replace it
-- [ ] Visibility toggle per document
+**Phase 6: Documents and RAG** (creates `clinical_records`; built before Phase 5 on review, 2026-09-26: the timeline and doctor chat read it)
+- [x] Upload route (presigned PUT) → `DocumentIngestionWorkflow`; only for patients under the doctor's care; a document that cannot be read is marked failed with the reason
+- [x] PDF text, OCR (Tesseract, Arabic and English) for scanned pages and images, a Claude vision description labelled "AI description, not a read"; chunked at sentence ends with overlap, embedded, hybrid search (vectors and words, fused by reciprocal rank); the patient's assistant searches in the patient's scope, so only shared passages come back; every read audited
+- [x] Embeddings: bge-m3 on the CPU by default in the `embeddings` service (decided 2026-09-26: the 8 GB GPU is spent on stt, the dialect-router and tts), behind the Protocol so a GPU or hosted model can replace it; not yet pinned to a commit (see Needs you)
+- [x] Visibility per document and per history entry, carried to its passages in the same transaction
 
 **Phase 7: In-person session recording** (creates `consultation`)
 - [ ] Decide the diarization backend for consultations (open: pyannote's weights are gated on Hugging Face; compare it with a pyannote-free option on our own recordings)
@@ -115,3 +115,4 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [ ] Run `uv lock` in `services/tts` where download.pytorch.org is reachable
 - [ ] Run the GPU checks and the listening test (Phase 3b's scripts), a clinician's sign-off on the safety eval set (`services/conversation/evals/safety.jsonl`) and its thresholds, a native speakers' pass on the normaliser
 - [ ] Labelled Arabic sentences for `make check-dialects`, to decide whether the dialect suggestion stays on
+- [ ] Pin bge-m3 (`services/embeddings/embeddings/model.toml`) to a Hugging Face commit, and lock `services/embeddings` where download.pytorch.org is reachable

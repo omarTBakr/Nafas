@@ -9,6 +9,7 @@ TABLES = {
     "identity": "identity.users",
     "scheduling": "scheduling.appointments",
     "conversation": "conversation.messages",
+    "clinical": "clinical.chunks",
 }
 
 

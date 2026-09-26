@@ -1,0 +1,14 @@
+# The model this service serves. Changing any line here is a model change:
+# it goes through the eval gate and promotion (docs/PLAN.md §6b), and every
+# chunk must be re-embedded, because one table holds one model's vectors.
+
+model_id = "BAAI/bge-m3"
+# NOT YET PINNED: set the Hugging Face commit sha before staging
+# (docs/CHECKLIST.md, "Needs you"); /health reports pinned=false until then
+model_revision = "main"
+model_dir = "/models/embeddings"
+dimensions = 1024
+
+# passages are ~900 characters; the model reads up to 8192 tokens
+max_texts = 64
+max_chars = 4000

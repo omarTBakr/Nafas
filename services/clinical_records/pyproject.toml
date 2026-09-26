@@ -1,0 +1,26 @@
+[project]
+name = "nafas-clinical-records"
+version = "0.1.0"
+description = "Patients' clinical records: history, documents and the per-patient search the assistants read"
+license = "PolyForm-Noncommercial-1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "httpx>=0.28.1",
+    "nafas-core",
+    "pillow>=11.0",
+    "pypdf>=6.0",
+    "pypdfium2>=4.30",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[tool.uv.sources]
+nafas-core = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+module-name = "nafas_clinical"

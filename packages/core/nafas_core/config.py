@@ -65,6 +65,8 @@ class Settings(BaseSettings):
 
     dialect_router_url: str = Field("http://localhost:8410", description="Base URL of the dialect-router service")
     tts_url: str = Field("http://localhost:8440", description="Base URL of the tts service")
+    embeddings_url: str = Field("http://localhost:8430", description="Base URL of the embeddings service")
+    clinical_url: str = Field("http://localhost:8050", description="Base URL of the clinical-records service's internal API")
 
     internal_api_token: SecretStr = Field(
         SecretStr(""), description="Shared secret on service-to-service calls; empty refuses them all"

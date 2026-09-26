@@ -52,6 +52,7 @@ test-gpu-services:
 	cd services/dialect_router && uv run pytest
 	cd services/stt && uv run pytest
 	cd services/tts && uv run pytest
+	cd services/embeddings && uv run pytest
 
 gpu-check:  ## prove a container can see the GPU
 	docker run --rm --device nvidia.com/gpu=all ubuntu:24.04 nvidia-smi -L

@@ -11,7 +11,9 @@ import httpx
 import pytest
 
 import nafas_core.config
+from nafas_clinical.api import app as clinical_app
 from nafas_conversation.api import app as conversation_app
+from nafas_core.clients.clinical import ClinicalClient, set_clinical
 from nafas_core.clients.conversation import ConversationClient, set_conversation
 from nafas_core.clients.identity import IdentityClient, set_identity
 from nafas_core.clients.scheduling import SchedulingClient, set_scheduling
@@ -62,7 +64,9 @@ async def doctor_id(database, monkeypatch):
     set_conversation(
         ConversationClient(httpx.AsyncClient(transport=httpx.ASGITransport(app=conversation_app), base_url="http://conversation"))
     )
+    set_clinical(ClinicalClient(httpx.AsyncClient(transport=httpx.ASGITransport(app=clinical_app), base_url="http://clinical")))
     yield doctor.id
+    set_clinical(None)
     set_identity(None)
     set_scheduling(None)
     set_conversation(None)

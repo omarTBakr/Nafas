@@ -12,6 +12,7 @@ from temporalio import activity
 
 from nafas_conversation.enums import EscalationReason, Intent, Modality
 from nafas_conversation.logic import escalations, messages, voice
+from nafas_conversation.logic.context import PatientContext
 from nafas_conversation.logic.medical import doctor_name
 from nafas_conversation.logic.turn import Models, answer_turn
 from nafas_conversation.logic.voice import VoiceProviders
@@ -43,12 +44,15 @@ class ConversationActivities:
         scheduling: SchedulingClient,
         models: Models,
         voice: VoiceProviders | None = None,
+        context: PatientContext | None = None,
     ):
         self._llm = llm
         self._identity = identity
         self._scheduling = scheduling
         self._models = models
         self._voice = voice
+        # what the medical answer may draw on; the visits alone without clinical-records
+        self._context = context
 
     def _voice_providers(self) -> VoiceProviders:
         if self._voice is None:
@@ -97,6 +101,7 @@ class ConversationActivities:
             history=history,
             models=self._models,
             now=datetime.now(UTC),
+            context=self._context,
         )
         reply = turn.reply
         return TurnResult(

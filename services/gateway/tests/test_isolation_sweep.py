@@ -15,10 +15,13 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from nafas_clinical.enums import DocumentKind, HistoryKind, SourceType, Visibility
+from nafas_clinical.logic import records, search
 from nafas_conversation.enums import EscalationReason
 from nafas_conversation.logic import escalations, messages
 from nafas_core.db import session_scope
 from nafas_core.enums.channel import Channel
+from nafas_core.interfaces.embeddings.fake import FakeEmbeddings
 from nafas_identity.enums import ConsentKind
 from nafas_identity.logic import consents
 from nafas_identity.logic.accounts import create_doctor_account, register_patient_account
@@ -108,6 +111,31 @@ async def clinic_a(database):
         reason=EscalationReason.SENSITIVE,
         workflow_id="escalation-sweep",
     )
+
+    async with session_scope(doctor_id=doctor_a) as session:
+        note = await records.add_history(
+            session, doctor_id=doctor_a, patient_id=patient_a, kind=HistoryKind.NOTE, content="Echo in six months."
+        )
+        await search.index(
+            session,
+            FakeEmbeddings(),
+            patient_id=patient_a,
+            doctor_id=doctor_a,
+            source_type=SourceType.HISTORY,
+            source_id=note.id,
+            text=note.content,
+            visibility=Visibility.DOCTOR_ONLY,
+        )
+        await records.new_document(
+            session,
+            doctor_id=doctor_a,
+            patient_id=patient_a,
+            kind=DocumentKind.REPORT,
+            filename="echo.pdf",
+            mime="application/pdf",
+            size_bytes=100,
+            uploaded_by=doctor_a,
+        )
 
     return {"doctor_a": doctor_a, "doctor_b": doctor_b, "patient_a": patient_a, "patient_b": patient_b}
 

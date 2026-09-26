@@ -73,6 +73,9 @@ services:
       DIALECT_ROUTER_URL: http://dialect-router:8410
       STT_URL: http://stt:8420
       TTS_URL: http://tts:8440
+      EMBEDDINGS_PROVIDER: self_hosted
+      EMBEDDINGS_URL: http://embeddings:8430
+      CLINICAL_URL: http://clinical-records:8050
       IDENTITY_URL: http://identity:8010
       SCHEDULING_URL: http://scheduling:8030
       CONVERSATION_URL: http://conversation:8040
@@ -196,6 +199,37 @@ services:
       - "8440:8440"
     devices:
       - nvidia.com/gpu=all
+
+  embeddings:
+    # bge-m3 on the CPU: the GPU is spent on stt, the dialect-router and tts
+    build: ./services/embeddings
+    image: nafas/embeddings:dev
+    ports:
+      - "8430:8430"
+
+  clinical-records:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        PACKAGE: nafas-clinical-records
+        MODULE: nafas_clinical.main
+        # scanned pages and images are read by OCR, in Arabic and English
+        SYSTEM_PACKAGES: tesseract-ocr tesseract-ocr-ara tesseract-ocr-eng
+    image: nafas/clinical-records:dev
+    environment:
+      <<: *service-env
+      DATABASE_URL: postgresql+asyncpg://nafas_clinical_svc:nafas@postgres:5432/nafas
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports:
+      - "8050:8050"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
+        condition: service_started
+      embeddings:
+        condition: service_started
 
   mailpit:
     # catches every email on a laptop; nothing leaves the machine

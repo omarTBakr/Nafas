@@ -1,4 +1,5 @@
 from nafas_core.config import get_setting
+from nafas_core.enums.providers import EmbeddingsProvider
 from nafas_core.exceptions.config import MissingSettingError
 from nafas_core.interfaces.embeddings.base import Embeddings
 
@@ -9,9 +10,14 @@ def get_embeddings() -> Embeddings:
     """The process-wide embeddings model for EMBEDDINGS_PROVIDER."""
     global _embeddings
     if _embeddings is None:
-        provider = get_setting().embeddings_provider
-        # bge-m3 is wired in phase 6, when the first document gets indexed
-        raise MissingSettingError(f"EMBEDDINGS_PROVIDER {provider!r} has no implementation yet")
+        settings = get_setting()
+        match settings.embeddings_provider:
+            case EmbeddingsProvider.SELF_HOSTED:
+                from nafas_core.interfaces.embeddings.http import HttpEmbeddings
+
+                _embeddings = HttpEmbeddings(settings.embeddings_url)
+            case _:
+                raise MissingSettingError("EMBEDDINGS_PROVIDER is not set; documents cannot be indexed or searched")
 
     return _embeddings
 

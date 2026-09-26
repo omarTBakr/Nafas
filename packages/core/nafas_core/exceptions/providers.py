@@ -25,6 +25,10 @@ class EmailError(ProviderError):
     """The mail server refused a message or could not be reached."""
 
 
+class EmbeddingsError(ProviderError):
+    """The embeddings service failed or returned vectors of the wrong shape."""
+
+
 class StorageError(ProviderError):
     """Object storage failed."""
 

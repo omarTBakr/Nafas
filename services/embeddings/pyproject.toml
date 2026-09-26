@@ -1,0 +1,46 @@
+[project]
+name = "nafas-embeddings"
+version = "0.1.0"
+description = "bge-m3 embeddings over HTTP for per-patient search, on the CPU by default"
+license = "PolyForm-Noncommercial-1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.141.1",
+    "prometheus-client>=0.23",
+    "pydantic-settings>=2.0",
+    "uvicorn[standard]>=0.52.4",
+]
+
+[project.optional-dependencies]
+# the model runtime; the image installs it, the unit tests do not need it
+model = [
+    "huggingface-hub>=0.34",
+    "sentence-transformers>=5.0",
+    "torch>=2.8",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13",
+    "pytest>=9.1.1",
+]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[build-system]
+requires = ["uv_build>=0.11,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+module-name = "embeddings"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

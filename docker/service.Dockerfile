@@ -27,6 +27,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 FROM python:3.12-slim-bookworm
 
+# system tools one service needs and the others do not (clinical-records: OCR)
+ARG SYSTEM_PACKAGES=""
+RUN if [ -n "$SYSTEM_PACKAGES" ]; then \
+        apt-get update && apt-get install -y --no-install-recommends $SYSTEM_PACKAGES && rm -rf /var/lib/apt/lists/*; \
+    fi
+
 ARG MODULE
 ENV PATH="/app/.venv/bin:$PATH" \
     SERVICE_MODULE="$MODULE"

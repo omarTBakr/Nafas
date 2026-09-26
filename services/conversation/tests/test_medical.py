@@ -207,3 +207,36 @@ def test_medication_words_are_caught_in_both_languages_and_small_talk_is_not():
     assert mentions_medication_change("Should I double my insulin dose?")
     assert not mentions_medication_change("هو الضغط الطبيعي كام؟")
     assert not mentions_medication_change("thanks, see you Wednesday")
+
+
+async def test_the_answer_may_draw_on_what_the_doctor_shared():
+    from nafas_conversation.logic.context import ClinicalContext
+
+    class Records:
+        def __init__(self):
+            self.asked = []
+
+        async def search(self, patient_id, doctor_id, query, audience, k):
+            self.asked.append((query, audience))
+            return [{"content": "Target blood pressure below 130/80.", "details": {"kind": "note"}}]
+
+    records = Records()
+    doctor_id = uuid.uuid4()
+    clinic = Clinic(doctor_id)
+    llm = FakeLLM([classified("medical"), scoped("in_scope"), sensitivity(False), text_message("general"), guarded("pass")])
+
+    await answer_turn(
+        llm,
+        clinic,
+        clinic,
+        patient_id=uuid.uuid4(),
+        doctor_id=doctor_id,
+        history=[{"role": "user", "content": "ضغطي المفروض يكون كام؟"}],
+        models=MODELS,
+        now=NOW,
+        context=ClinicalContext(clinic, records),
+    )
+
+    # searched as the patient: only what the doctor shared can come back
+    assert records.asked == [("ضغطي المفروض يكون كام؟", "patient")]
+    assert "From the patient's record (note): Target blood pressure below 130/80." in llm.requests[3]["system"]

@@ -13,6 +13,8 @@ class STTProvider(StrEnum):
 
 class EmbeddingsProvider(StrEnum):
     NONE = ""
+    # the embeddings service (services/embeddings): bge-m3, on the CPU by default
+    SELF_HOSTED = "self_hosted"
 
 
 class StorageProvider(StrEnum):

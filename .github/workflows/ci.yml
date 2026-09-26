@@ -47,6 +47,10 @@ jobs:
       - name: Lint with ruff
         run: uv run ruff check --output-format=github .
 
+      # scanned pages and images are read by OCR in clinical-records' tests
+      - name: Install tesseract
+        run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-ara
+
       - name: Run tests
         run: uv run pytest
 
@@ -72,6 +76,10 @@ jobs:
 
       - name: Run tts tests
         working-directory: services/tts
+        run: uv run pytest
+
+      - name: Run embeddings tests
+        working-directory: services/embeddings
         run: uv run pytest
 
   # the safety eval set against the real model: on only once the repository
