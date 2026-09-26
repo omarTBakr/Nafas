@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 import nafas_core.config
-from nafas_gateway.clients.identity import IdentityClient, set_identity
+from nafas_core.clients.identity import IdentityClient, set_identity
 from nafas_gateway.main import app
 from nafas_gateway.sessions import COOKIE_NAME
 

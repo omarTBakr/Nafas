@@ -11,9 +11,9 @@ import httpx
 import pytest
 
 import nafas_core.config
+from nafas_core.clients.identity import IdentityClient, set_identity
+from nafas_core.clients.scheduling import SchedulingClient, set_scheduling
 from nafas_core.db import session_scope
-from nafas_gateway.clients.identity import IdentityClient, set_identity
-from nafas_gateway.clients.scheduling import SchedulingClient, set_scheduling
 from nafas_gateway.main import app as gateway
 from nafas_identity.api import app as identity_app
 from nafas_identity.logic.accounts import create_doctor_account

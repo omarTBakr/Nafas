@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, EmailStr, Field
 
+from nafas_core.clients.identity import Account, get_identity
 from nafas_core.config import get_setting
 from nafas_core.enums.dialect import SpokenDialect, VoiceGender
 from nafas_core.enums.identity import Language
-from nafas_gateway.clients.identity import Account, get_identity
 from nafas_gateway.sessions import COOKIE_NAME, current_account, issue_token
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])

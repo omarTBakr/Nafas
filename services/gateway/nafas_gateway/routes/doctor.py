@@ -6,8 +6,8 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import AwareDatetime
 
-from nafas_gateway.clients.identity import Account, get_identity
-from nafas_gateway.clients.scheduling import get_scheduling
+from nafas_core.clients.identity import Account, get_identity
+from nafas_core.clients.scheduling import get_scheduling
 from nafas_gateway.sessions import current_doctor
 
 router = APIRouter(prefix="/api/doctor", tags=["doctor"])

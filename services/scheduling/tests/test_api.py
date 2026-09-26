@@ -148,3 +148,37 @@ async def test_the_clock_is_real(api, clinic):
     ).json()
 
     assert body["bookable"] is False
+
+
+async def test_interpreting_an_hour_without_am_pm_checks_both(api, clinic):
+    """ "Wednesday at 5:40": 05:40 is outside hours, 17:40 is bookable; the caller sees both, checked."""
+    body = (
+        await api.post(
+            f"/internal/v1/doctors/{clinic.doctor_id}/interpret-time",
+            json={"day": {"weekday": 2}, "hour": 5, "minute": 40},
+        )
+    ).json()
+
+    checked = {datetime.fromisoformat(c["start"]).astimezone(CAIRO).strftime("%H:%M"): c for c in body["candidates"]}
+    assert checked["05:40"]["bookable"] is False and checked["05:40"]["reason"] == "outside_hours"
+    assert checked["17:40"]["bookable"] is True
+    assert body["timezone"] == "Africa/Cairo"
+
+
+async def test_interpreting_a_period_lists_its_free_slots(api, clinic):
+    """ "Wednesday after asr" (15:00-18:00) meets the 17:00 opening: 17:00, 17:20, 17:40."""
+    body = (
+        await api.post(f"/internal/v1/doctors/{clinic.doctor_id}/interpret-time", json={"day": {"weekday": 2}, "period": "asr"})
+    ).json()
+
+    assert body["candidates"] == []
+    starts = [datetime.fromisoformat(s["start"]).astimezone(CAIRO).strftime("%H:%M") for s in body["free_slots"]]
+    assert starts == ["17:00", "17:20", "17:40"]
+
+
+async def test_an_impossible_expression_is_422(api, clinic):
+    response = await api.post(
+        f"/internal/v1/doctors/{clinic.doctor_id}/interpret-time", json={"day": {"weekday": 2, "relative_days": 1}}
+    )
+
+    assert response.status_code == 422

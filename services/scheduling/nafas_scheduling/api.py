@@ -9,7 +9,7 @@ own appointments, whatever id they send.
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -25,6 +25,7 @@ from nafas_scheduling.exceptions import (
     SlotUnavailableError,
 )
 from nafas_scheduling.logic import booking
+from nafas_scheduling.logic.time_expressions import DayPeriod, DayRef, Meridiem, TimeExpression, resolve
 from nafas_scheduling.models import Appointment, BookingSettings
 
 
@@ -96,6 +97,39 @@ def _appointment(a: Appointment) -> AppointmentOut:
     )
 
 
+class DayRefIn(BaseModel):
+    """Exactly one: days from today (0 today, 1 tomorrow), a weekday (0 = Monday), or a date."""
+
+    relative_days: int | None = None
+    weekday: int | None = None
+    on: date | None = None
+
+
+class TimeExpressionIn(BaseModel):
+    """What the patient said about time, as the language model extracted it; nothing computed."""
+
+    day: DayRefIn
+    hour: int | None = None
+    minute: int = 0
+    meridiem: Meridiem | None = None
+    period: DayPeriod | None = None
+
+
+class CandidateOut(BaseModel):
+    start: datetime
+    bookable: bool
+    reason: Unavailable | None = None
+
+
+class InterpretOut(BaseModel):
+    timezone: str
+    day: date
+    # exact times the patient may have meant (an am/pm pair when nothing settled it), each checked
+    candidates: list[CandidateOut]
+    # free slots in the period or day they named: what to offer when no exact time works
+    free_slots: list[SlotOut]
+
+
 router = APIRouter(prefix="/internal/v1")
 
 
@@ -140,6 +174,46 @@ async def check(doctor_id: uuid.UUID, start: AwareDatetime, mode: AppointmentMod
                 raise
             nearby = await booking.suggest(session, doctor_id, start, now, mode)
             return CheckOut(bookable=False, reason=refused.reason, suggestions=[_slot(s) for s in nearby])
+
+
+@router.post("/doctors/{doctor_id}/interpret-time", response_model=InterpretOut)
+async def interpret_time(
+    doctor_id: uuid.UUID, expression: TimeExpressionIn, mode: AppointmentMode = AppointmentMode.IN_PERSON
+) -> InterpretOut:
+    """
+    Resolves a patient's words about time in the clinic's zone, checks every
+    exact time they might have meant, and lists the free slots around it.
+    The language model extracts; this does all the arithmetic.
+    """
+    try:
+        parsed = TimeExpression(
+            day=DayRef(relative_days=expression.day.relative_days, weekday=expression.day.weekday, on=expression.day.on),
+            hour=expression.hour,
+            minute=expression.minute,
+            meridiem=expression.meridiem,
+            period=expression.period,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    now = _now()
+    async with session_scope(doctor_id=doctor_id) as session:
+        timezone = await booking.timezone_of(session, doctor_id)
+        resolution = resolve(parsed, now, timezone)
+
+        candidates = []
+        for start in resolution.candidates:
+            try:
+                await booking.check_time(session, doctor_id, start, now, mode)
+                candidates.append(CandidateOut(start=start, bookable=True))
+            except SlotUnavailableError as refused:
+                candidates.append(CandidateOut(start=start, bookable=False, reason=refused.reason))
+
+        free = await booking.find_available(
+            session, doctor_id, resolution.search.start, resolution.search.end, now, mode, limit=12
+        )
+
+    return InterpretOut(timezone=timezone, day=resolution.day, candidates=candidates, free_slots=[_slot(s) for s in free])
 
 
 @router.post("/doctors/{doctor_id}/holds", response_model=AppointmentOut, status_code=201)

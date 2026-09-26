@@ -3,9 +3,9 @@ from dataclasses import dataclass
 
 import httpx
 
+from nafas_core.clients.base import InternalClient
 from nafas_core.config import get_setting
 from nafas_core.enums.identity import UserRole
-from nafas_gateway.clients.base import InternalClient
 
 
 @dataclass

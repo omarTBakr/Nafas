@@ -2,7 +2,7 @@ import uuid
 
 from fastapi import APIRouter
 
-from nafas_gateway.clients.identity import get_identity
+from nafas_core.clients.identity import get_identity
 
 # public: choosing a doctor comes before signing up, and none of this is patient data
 router = APIRouter(prefix="/api", tags=["directory"])

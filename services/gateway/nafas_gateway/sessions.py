@@ -12,10 +12,10 @@ from datetime import UTC, datetime, timedelta
 import jwt
 from fastapi import Cookie, Depends, HTTPException
 
+from nafas_core.clients.identity import Account, get_identity
 from nafas_core.config import get_setting
 from nafas_core.enums.identity import UserRole
 from nafas_core.exceptions.config import MissingSettingError
-from nafas_gateway.clients.identity import Account, get_identity
 
 COOKIE_NAME = "nafas_session"
 ALGORITHM = "HS256"

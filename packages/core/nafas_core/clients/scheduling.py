@@ -3,8 +3,8 @@ from datetime import datetime
 
 import httpx
 
+from nafas_core.clients.base import InternalClient
 from nafas_core.config import get_setting
-from nafas_gateway.clients.base import InternalClient
 
 
 class SchedulingClient(InternalClient):
@@ -27,6 +27,11 @@ class SchedulingClient(InternalClient):
     async def check(self, doctor_id: uuid.UUID, start: datetime, mode: str) -> dict:
         params = {"start": start.isoformat(), "mode": mode}
         return (await self.request("GET", f"/internal/v1/doctors/{doctor_id}/check", params=params)).json()
+
+    async def interpret_time(self, doctor_id: uuid.UUID, expression: dict, mode: str = "in_person") -> dict:
+        return (
+            await self.request("POST", f"/internal/v1/doctors/{doctor_id}/interpret-time", params={"mode": mode}, json=expression)
+        ).json()
 
     async def hold(self, doctor_id: uuid.UUID, body: dict) -> dict:
         return (await self.request("POST", f"/internal/v1/doctors/{doctor_id}/holds", json=body)).json()

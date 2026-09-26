@@ -4,12 +4,12 @@ import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from nafas_core.clients.base import UpstreamRefusal
 from nafas_core.config import get_setting
 from nafas_core.exceptions.config import ConfigurationError
 from nafas_core.exceptions.providers import ProviderError
 from nafas_core.logger import get_logger, setup_logging
 from nafas_core.tracing import configure_tracing
-from nafas_gateway.clients.base import UpstreamRefusal
 from nafas_gateway.routes import auth, booking, directory, doctor, profile
 from nafas_gateway.sessions import signing_secret
 

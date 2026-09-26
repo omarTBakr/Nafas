@@ -35,12 +35,13 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 
 **Phase 3: Booking by AI chat in the UI, text and voice** (creates `conversation`)
 - [ ] **(in progress)** `conversation` service: conversations and messages tables; `PatientConversationWorkflow` per patient and doctor (update-with-start, continue_as_new)
-- [ ] Intent classifier; the booking tool loop on Claude (extract a `TimeExpression`, then find, check, hold, confirm, cancel through scheduling)
+- [x] The booking tool loop on Claude: a versioned prompt; tools that only reach scheduling (`interpret_time` resolves and checks what the model extracted, then hold, confirm, cancel, my appointments), bound to one patient and doctor, times in clinic time; tested with a scripted model
+- [ ] Intent routing: booking to the agent; other intents answered safely until phase 4
 - [ ] Chat panel in the patient portal with streamed replies; chat and slot picker share the same holds
 - [ ] `BookingWorkflow`: hold expiry and in-app reminders (T-24h, T-1h); Temporal time-skipping tests
 - [x] Patient dialect and voice: `dialect` (13 Lahgtna codes) and `voice` (male/female) on the patient, chosen at sign-up or on the profile page (`/api/me/profile`, patient scope)
 - [ ] The dialect-router suggests a default from a patient's first chat messages (with the conversation service)
-- [ ] **(in progress)** `stt` GPU service: `whisper-large-v3-turbo-arabic-dialectal-v2` pinned in a CUDA image, `/health` config, `/metrics`, and the `interfaces/stt` client and fake
+- [x] `stt` GPU service: `whisper-large-v3-turbo-arabic-dialectal-v2` pinned in a CUDA image with ffmpeg, `/health` config, `/metrics` (incl. realtime factor), and the `interfaces/stt` HTTP client; runs on the RTX 4060 at ~12× realtime, and the card's Egyptian and Iraqi samples (wav and browser webm/opus) come back within a word or two of their references
 - [ ] Voice input: record in the browser → STT → the same pipeline; audio in S3, transcript on the message; check English voice notes and fall back to base turbo for English patients if the fine-tune lost English
 - [ ] Validate STT on our own labelled samples per dialect against the published WER
 - [ ] `tts` GPU service: Lahgtna OmniVoice v2 (13 dialects, built-in voices, `language` = the patient's dialect) pinned in a CUDA image, `/health` config, `/metrics`, and the `interfaces/tts` client and fake

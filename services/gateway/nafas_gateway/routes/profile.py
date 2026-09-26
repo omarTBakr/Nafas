@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from nafas_core.clients.identity import Account, get_identity
 from nafas_core.enums.dialect import SpokenDialect, VoiceGender
 from nafas_core.enums.identity import Language
-from nafas_gateway.clients.identity import Account, get_identity
 from nafas_gateway.sessions import current_patient
 
 router = APIRouter(prefix="/api/me", tags=["profile"])
