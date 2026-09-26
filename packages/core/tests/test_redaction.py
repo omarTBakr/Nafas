@@ -41,3 +41,23 @@ def test_every_logger_and_its_tracebacks_are_cleaned(caplog):
     assert record.getMessage() == "insert failed for [email]"
     assert "منى" not in record.exc_text and "mona@example.com" not in record.exc_text
     assert "ValueError: bad row ('[text]', '[email]')" in record.exc_text
+
+
+def test_formatters_that_read_the_arguments_still_work():
+    """uvicorn's access log unpacks record.args itself; redaction must leave them as arguments."""
+    from uvicorn.logging import AccessFormatter
+
+    redaction.install()
+    record = logging.getLogger("uvicorn.access").makeRecord(
+        "uvicorn.access",
+        logging.INFO,
+        __file__,
+        1,
+        '%s - "%s %s HTTP/%s" %d',
+        ("127.0.0.1:5000", "GET", "/api/chat/x?email=sara@example.com", "1.1", 200),
+        None,
+    )
+
+    line = AccessFormatter('%(client_addr)s - "%(request_line)s" %(status_code)s').format(record)
+
+    assert line == '127.0.0.1:5000 - "GET /api/chat/x?email=[email] HTTP/1.1" 200 OK'

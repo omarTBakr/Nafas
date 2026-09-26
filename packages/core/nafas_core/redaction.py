@@ -12,6 +12,7 @@ nothing without the database.
 import logging
 import re
 import traceback
+from collections.abc import Mapping
 
 REDACTED = "[redacted]"
 
@@ -33,6 +34,11 @@ def redact(text: str) -> str:
     return text
 
 
+def _clean(value):
+    # strings are cleaned; anything else a formatter needs (numbers, a status code) is kept
+    return redact(value) if isinstance(value, str) else value
+
+
 _installed = False
 
 
@@ -45,12 +51,18 @@ def install() -> None:
 
     def redacted_record(*args, **kwargs) -> logging.LogRecord:
         record = make_record(*args, **kwargs)
+        # the template and each argument are cleaned where they are, so formatters
+        # that read record.args themselves (uvicorn's access log) still work
         try:
-            record.msg = redact(record.getMessage())
-            record.args = ()
+            if isinstance(record.msg, str):
+                record.msg = redact(record.msg)
+            if isinstance(record.args, Mapping):
+                record.args = {k: _clean(v) for k, v in record.args.items()}
+            elif isinstance(record.args, tuple):
+                record.args = tuple(_clean(v) for v in record.args)
         except Exception:
-            # a message that cannot even be formatted is dropped, not printed raw
-            record.msg, record.args = "[unformattable log message]", ()
+            # a message that cannot even be cleaned is dropped, not printed raw
+            record.msg, record.args = "[unredactable log message]", ()
         if record.exc_info and record.exc_info[0] is not None:
             # formatted now, cleaned, and cached where every Formatter looks first
             record.exc_text = redact("".join(traceback.format_exception(*record.exc_info)).rstrip())

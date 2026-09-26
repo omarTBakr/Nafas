@@ -172,6 +172,9 @@ textarea { min-height: 80px; resize: vertical; }
 .tabs { display: flex; gap: 4px; border-block-end: 1px solid var(--border); }
 .tab { background: none; color: var(--muted); border: 0; border-block-end: 2px solid transparent; border-radius: 0; padding: 8px 14px; }
 .tab[aria-selected="true"] { color: var(--primary); border-block-end-color: var(--primary); font-weight: 600; }
+/* the general button hover would paint a tab solid; a tab only tints */
+.tab:hover:not(:disabled) { background: var(--surface-2); color: var(--text); }
+.tab[aria-selected="true"]:hover:not(:disabled) { color: var(--primary); }
 
 /* chat */
 .chat .messages { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; padding-block: 4px; }
