@@ -29,6 +29,7 @@ MODEL_MODULES: list[str] = [
     "nafas_scheduling.models",
     "nafas_conversation.models",
     "nafas_clinical.models",
+    "nafas_consultation.models",
 ]
 
 for module in MODEL_MODULES:

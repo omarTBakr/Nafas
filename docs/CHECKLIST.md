@@ -85,7 +85,8 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [x] Visibility per document and per history entry, carried to its passages in the same transaction
 
 **Phase 7: In-person session recording** (creates `consultation`)
-- [ ] Decide the diarization backend for consultations (open: pyannote's weights are gated on Hugging Face; compare it with a pyannote-free option on our own recordings)
+- [x] Diarization for v1: none. Timed transcript parts, the summary model tells speakers apart by content, the doctor approves every draft (PLAN.md §6c); a backend can be added behind the stt interface later
+- [x] Consent to record, asked afresh for every recording and recorded by the patient's own doctor
 - [ ] Browser recorder with chunked upload and a recording-consent checkbox
 - [ ] `ConsultationWorkflow`: diarized transcript → SOAP draft → doctor review/edit UI → approve → history and embeddings → optional patient summary
 

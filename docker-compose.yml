@@ -76,6 +76,7 @@ services:
       EMBEDDINGS_PROVIDER: self_hosted
       EMBEDDINGS_URL: http://embeddings:8430
       CLINICAL_URL: http://clinical-records:8050
+      CONSULTATION_URL: http://consultation:8060
       DOCTOR_ASSISTANT_URL: http://doctor-assistant:8020
       IDENTITY_URL: http://identity:8010
       SCHEDULING_URL: http://scheduling:8030
@@ -245,6 +246,27 @@ services:
       temporal:
         condition: service_started
       embeddings:
+        condition: service_started
+
+  consultation:
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        PACKAGE: nafas-consultation
+        MODULE: nafas_consultation.main
+    image: nafas/consultation:dev
+    environment:
+      <<: *service-env
+      DATABASE_URL: postgresql+asyncpg://nafas_consultation_svc:nafas@postgres:5432/nafas
+      # the SOAP draft is written by the summary model (LLM_SUMMARY_MODEL)
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports:
+      - "8060:8060"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      temporal:
         condition: service_started
 
   mailpit:

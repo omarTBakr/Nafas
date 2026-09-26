@@ -75,6 +75,16 @@ async def visibility(
     await get_clinical().set_visibility(doctor.doctor_id, source_type, record_id, body.visibility)
 
 
+@router.get("/me/records")
+async def my_records(patient: Account = Depends(current_patient)) -> dict:
+    """What the patient's doctors shared with them: entries (a visit's summary among them) and documents."""
+    clinical = get_clinical()
+    return {
+        "history": await clinical.patient_history(patient.patient_id),
+        "documents": await clinical.patient_documents(patient.patient_id),
+    }
+
+
 @router.get("/me/documents")
 async def shared_with_me(patient: Account = Depends(current_patient)) -> list[dict]:
     """What the patient's doctors shared with them."""

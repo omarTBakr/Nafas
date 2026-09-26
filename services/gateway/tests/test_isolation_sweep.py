@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from nafas_clinical.enums import DocumentKind, HistoryKind, SourceType, Visibility
 from nafas_clinical.logic import records, search
+from nafas_consultation.logic import consultations
 from nafas_conversation.enums import EscalationReason
 from nafas_conversation.logic import escalations, messages
 from nafas_core.db import session_scope
@@ -113,7 +114,7 @@ async def clinic_a(database):
     )
 
     async with session_scope(doctor_id=doctor_a) as session:
-        note = await records.add_history(
+        note, _ = await records.add_history(
             session, doctor_id=doctor_a, patient_id=patient_a, kind=HistoryKind.NOTE, content="Echo in six months."
         )
         await search.index(
@@ -136,6 +137,10 @@ async def clinic_a(database):
             size_bytes=100,
             uploaded_by=doctor_a,
         )
+        recording = await consents.record_session_recording(
+            session, patient_id=patient_a, doctor_id=doctor_a, evidence="verbal, in the room"
+        )
+        await consultations.create(session, doctor_id=doctor_a, patient_id=patient_a, consent_id=recording.id)
 
     return {"doctor_a": doctor_a, "doctor_b": doctor_b, "patient_a": patient_a, "patient_b": patient_b}
 

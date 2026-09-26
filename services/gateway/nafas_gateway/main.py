@@ -17,6 +17,7 @@ from nafas_gateway.routes import (
     booking,
     chat,
     consents,
+    consultations,
     dashboard,
     directory,
     doctor,
@@ -42,6 +43,7 @@ app.include_router(chat.router)
 app.include_router(notifications.router)
 app.include_router(consents.router)
 app.include_router(records.router)
+app.include_router(consultations.router)
 app.include_router(dashboard.router)
 app.include_router(assistant.router)
 

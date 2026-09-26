@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends
 
 from nafas_core.clients.clinical import get_clinical
+from nafas_core.clients.consultation import get_consultation
 from nafas_core.clients.conversation import get_conversation
 from nafas_core.clients.identity import Account, get_identity
 from nafas_core.clients.scheduling import get_scheduling
@@ -38,7 +39,12 @@ def _at(value: str) -> datetime:
 
 async def timeline_items(doctor_id: uuid.UUID, patient_id: uuid.UUID) -> list[dict]:
     return await shared_timeline(
-        doctor_id, patient_id, scheduling=get_scheduling(), clinical=get_clinical(), conversation=get_conversation()
+        doctor_id,
+        patient_id,
+        scheduling=get_scheduling(),
+        clinical=get_clinical(),
+        conversation=get_conversation(),
+        consultation=get_consultation(),
     )
 
 

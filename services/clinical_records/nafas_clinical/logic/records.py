@@ -90,8 +90,17 @@ async def add_history(
     source_type: str | None = None,
     source_id: uuid.UUID | None = None,
     created_by: uuid.UUID | None = None,
-) -> HistoryEntry:
+    entry_id: uuid.UUID | None = None,
+) -> tuple[HistoryEntry, bool]:
+    """
+    The entry, and whether it is new. A caller that names the id (a workflow
+    filing a consultation) may call again after a retry and gets the same
+    entry back rather than a second one.
+    """
+    if entry_id is not None and (existing := await session.get(HistoryEntry, entry_id)) is not None:
+        return existing, False
     entry = HistoryEntry(
+        id=entry_id or uuid.uuid4(),
         doctor_id=doctor_id,
         patient_id=patient_id,
         kind=kind,
@@ -105,7 +114,7 @@ async def add_history(
     )
     session.add(entry)
     await session.flush()
-    return entry
+    return entry, True
 
 
 async def history(session: AsyncSession, patient_id: uuid.UUID) -> list[HistoryEntry]:

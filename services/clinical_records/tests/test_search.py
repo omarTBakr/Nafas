@@ -10,7 +10,7 @@ EMBED = FakeEmbeddings()
 
 async def entry(clinic, text: str, visibility: Visibility):
     async with session_scope(doctor_id=clinic.doctor_id) as session:
-        added = await records.add_history(
+        added, _ = await records.add_history(
             session,
             doctor_id=clinic.doctor_id,
             patient_id=clinic.patient_id,

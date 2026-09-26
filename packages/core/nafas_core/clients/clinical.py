@@ -40,6 +40,9 @@ class ClinicalClient(InternalClient):
         path = f"/internal/v1/doctors/{doctor_id}/records/{source_type}/{record_id}/visibility"
         await self.request("PATCH", path, json={"visibility": visibility})
 
+    async def patient_history(self, patient_id: uuid.UUID) -> list[dict]:
+        return (await self.request("GET", f"/internal/v1/patients/{patient_id}/history")).json()
+
     async def patient_documents(self, patient_id: uuid.UUID, doctor_id: uuid.UUID | None = None) -> list[dict]:
         params = {"doctor_id": str(doctor_id)} if doctor_id else None
         return (await self.request("GET", f"/internal/v1/patients/{patient_id}/documents", params=params)).json()

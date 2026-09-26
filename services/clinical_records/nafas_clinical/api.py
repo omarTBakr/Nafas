@@ -39,6 +39,7 @@ class NewDocument(BaseModel):
 class DocumentOut(BaseModel):
     document_id: uuid.UUID
     patient_id: uuid.UUID
+    doctor_id: uuid.UUID
     kind: DocumentKind
     filename: str
     mime: str
@@ -59,14 +60,23 @@ class NewEntry(BaseModel):
     visibility: Visibility = Visibility.DOCTOR_ONLY
     occurred_at: AwareDatetime | None = None
     author_id: uuid.UUID | None = None
+    structured: dict = Field(default_factory=dict)
+    # where it came from, when not the doctor's own hand: an approved consultation
+    source_type: Literal["consultation"] | None = None
+    source_id: uuid.UUID | None = None
+    # named by a caller that may retry (a workflow): the same id gives back the same entry
+    entry_id: uuid.UUID | None = None
 
 
 class EntryOut(BaseModel):
     entry_id: uuid.UUID
+    doctor_id: uuid.UUID
     kind: HistoryKind
     content: str
     visibility: Visibility
     source_type: str | None
+    source_id: uuid.UUID | None = None
+    structured: dict = Field(default_factory=dict)
     occurred_at: datetime
 
 
@@ -96,6 +106,7 @@ def _document(d) -> DocumentOut:
     return DocumentOut(
         document_id=d.id,
         patient_id=d.patient_id,
+        doctor_id=d.doctor_id,
         kind=d.kind,
         filename=d.filename,
         mime=d.mime,
@@ -112,10 +123,13 @@ def _document(d) -> DocumentOut:
 def _entry(e) -> EntryOut:
     return EntryOut(
         entry_id=e.id,
+        doctor_id=e.doctor_id,
         kind=e.kind,
         content=e.content,
         visibility=e.visibility,
         source_type=e.source_type,
+        source_id=e.source_id,
+        structured=e.structured or {},
         occurred_at=e.occurred_at,
     )
 
@@ -214,7 +228,7 @@ async def add_entry(doctor_id: uuid.UUID, patient_id: uuid.UUID, body: NewEntry)
     """A note, medication, allergy... in the patient's record, searchable at once."""
     await _require_care(doctor_id, patient_id)
     async with session_scope(doctor_id=doctor_id) as session:
-        entry = await records.add_history(
+        entry, new = await records.add_history(
             session,
             doctor_id=doctor_id,
             patient_id=patient_id,
@@ -222,8 +236,17 @@ async def add_entry(doctor_id: uuid.UUID, patient_id: uuid.UUID, body: NewEntry)
             content=body.content,
             visibility=body.visibility,
             occurred_at=body.occurred_at,
+            structured=body.structured,
+            source_type=body.source_type,
+            source_id=body.source_id,
             created_by=body.author_id,
+            entry_id=body.entry_id,
         )
+        if not new:
+            return _entry(entry)
+        details = {"kind": body.kind.value, "occurred_at": entry.occurred_at.isoformat()}
+        if body.source_type:
+            details |= {"source": body.source_type, "source_id": str(body.source_id)}
         await search.index(
             session,
             get_embeddings(),
@@ -233,7 +256,7 @@ async def add_entry(doctor_id: uuid.UUID, patient_id: uuid.UUID, body: NewEntry)
             source_id=entry.id,
             text=body.content,
             visibility=body.visibility,
-            details={"kind": body.kind.value, "occurred_at": entry.occurred_at.isoformat()},
+            details=details,
         )
     return _entry(entry)
 
@@ -279,6 +302,18 @@ async def search_record(body: SearchIn) -> list[PassageOut]:
         )
         for p in found
     ]
+
+
+@router.get("/patients/{patient_id}/history", response_model=list[EntryOut])
+async def patient_history(patient_id: uuid.UUID) -> list[EntryOut]:
+    """The entries doctors shared with the patient, in the patient's own scope: their "My records"."""
+    async with session_scope(patient_id=patient_id) as session:
+        found = await records.history(session, patient_id)
+    if found:
+        await _read(
+            audit.Actor.PATIENT, patient_id, "read_own_history", "patient", patient_id, patient_id, None, count=len(found)
+        )
+    return [_entry(e) for e in found]
 
 
 @router.get("/patients/{patient_id}/documents", response_model=list[DocumentOut])

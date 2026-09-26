@@ -12,8 +12,10 @@ import pytest
 
 import nafas_core.config
 from nafas_clinical.api import app as clinical_app
+from nafas_consultation.api import app as consultation_app
 from nafas_conversation.api import app as conversation_app
 from nafas_core.clients.clinical import ClinicalClient, set_clinical
+from nafas_core.clients.consultation import ConsultationClient, set_consultation
 from nafas_core.clients.conversation import ConversationClient, set_conversation
 from nafas_core.clients.doctor_assistant import DoctorAssistantClient, set_doctor_assistant
 from nafas_core.clients.identity import IdentityClient, set_identity
@@ -67,11 +69,15 @@ async def doctor_id(database, monkeypatch):
         ConversationClient(httpx.AsyncClient(transport=httpx.ASGITransport(app=conversation_app), base_url="http://conversation"))
     )
     set_clinical(ClinicalClient(httpx.AsyncClient(transport=httpx.ASGITransport(app=clinical_app), base_url="http://clinical")))
+    set_consultation(
+        ConsultationClient(httpx.AsyncClient(transport=httpx.ASGITransport(app=consultation_app), base_url="http://consultation"))
+    )
     set_doctor_assistant(
         DoctorAssistantClient(httpx.AsyncClient(transport=httpx.ASGITransport(app=assistant_app), base_url="http://assistant"))
     )
     yield doctor.id
     set_doctor_assistant(None)
+    set_consultation(None)
     set_clinical(None)
     set_identity(None)
     set_scheduling(None)

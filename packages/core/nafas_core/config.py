@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     embeddings_url: str = Field("http://localhost:8430", description="Base URL of the embeddings service")
     doctor_assistant_url: str = Field("http://localhost:8020", description="Base URL of the doctor assistant's internal API")
     clinical_url: str = Field("http://localhost:8050", description="Base URL of the clinical-records service's internal API")
+    consultation_url: str = Field("http://localhost:8060", description="Base URL of the consultation service's internal API")
 
     internal_api_token: SecretStr = Field(
         SecretStr(""), description="Shared secret on service-to-service calls; empty refuses them all"

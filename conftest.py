@@ -110,6 +110,34 @@ def ingestion_events():
     events.set_events(None)
 
 
+class RecordingConsultationEvents:
+    def __init__(self):
+        self.events: list[tuple[str, str]] = []
+
+    async def finished(self, consultation_id, doctor_id):
+        self.events.append(("finished", consultation_id))
+        return True
+
+    async def approved(self, consultation_id):
+        self.events.append(("approved", consultation_id))
+        return True
+
+    async def discarded(self, consultation_id):
+        self.events.append(("discarded", consultation_id))
+        return True
+
+
+@pytest.fixture(autouse=True)
+def consultation_events():
+    """No test starts or signals a consultation's workflow through its API by accident."""
+    from nafas_consultation import events
+
+    recorder = RecordingConsultationEvents()
+    events.set_events(recorder)
+    yield recorder
+    events.set_events(None)
+
+
 # --- temporal -------------------------------------------------------------
 
 

@@ -62,7 +62,7 @@ Decisions confirmed with the user:
   - It is Whisper large-v3-turbo (809M) fine-tuned on a dialect-balanced set of the same 13 dialects the voices cover. Published WER is 0.332 overall, against 0.320 for the 1.5B large-v3 at twice the size. Per dialect it ranges from Saudi (0.17), Iraqi, Egyptian and Syrian (about 0.27) to Tunisian (0.48, the hardest).
   - It is one model for every dialect, with no dialect switch. The patient's chosen dialect is for the voice and the reply style.
   - Open question for Phase 3: English voice notes. The fine-tune may have lost English, so test it, and fall back to the base turbo model for English-language patients if needed.
-  - Consultation recordings (Phase 7) need diarization on top of it. That is decided there.
+  - Consultation recordings (Phase 7) run through the same model in parts, each part keeping its time offset. v1 has no acoustic speaker separation (§6c).
 - **Dialect identification (`interfaces/dialect`, the `dialect-router` service on GPU):** [`oddadmix/dialect-router-v0.1`](https://huggingface.co/oddadmix/dialect-router-v0.1). It is a small BERT (`bert-mini-arabic`, MIT) that labels text with one of 12 codes from its `config.json`: ar (MSA), eg, sa, ma, iq, sd, tn, lb, sy, ly, ps, and en for English. The model card lists 11 and calls Moroccan `mo`; `config.json` is authoritative.
   - Uses: tagging transcripts and messages (for the STT spike, analytics and reply tone), and later choosing a dialect voice for TTS replies. Its home project, Lahgtna, is built for exactly that.
   - Limits: no published accuracy, unreliable on short or code-switched text, and adjacent dialects get confused. **It is never an input to a safety or clinical decision.** Before relying on it, evaluate it on our own labelled samples.
@@ -189,7 +189,8 @@ The Temporal conventions come from the existing README and `workflows/__init__.p
 
 6. **`ConsultationWorkflow`**: runs when a recording is uploaded, either from the browser recorder or from LiveKit Egress.
    - It needs the `session_recording` consent first.
-   - Steps: transcribe with diarization → Opus SOAP summary plus a plain-language patient summary → status `draft_ready`, and the doctor is notified.
+   - Steps: transcribe the recorded parts in order → Opus SOAP summary plus a plain-language patient summary → status `draft_ready`, and the doctor is notified.
+   - The recording can be discarded at any point before approval, and then its audio is deleted.
    - It then waits for the `approve` signal, which can come with edits.
    - After approval it writes the `history_entries` (a visit summary plus extracted meds, allergies and diagnoses), embeds them, and sends the patient their summary if the doctor chose to.
 
@@ -323,7 +324,8 @@ Changes agreed after the booking chat and voice landed:
 - **No token streaming in the patient chat.** A reply is one workflow update, and the booking agent calls tools before it answers; replies arrive whole with a typing indicator. Doctor chat (Phase 5) is request/response and can stream over SSE as planned.
 - **Online sessions move after v1.** LiveKit adds a media server, egress and TURN for what the first clinics do not need yet.
 - **GPU budget.** The 8 GB card holds stt, the dialect-router and tts v2. Egyptian v3 loads only if it wins the listening test, and embeddings (bge-m3) run on the CPU by default.
-- **Open decision, Phase 7:** the diarization backend. pyannote's weights are gated on Hugging Face; compare it with a pyannote-free option on our own recordings before choosing.
+- **Decided at Phase 7: v1 ships without diarization.** pyannote's weights are gated on Hugging Face and neither option could be compared on our own recordings from here. The transcript is kept as timed parts, the summary model tells doctor from patient by what is said (questions, examination, advice), and nothing reaches the record until the doctor has read and approved the draft. A diarization backend can be added behind the stt interface later without changing the workflow; the choice stays open for when clinic recordings exist to compare on.
+  - Browser recording is cut into 60-second parts, each uploaded straight to storage with its own link, so a dropped connection loses one part at most.
 - **Checks only a person or the GPU can do** get one-command scripts: STT WER per dialect on labelled clips, the tts service's dialect support, a v2/v3 listening page, and a review sheet of the normaliser's number and time words for native speakers.
 - **Found by the isolation sweep:** every service logged in as `nafas_service`, whose group could read every schema, including the password hashes in `identity.users`. Each service now logs in as `nafas_<service>_svc`, which holds its own schema through `nafas_<service>_access` and no other. `nafas_app` is still the role the row-level security policies name, so every login is in it, but it holds no tables. "A service reads and writes only its own schema" is now enforced by the database, not only by convention.
 - **Found while building tts:** the base OmniVoice package drops a language name it does not know and speaks language-agnostic. Whether the Lahgtna fine-tune registers names like `"egyptian lahgtna"` can only be seen with the weights, so the service reports it per dialect on `/health` and refuses a dialect it does not know.
