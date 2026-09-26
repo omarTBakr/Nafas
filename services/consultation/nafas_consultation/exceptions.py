@@ -15,3 +15,11 @@ class NotUnderCareError(ConsultationError):
 
 class WrongStateError(ConsultationError):
     """The consultation is not at a step where this can be done."""
+
+
+class JoinRefusedError(ConsultationError):
+    """An online visit's room cannot be joined or recorded now: not online, not confirmed, too early, too late."""
+
+    def __init__(self, reason: str):
+        self.reason = reason
+        super().__init__(f"this visit cannot be joined now ({reason})")

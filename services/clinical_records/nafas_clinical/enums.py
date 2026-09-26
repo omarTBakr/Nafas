@@ -10,6 +10,8 @@ class Visibility(StrEnum):
 
 class HistoryKind(StrEnum):
     VISIT_SUMMARY = "visit_summary"
+    # what was said in a recorded visit, timed, as the doctor approved it into the record
+    VISIT_TRANSCRIPT = "visit_transcript"
     DIAGNOSIS = "diagnosis"
     MEDICATION = "medication"
     ALLERGY = "allergy"

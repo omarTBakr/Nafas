@@ -58,12 +58,17 @@ class ConsultationActivities:
             consultation = await consultations.get(session, consultation_id)
             parts = list(consultation.parts)
 
+        # a track whose recording failed has no file; the others still make a transcript
+        parts = [p for p in parts if p.get("state") != "failed"]
         segments: list[dict] = []
         for i, part in enumerate(parts):
             activity.heartbeat(i)
             heard = await self._stt.transcribe(await self._storage.get(part["key"]), part["mime"])
-            following = parts[i + 1]["offset_seconds"] if i + 1 < len(parts) else None
-            segments += transcript.place(heard, part["offset_seconds"], following)
+            # the next part from the same microphone ends this one, when timings are missing
+            same = [p for p in parts[i + 1 :] if p.get("speaker") == part.get("speaker")]
+            following = same[0]["offset_seconds"] if same else None
+            segments += transcript.place(heard, part["offset_seconds"], following, part.get("speaker"))
+        segments = transcript.in_order(segments)
 
         async with session_scope(doctor_id=doctor_id) as session:
             consultation = await consultations.get(session, consultation_id)
@@ -105,8 +110,9 @@ class ConsultationActivities:
             note, share = Note.model_validate(consultation.approved), consultation.share_with_patient
             patient_id = consultation.patient_id
             occurred = consultation.started_at.isoformat()
+            said = transcript.for_prompt(consultation.transcript or [])
 
-        bodies = entries(consultation_id, note, share)
+        bodies = entries(consultation_id, note, share, said)
         for body in bodies:
             await self._clinical.add_entry(doctor_id, patient_id, body | {"occurred_at": occurred, "author_id": None})
 

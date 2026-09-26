@@ -86,8 +86,7 @@ CONSENTED = text("SELECT DISTINCT patient_id FROM identity.consents WHERE kind =
 PATIENT_NAMES = text("SELECT id, full_name FROM identity.patients WHERE id = ANY(:ids)")
 DOCTOR_NAMES = text("SELECT full_name_en, full_name_ar FROM identity.doctors")
 
-CHAT_RATINGS = text(
-    """
+_CHAT_RATINGS_SQL = """
     SELECT f.rating, f.patient_id, f.doctor_id, f.created_at, r.content AS reply, r.model, r.prompt_version,
            r.intent, r.safety, q.content AS question
     FROM conversation.reply_feedback f
@@ -100,25 +99,23 @@ CHAT_RATINGS = text(
     WHERE f.patient_id = ANY(:ids) AND f.created_at >= :since
     ORDER BY f.created_at
     """
-)
-ESCALATIONS = text(
-    """
+CHAT_RATINGS = text(_CHAT_RATINGS_SQL)
+_ESCALATIONS_SQL = """
     SELECT e.id, e.patient_id, e.doctor_id, e.reason, e.status, e.doctor_reply, e.created_at, e.answered_at,
            m.content AS question
     FROM conversation.escalations e JOIN conversation.messages m ON m.id = e.message_id
     WHERE e.patient_id = ANY(:ids) AND e.created_at >= :since
     ORDER BY e.created_at
     """
-)
-VISIT_NOTES = text(
-    """
+ESCALATIONS = text(_ESCALATIONS_SQL)
+_VISIT_NOTES_SQL = """
     SELECT id, patient_id, doctor_id, transcript, draft, approved, share_with_patient, model, prompt_version,
            started_at, approved_at
     FROM consultation.consultations
     WHERE status = 'approved' AND patient_id = ANY(:ids) AND started_at >= :since
     ORDER BY started_at
     """
-)
+VISIT_NOTES = text(_VISIT_NOTES_SQL)
 AUDIT = text(
     "INSERT INTO audit.audit_log (service, actor_type, action, resource_type, detail)"
     " VALUES ('feedback-export', 'system', 'export_feedback', 'dataset', CAST(:detail AS jsonb))"

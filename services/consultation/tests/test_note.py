@@ -64,3 +64,24 @@ def test_filing_twice_names_the_same_entries_and_not_sharing_keeps_the_summary_b
 
 def test_recorder_types_lose_their_codec():
     assert base_mime("audio/webm;codecs=opus") == "audio/webm"
+
+
+def test_an_approved_note_files_its_transcript_for_the_doctor_only():
+    cid = uuid.uuid4()
+    said = "[00:01] عندي خفقان\n[00:05] الضغط ١٥٠ على ٩٥"
+
+    filed = entries(cid, NOTE, share_with_patient=True, transcript=said)
+    [kept] = [e for e in filed if e["kind"] == "visit_transcript"]
+
+    assert kept["content"] == said and kept["visibility"] == "doctor_only" and kept["structured"] == {"truncated": False}
+    assert kept["entry_id"] == entries(cid, NOTE, True, said)[-2]["entry_id"]
+    # nothing said, nothing filed
+    assert all(e["kind"] != "visit_transcript" for e in entries(cid, NOTE, True, "  "))
+
+
+def test_a_very_long_transcript_is_cut_and_says_so():
+    from nafas_consultation.logic.note import MAX_TRANSCRIPT
+
+    [kept] = [e for e in entries(uuid.uuid4(), NOTE, False, "x" * (MAX_TRANSCRIPT + 10)) if e["kind"] == "visit_transcript"]
+
+    assert len(kept["content"]) == MAX_TRANSCRIPT and kept["structured"] == {"truncated": True}

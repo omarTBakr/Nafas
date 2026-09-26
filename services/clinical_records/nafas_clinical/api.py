@@ -58,7 +58,8 @@ class DocumentOut(BaseModel):
 
 class NewEntry(BaseModel):
     kind: HistoryKind = HistoryKind.NOTE
-    content: str = Field(min_length=1, max_length=20000)
+    # a visit's transcript is long; every other kind is a note's length
+    content: str = Field(min_length=1, max_length=200_000)
     visibility: Visibility = Visibility.DOCTOR_ONLY
     occurred_at: AwareDatetime | None = None
     author_id: uuid.UUID | None = None

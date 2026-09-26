@@ -97,7 +97,11 @@ async def test_a_visit_is_transcribed_drafted_approved_with_edits_and_filed(api,
     done = (await api.get(f"/internal/v1/doctors/{clinic.doctor_id}/consultations/{cid}")).json()
     assert done["status"] == "approved" and done["approved_at"]
     history = await api.clinical.history(clinic.doctor_id, clinic.patient_id)
-    assert sorted(e["kind"] for e in history) == ["diagnosis", "medication", "visit_summary", "visit_summary"]
+    assert sorted(e["kind"] for e in history) == ["diagnosis", "medication", "visit_summary", "visit_summary", "visit_transcript"]
+    # what was said is in the record, timed, for the doctor only
+    said = next(e for e in history if e["kind"] == "visit_transcript")
+    assert said["visibility"] == "doctor_only" and said["content"].startswith("[00:01] عندي خفقان من أسبوعين")
+    assert "[01:07] الضغط ١٥٠ على ٩٥" in said["content"]
     assert all(e["source_type"] == "consultation" and e["source_id"] == cid for e in history)
     soap_entry = next(e for e in history if e["kind"] == "visit_summary" and e["visibility"] == "doctor_only")
     assert "home BP diary" in soap_entry["content"]
@@ -120,8 +124,8 @@ async def test_filing_again_after_a_retry_adds_nothing(api, clinic):
         f"/internal/v1/doctors/{clinic.doctor_id}/consultations/{cid}/approve", json={"note": DRAFT, "share_with_patient": False}
     )
 
-    assert await acts.file(ref) == await acts.file(ref) == 3
-    assert len(await api.clinical.history(clinic.doctor_id, clinic.patient_id)) == 3
+    assert await acts.file(ref) == await acts.file(ref) == 4
+    assert len(await api.clinical.history(clinic.doctor_id, clinic.patient_id)) == 4
     assert await api.clinical.patient_history(clinic.patient_id) == []
 
 

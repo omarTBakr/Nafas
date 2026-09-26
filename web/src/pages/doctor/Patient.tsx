@@ -67,7 +67,15 @@ function Item({ item, tz, reload }: { item: TimelineItem; tz: string; reload: ()
           {item.reason_for_visit && <span className="muted">{item.reason_for_visit}</span>}
         </div>
       )}
-      {item.type === "history" && (
+      {item.type === "history" && item.kind === "visit_transcript" && (
+        <details>
+          <summary>{t("transcript")}</summary>
+          <p className="question transcript-text" dir="auto">
+            {item.content}
+          </p>
+        </details>
+      )}
+      {item.type === "history" && item.kind !== "visit_transcript" && (
         <>
           <p className="question" dir="auto">{item.content}</p>
           <Sharing item={item} onChange={reload} />

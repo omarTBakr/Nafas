@@ -7,7 +7,7 @@ START = datetime(2026, 9, 30, 14, 40, tzinfo=UTC)
 END = datetime(2026, 9, 30, 15, 0, tzinfo=UTC)
 
 
-def email(kind=NotificationKind.CONFIRMED, language="ar"):
+def email(kind=NotificationKind.CONFIRMED, language="ar", mode="in_person"):
     return compose(
         kind=kind,
         recipient=Recipient("mona@example.com", "منى", language),
@@ -15,7 +15,7 @@ def email(kind=NotificationKind.CONFIRMED, language="ar"):
         appointment_id="a1",
         start=START,
         end=END,
-        mode="in_person",
+        mode=mode,
         timezone="Africa/Cairo",
         web_url="https://nafas.example/",
     )
@@ -46,3 +46,16 @@ def test_other_notices_have_their_own_words_and_no_invite():
 
     assert reminder.subject == "Reminder: your appointment with Dr Heart" and reminder.attachments == []
     assert "was not confirmed, so it is free again" in lapsed.text
+
+
+def test_an_online_visit_carries_its_link_in_the_email_and_the_invite():
+    confirmed, reminder, lapsed = (
+        email(NotificationKind.CONFIRMED, "en", "online"),
+        email(NotificationKind.REMINDER, "en", "online"),
+        email(NotificationKind.HOLD_EXPIRED, "en", "online"),
+    )
+
+    assert "https://nafas.example/visit/a1" in confirmed.text and "https://nafas.example/visit/a1" in reminder.text
+    assert "/visit/" not in lapsed.text
+    assert "LOCATION:https://nafas.example/visit/a1" in confirmed.attachments[0].content.decode()
+    assert "/visit/" not in email().text

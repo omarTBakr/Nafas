@@ -85,7 +85,9 @@ async def test_a_recorded_visit_reaches_the_record_only_once_the_doctor_approves
     assert approved.json()["status"] == "filing" and consultation_events.events[-1] == ("approved", cid)
     assert [e["content"] for e in after["history"]] == [NOTE["patient_summary"]]
     assert after["history"][0]["doctor_id"] == str(doctor_id)
-    assert {e["kind"] for e in history} == {"visit_summary", "diagnosis", "medication"}
+    assert {e["kind"] for e in history} == {"visit_summary", "diagnosis", "medication", "visit_transcript"}
+    # the patient sees their summary, never the transcript
+    assert all(e["kind"] != "visit_transcript" for e in after["history"])
 
 
 async def test_a_doctor_cannot_record_someone_not_under_their_care(doctor_id):

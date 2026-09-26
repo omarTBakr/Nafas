@@ -26,6 +26,7 @@ from nafas_gateway.routes import (
     notifications,
     profile,
     records,
+    visits,
 )
 from nafas_gateway.sessions import signing_secret
 
@@ -47,6 +48,7 @@ app.include_router(notifications.router)
 app.include_router(consents.router)
 app.include_router(records.router)
 app.include_router(consultations.router)
+app.include_router(visits.router)
 app.include_router(dashboard.router)
 app.include_router(assistant.router)
 

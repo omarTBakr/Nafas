@@ -42,8 +42,8 @@ seed:  ## create or update the specializations
 storage:  ## create the S3 bucket
 	uv run python -m scripts.init_storage
 
-test:  ## the workspace suite, then each GPU service's own suite
-	uv run pytest
+test:  ## the workspace suite (needs the stack: nothing may skip), then the web and each GPU service's own suite
+	NAFAS_REQUIRE_SERVICES=1 uv run pytest
 	$(MAKE) test-web
 	$(MAKE) test-gpu-services
 

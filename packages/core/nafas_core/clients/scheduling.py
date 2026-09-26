@@ -53,6 +53,13 @@ class SchedulingClient(InternalClient):
     async def read_notification(self, patient_id: uuid.UUID, notification_id: uuid.UUID) -> None:
         await self.request("POST", f"/internal/v1/patients/{patient_id}/notifications/{notification_id}/read")
 
+    async def appointment(
+        self, appointment_id: uuid.UUID, *, patient_id: uuid.UUID | None = None, doctor_id: uuid.UUID | None = None
+    ) -> dict:
+        """One appointment as its patient or its doctor sees it; UpstreamRefusal 404 when it is not theirs."""
+        params = {"patient_id": str(patient_id)} if patient_id else {"doctor_id": str(doctor_id)}
+        return (await self.request("GET", f"/internal/v1/appointments/{appointment_id}", params=params)).json()
+
     async def patient_appointments(self, patient_id: uuid.UUID) -> list[dict]:
         return (await self.request("GET", f"/internal/v1/patients/{patient_id}/appointments")).json()
 
