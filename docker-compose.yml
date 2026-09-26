@@ -98,7 +98,10 @@ services:
         PACKAGE: nafas-identity
         MODULE: nafas_identity.main
     image: nafas/identity:dev
-    environment: *service-env
+    environment:
+      <<: *service-env
+      # its own login: this service's schema and no other (deploy/postgres/roles.sql)
+      DATABASE_URL: postgresql+asyncpg://nafas_identity_svc:nafas@postgres:5432/nafas
     # internal API: published for development only; in production it is
     # reachable from the other services and nothing else
     ports:
@@ -115,7 +118,10 @@ services:
         PACKAGE: nafas-scheduling
         MODULE: nafas_scheduling.main
     image: nafas/scheduling:dev
-    environment: *service-env
+    environment:
+      <<: *service-env
+      # its own login: this service's schema and no other (deploy/postgres/roles.sql)
+      DATABASE_URL: postgresql+asyncpg://nafas_scheduling_svc:nafas@postgres:5432/nafas
     ports:
       - "8030:8030"
     depends_on:
@@ -134,6 +140,7 @@ services:
     image: nafas/conversation:dev
     environment:
       <<: *service-env
+      DATABASE_URL: postgresql+asyncpg://nafas_conversation_svc:nafas@postgres:5432/nafas
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     ports:
       - "8040:8040"

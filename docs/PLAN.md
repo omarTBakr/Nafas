@@ -226,7 +226,7 @@ Every feature is its own deployable service, and all of them live in one reposit
 - Booking is done by the scheduling service *on the patient's behalf*, inside the doctor's scope, because checking a slot means reading the doctor's whole calendar. The patient only ever receives their own appointment back. The care link to the doctor is created on the first booking.
 
 **Rules**
-- A service reads and writes only its own schema. The one exception is appending to `audit.audit_log` (§6c).
+- A service reads and writes only its own schema, enforced by the database: each logs in with a role that holds only its schema. The one exception is appending to `audit.audit_log` (§6c).
 - It gets anything else by calling the owning service: a Temporal activity on that service's queue, or its internal API.
 - The one allowed coupling is foreign keys to `identity` (doctor_id, patient_id), so row-level security and referential integrity still hold.
 - There is one Alembic history, at the repository root, covering every schema. This means migrations never race each other across services.
@@ -325,6 +325,7 @@ Changes agreed after the booking chat and voice landed:
 - **GPU budget.** The 8 GB card holds stt, the dialect-router and tts v2. Egyptian v3 loads only if it wins the listening test, and embeddings (bge-m3) run on the CPU by default.
 - **Open decision, Phase 7:** the diarization backend. pyannote's weights are gated on Hugging Face; compare it with a pyannote-free option on our own recordings before choosing.
 - **Checks only a person or the GPU can do** get one-command scripts: STT WER per dialect on labelled clips, the tts service's dialect support, a v2/v3 listening page, and a review sheet of the normaliser's number and time words for native speakers.
+- **Found by the isolation sweep:** every service logged in as `nafas_service`, whose group could read every schema, including the password hashes in `identity.users`. Each service now logs in as `nafas_<service>_svc`, which holds its own schema through `nafas_<service>_access` and no other. `nafas_app` is still the role the row-level security policies name, so every login is in it, but it holds no tables. "A service reads and writes only its own schema" is now enforced by the database, not only by convention.
 - **Found while building tts:** the base OmniVoice package drops a language name it does not know and speaks language-agnostic. Whether the Lahgtna fine-tune registers names like `"egyptian lahgtna"` can only be seen with the weights, so the service reports it per dialect on `/health` and refuses a dialect it does not know.
 
 ## 7. Execution checklist

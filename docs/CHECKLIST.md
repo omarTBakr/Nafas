@@ -59,7 +59,8 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [x] Rate limits on login (per address and per account), sign-up (per address), chat and voice notes (per patient), answered 429 with Retry-After; the client address comes from X-Forwarded-For, trusted only from FORWARDED_ALLOW_IPS
 - [x] PHI kept out of logs: every record from every logger is cleaned as it is made, tracebacks included (SQL parameters, emails, phone numbers, Arabic text); ids, dates and times are kept
 - [x] Append-only audit log of every clinical read, by a person or the model (`audit.audit_log`: services may insert, never read, change or delete); today a doctor reading patient names, a patient reading a thread, the model reading one to answer; later phases add their reads
-- [ ] Cross-doctor isolation sweep: every table under row-level security is checked, doctor B sees none of doctor A's rows and patient B none of patient A's
+- [x] Cross-doctor isolation sweep: every table under row-level security is checked, doctor B sees none of doctor A's rows and patient B none of another patient's, nothing is visible without a scope; the sweep fails on a table with no rows to check, or with no row-level security and no stated reason
+- [x] Per-service database logins (found by the sweep: every service logged in as one role that could read `identity.users`): each service's schema is held by its own role, `nafas_app` keeps only what all share (the policies' role, the scope functions, appending to the audit log)
 - [ ] Email beside the in-app notices, for confirmations, reminders and a doctor's cancellation (in-app alone reaches no one who is not looking)
 - [ ] One-command scripts for the checks that need the GPU or a person: STT WER per dialect, tts dialect support, the v2/v3 listening test page, the normaliser review sheet
 

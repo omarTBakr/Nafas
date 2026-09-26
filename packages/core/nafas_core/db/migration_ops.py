@@ -9,12 +9,32 @@ from alembic import op
 APP_ROLE = "nafas_app"
 
 
+def service_role(schema: str) -> str:
+    """The group holding one service's tables (deploy/postgres/roles.sql); only that service logs in with it."""
+    return f"nafas_{schema}_access"
+
+
+def ensure_role(role: str) -> None:
+    """A NOLOGIN group role, created if a fresh server's roles.sql did not already."""
+    op.execute(
+        f"DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}')"
+        f" THEN CREATE ROLE {role} NOLOGIN; END IF; END $$"
+    )
+
+
 def create_service_schema(schema: str) -> None:
-    """A schema owned by one service, usable by the app role, now and for tables added later."""
+    """
+    A schema owned by one service, usable by that service's role alone, now
+    and for tables added later. Its login is also in APP_ROLE, which the
+    row-level security policies name; APP_ROLE itself holds no tables.
+    """
+    role = service_role(schema)
+    ensure_role(role)
     op.execute(f"CREATE SCHEMA IF NOT EXISTS {schema}")
-    op.execute(f"GRANT USAGE ON SCHEMA {schema} TO {APP_ROLE}")
+    op.execute(f"GRANT USAGE ON SCHEMA {schema} TO {role}")
     # applies to tables the migration role creates from here on
-    op.execute(f"ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {APP_ROLE}")
+    op.execute(f"ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {role}")
+    op.execute(f"ALTER DEFAULT PRIVILEGES IN SCHEMA {schema} GRANT USAGE, SELECT ON SEQUENCES TO {role}")
 
 
 def drop_service_schema(schema: str) -> None:
