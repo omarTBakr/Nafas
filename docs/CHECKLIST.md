@@ -72,11 +72,11 @@ The order of work for [PLAN.md](PLAN.md), kept current as work happens: an item 
 - [x] Minimal escalations inbox for the doctor (open questions with the patient's name, emergencies marked, reply in place, a count in the top bar), tested end to end through the gateway
 - [x] Safety eval set: 150 prompts (Egyptian, Gulf, Levantine, Maghrebi, formal Arabic and English; emergencies, diagnoses, medicines and doses, results, mental health, pregnancy and children, general, out of scope, not medical) with the outcome each must get. Its plain-code checks run in CI and found seven gaps in the keyword and medication rules, now fixed; the model run gates CI with thresholds (emergencies 100%, sensitive 98%) once `ANTHROPIC_API_KEY` is a repository secret
 
-**Phase 5: Doctor dashboard** (creates `doctor_assistant`)
-- [ ] The next-patient card
-- [ ] Patient list and timeline (history, documents, consultations)
-- [ ] Escalations inbox, extended: filters, history, and answering from the patient's timeline (the minimal inbox ships in Phase 4)
-- [ ] Doctor chat (SSE streaming, patient-scoped RAG and tools)
+**Phase 5: Doctor dashboard** (creates `doctor_assistant`; built after Phase 6, on review)
+- [x] The next-patient card: today's next confirmed visit (or one a few minutes late) with a brief: last visit, recent entries, questions waiting, documents on file
+- [x] Patient list (under care only) and timeline: appointments, notes, documents and escalated questions from the services that hold them; notes with a sharing choice, uploads straight to storage, share and unshare, open a document; consultations join it with Phase 7
+- [x] Escalations inbox, extended: filters (open, answered, expired), and answering from the patient's timeline
+- [x] Doctor chat in the `doctor_assistant` service, streamed over SSE through the gateway: a colleague's prompt, read-only tools bound to the doctor and the patient the dashboard selected (timeline, record search, today's schedule, next patient); history kept by the browser, every read audited where it happens
 
 **Phase 6: Documents and RAG** (creates `clinical_records`; built before Phase 5 on review, 2026-09-26: the timeline and doctor chat read it)
 - [x] Upload route (presigned PUT) → `DocumentIngestionWorkflow`; only for patients under the doctor's care; a document that cannot be read is marked failed with the reason

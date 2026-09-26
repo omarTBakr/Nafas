@@ -160,6 +160,120 @@ export interface Escalation {
   created_at: string;
 }
 
+export type Visibility = "doctor_only" | "patient_visible";
+
+export interface PatientCard {
+  patient_id: string;
+  full_name: string;
+  date_of_birth: string | null;
+  sex: string | null;
+  phone: string | null;
+  preferred_language: "ar" | "en";
+  first_seen_at: string;
+}
+
+export interface DocumentRecord {
+  document_id: string;
+  patient_id: string;
+  kind: string;
+  filename: string;
+  mime: string;
+  size_bytes: number | null;
+  page_count: number | null;
+  status: "awaiting_upload" | "uploaded" | "processing" | "indexed" | "failed";
+  error: string | null;
+  visibility: Visibility;
+  ai_description: string | null;
+  ai_label: string;
+  created_at: string;
+}
+
+export interface HistoryRecord {
+  entry_id: string;
+  kind: string;
+  content: string;
+  visibility: Visibility;
+  source_type: string | null;
+  occurred_at: string;
+}
+
+export type TimelineItem =
+  | ({ type: "appointment"; at: string } & Appointment)
+  | ({ type: "history"; at: string } & HistoryRecord)
+  | ({ type: "document"; at: string } & DocumentRecord)
+  | ({ type: "escalation"; at: string } & Escalation);
+
+export interface Timeline {
+  patient: PatientCard;
+  timezone: string;
+  items: TimelineItem[];
+}
+
+export interface NextPatient {
+  appointment: Appointment | null;
+  timezone: string;
+  patient?: PatientCard;
+  brief?: {
+    last_visit: string | null;
+    recent_entries: HistoryRecord[];
+    open_questions: Escalation[];
+    documents: number;
+  };
+}
+
+export type AssistantEvent =
+  | { type: "text"; text: string }
+  | { type: "tool"; name: string }
+  | { type: "error"; detail: string }
+  | { type: "done"; model: string; prompt_version: string };
+
+/**
+ * One streamed turn of the doctor's assistant: calls `onEvent` for each
+ * server-sent event as it arrives. POST, so EventSource cannot be used.
+ */
+export async function streamAssistant(
+  body: { patient_id?: string | null; messages: { role: "user" | "assistant"; content: string }[] },
+  onEvent: (event: AssistantEvent) => void,
+): Promise<void> {
+  const response = await fetch("/api/doctor/assistant", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok || !response.body) {
+    const payload = await response.json().catch(() => ({}));
+    throw new ApiError(response.status, payload.detail ?? response.statusText, payload.reason);
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+    let boundary;
+    while ((boundary = buffer.indexOf("\n\n")) >= 0) {
+      const frame = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const data = frame.split("\n").find((line) => line.startsWith("data: "));
+      if (data) onEvent(JSON.parse(data.slice(6)) as AssistantEvent);
+    }
+    if (done) return;
+  }
+}
+
+/** Puts a file straight into storage through the upload link, then asks for it to be read. */
+export async function uploadDocument(patientId: string, file: File, kind: string): Promise<DocumentRecord> {
+  const started = await call<{ document: DocumentRecord; upload_url: string; content_type: string }>(
+    "POST",
+    `/api/doctor/patients/${patientId}/documents`,
+    { kind, filename: file.name, mime: file.type || "application/octet-stream", size_bytes: file.size },
+  );
+  const put = await fetch(started.upload_url, { method: "PUT", body: file, headers: { "Content-Type": started.content_type } });
+  if (!put.ok) throw new ApiError(put.status, "the file could not be uploaded");
+  return call<DocumentRecord>("POST", `/api/doctor/documents/${started.document.document_id}/uploaded`);
+}
+
 export interface Schedule {
   timezone: string;
   appointments: Appointment[];
@@ -273,6 +387,15 @@ export const api = {
     call<Escalation[]>("GET", `/api/doctor/escalations?${status.map((s) => `status=${s}`).join("&")}`),
   replyToEscalation: (id: string, reply: string) =>
     call<Escalation>("POST", `/api/doctor/escalations/${id}/reply`, { reply }),
+
+  patients: () => call<PatientCard[]>("GET", "/api/doctor/patients"),
+  timeline: (patientId: string) => call<Timeline>("GET", `/api/doctor/patients/${patientId}/timeline`),
+  nextPatient: () => call<NextPatient>("GET", "/api/doctor/next"),
+  addNote: (patientId: string, content: string, visibility: Visibility, kind = "note") =>
+    call<HistoryRecord>("POST", `/api/doctor/patients/${patientId}/history`, { content, visibility, kind }),
+  setVisibility: (sourceType: "document" | "history", id: string, visibility: Visibility) =>
+    call<void>("PATCH", `/api/doctor/records/${sourceType}/${id}/visibility`, { visibility }),
+  documentLink: (documentId: string) => call<{ url: string }>("GET", `/api/doctor/documents/${documentId}/download`),
 
   noShow: (appointmentId: string) => call<Appointment>("POST", `/api/doctor/appointments/${appointmentId}/no-show`),
 

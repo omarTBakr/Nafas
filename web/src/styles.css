@@ -196,3 +196,13 @@ textarea { min-height: 80px; resize: vertical; }
 .consent input { margin-block-start: 5px; }
 .urgent { border-inline-start: 4px solid var(--danger); }
 .question { white-space: pre-wrap; margin: 0; }
+
+/* doctor portal */
+.patient-page { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 380px); gap: 16px; align-items: start; }
+.patient-page aside { position: sticky; inset-block-start: 80px; }
+@media (max-width: 860px) { .patient-page { grid-template-columns: 1fr; } .patient-page aside { position: static; } }
+.patient-row { color: var(--text); }
+.patient-row:hover { text-decoration: none; border-color: var(--primary); }
+.timeline-item.escalation { border-inline-start: 4px solid var(--warn); }
+.next-patient ul { margin: 0; padding-inline-start: 18px; }
+.narrow { max-width: 720px; }

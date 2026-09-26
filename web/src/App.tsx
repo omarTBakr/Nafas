@@ -4,7 +4,10 @@ import { Navigate, NavLink, Route, Routes, useLocation, useNavigate } from "reac
 import { api, type Role } from "./api";
 import { useAuth } from "./auth";
 import { useI18n } from "./i18n";
+import AssistantPage from "./pages/doctor/Assistant";
 import Inbox from "./pages/doctor/Inbox";
+import PatientPage from "./pages/doctor/Patient";
+import Patients from "./pages/doctor/Patients";
 import Schedule from "./pages/doctor/Schedule";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -66,6 +69,8 @@ function TopBar() {
               <NavLink to="/doctor" end>
                 {t("schedule")}
               </NavLink>
+              <NavLink to="/doctor/patients">{t("patients")}</NavLink>
+              <NavLink to="/doctor/assistant">{t("assistant")}</NavLink>
               <NavLink to="/doctor/inbox" className="bell">
                 {t("inbox")}
                 {waiting > 0 && <span className="count">{waiting}</span>}
@@ -164,6 +169,32 @@ export default function App() {
             element={
               <RequireRole role="doctor">
                 <Inbox />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/doctor/patients"
+            element={
+              <RequireRole role="doctor">
+                <Patients />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/doctor/patients/:patientId"
+            element={
+              <RequireRole role="doctor">
+                <PatientPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/doctor/assistant"
+            element={
+              <RequireRole role="doctor">
+                <div className="narrow">
+                  <AssistantPage />
+                </div>
               </RequireRole>
             }
           />

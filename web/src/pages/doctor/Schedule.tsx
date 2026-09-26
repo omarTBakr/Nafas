@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, type Appointment, type Schedule as ScheduleData } from "../../api";
 import { useI18n } from "../../i18n";
 import { clinicClock, clinicDate, clinicDay, upcomingDates } from "../../time";
+import NextPatient from "./NextPatient";
 
 type Range = "today" | "week";
 
@@ -60,6 +61,7 @@ export default function Schedule() {
       <p className="muted small">
         {t("clinicTime")} ({tz})
       </p>
+      <NextPatient />
 
       {byDay.map(({ date, appointments }) => (
         <section key={date} className="card stack">

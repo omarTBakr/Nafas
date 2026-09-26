@@ -55,28 +55,46 @@ function Question({ item, onAnswered }: { item: Escalation; onAnswered: () => vo
 }
 
 /** Questions the assistant sent to the doctor instead of answering, oldest first; emergencies stand out. */
+const FILTERS = [
+  ["open", "filterOpen"],
+  ["answered", "filterAnswered"],
+  ["expired", "filterExpired"],
+] as const;
+
 export default function Inbox() {
   const { t } = useI18n();
+  const [filter, setFilter] = useState<(typeof FILTERS)[number][0]>("open");
   const [open, setOpen] = useState<Escalation[] | null>(null);
   const [answered, setAnswered] = useState<Escalation[]>([]);
 
   const load = useCallback(() => {
     api
-      .escalations(["open"])
-      .then(setOpen)
+      .escalations([filter])
+      .then((items) => setOpen(filter === "open" ? items : items.slice().reverse()))
       .catch(() => setOpen([]));
-    api
-      .escalations(["answered"])
-      .then((items) => setAnswered(items.slice(-20).reverse()))
-      .catch(() => setAnswered([]));
-  }, []);
+    if (filter === "open")
+      api
+        .escalations(["answered"])
+        .then((items) => setAnswered(items.slice(-20).reverse()))
+        .catch(() => setAnswered([]));
+    else setAnswered([]);
+  }, [filter]);
 
   useEffect(load, [load]);
 
   if (!open) return <p className="muted">{t("loading")}</p>;
   return (
     <div className="stack">
-      <h1>{t("inbox")}</h1>
+      <div className="row spread">
+        <h1 style={{ marginBlock: 0 }}>{t("inbox")}</h1>
+        <div className="chips" role="group">
+          {FILTERS.map(([value, label]) => (
+            <button key={value} className="chip" aria-pressed={filter === value} onClick={() => setFilter(value)}>
+              {t(label)}
+            </button>
+          ))}
+        </div>
+      </div>
       {open.length === 0 && <p className="muted">{t("inboxEmpty")}</p>}
       {open.map((item) => (
         <Question key={item.escalation_id} item={item} onAnswered={load} />
