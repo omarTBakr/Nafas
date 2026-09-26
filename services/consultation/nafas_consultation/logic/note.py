@@ -15,6 +15,8 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 MAX_TEXT = 20000
+# clinical-records keeps an entry up to 200,000 characters: some four hours of talk
+MAX_TRANSCRIPT = 200_000
 
 
 class Diagnosis(BaseModel):
@@ -68,8 +70,13 @@ def entry_id(consultation_id: uuid.UUID, slot: str) -> uuid.UUID:
     return uuid.uuid5(consultation_id, slot)
 
 
-def entries(consultation_id: uuid.UUID, note: Note, share_with_patient: bool) -> list[dict]:
-    """The history entries an approved note becomes, as clinical-records' NewEntry bodies."""
+def entries(consultation_id: uuid.UUID, note: Note, share_with_patient: bool, transcript: str | None = None) -> list[dict]:
+    """
+    The history entries an approved note becomes, as clinical-records' NewEntry
+    bodies. With `transcript` (the visit's timed lines), the transcript itself
+    is kept in the record too, for the doctor only, so what was said can be
+    found and read beside the note made of it.
+    """
     source = {"source_type": "consultation", "source_id": str(consultation_id)}
     out = [
         {
@@ -110,6 +117,17 @@ def entries(consultation_id: uuid.UUID, note: Note, share_with_patient: bool) ->
                 "kind": "allergy",
                 "content": _allergy(a),
                 "structured": a.model_dump(),
+                "visibility": "doctor_only",
+                **source,
+            }
+        )
+    if transcript and transcript.strip():
+        out.append(
+            {
+                "entry_id": str(entry_id(consultation_id, "visit_transcript")),
+                "kind": "visit_transcript",
+                "content": transcript.strip()[:MAX_TRANSCRIPT],
+                "structured": {"truncated": len(transcript.strip()) > MAX_TRANSCRIPT},
                 "visibility": "doctor_only",
                 **source,
             }

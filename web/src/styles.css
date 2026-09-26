@@ -224,3 +224,4 @@ textarea { min-height: 80px; resize: vertical; }
 .thumbs { display: inline-flex; gap: 4px; margin-block-start: 4px; }
 .thumbs button { opacity: 0.45; padding: 2px 4px; }
 .thumbs button[aria-pressed="true"], .thumbs button:hover { opacity: 1; }
+.transcript-text { white-space: pre-line; max-height: 60vh; overflow: auto; }

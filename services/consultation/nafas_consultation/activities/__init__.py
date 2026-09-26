@@ -110,8 +110,9 @@ class ConsultationActivities:
             note, share = Note.model_validate(consultation.approved), consultation.share_with_patient
             patient_id = consultation.patient_id
             occurred = consultation.started_at.isoformat()
+            said = transcript.for_prompt(consultation.transcript or [])
 
-        bodies = entries(consultation_id, note, share)
+        bodies = entries(consultation_id, note, share, said)
         for body in bodies:
             await self._clinical.add_entry(doctor_id, patient_id, body | {"occurred_at": occurred, "author_id": None})
 
