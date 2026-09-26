@@ -183,6 +183,41 @@ def task_queue() -> str:
     return f"conversation-test-{uuid.uuid4()}"
 
 
+# --- the stack's other services --------------------------------------------
+
+
+def _reachable(host: str, port: int) -> bool:
+    import socket
+
+    try:
+        with socket.create_connection((host, port), timeout=2):
+            return True
+    except OSError:
+        return False
+
+
+@pytest.fixture
+def mailpit() -> str:
+    """The stack's Mailpit (SMTP on :1025, its API on :8025): real email, caught before it leaves."""
+    if not (_reachable("localhost", 1025) and _reachable("localhost", 8025)):
+        _unavailable("no Mailpit for email tests at localhost:1025 (`make up`)")
+    import httpx
+
+    httpx.delete("http://localhost:8025/api/v1/messages", timeout=5)
+    return "http://localhost:8025"
+
+
+@pytest.fixture
+def s3_bucket(monkeypatch) -> str:
+    """A fresh bucket on the stack's S3 (SeaweedFS on :8333), for tests of real object storage."""
+    if not _reachable("localhost", 8333):
+        _unavailable("no S3 for storage tests at localhost:8333 (`make up`)")
+    bucket = f"test-{uuid.uuid4().hex[:12]}"
+    monkeypatch.setenv("S3_BUCKET", bucket)
+    nafas_core.config._settings_instance = None
+    return bucket
+
+
 # --- database -------------------------------------------------------------
 #
 # Tests that take the `database` fixture run against a real Postgres, in a
