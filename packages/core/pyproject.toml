@@ -6,7 +6,6 @@ license = "PolyForm-Noncommercial-1.0.0"
 requires-python = ">=3.12"
 dependencies = [
     "aioboto3>=15.5.0",
-    "aiogram>=3.31.0",
     "alembic>=1.20.0",
     "anthropic>=1.8.0",
     "asyncpg>=0.31.0",

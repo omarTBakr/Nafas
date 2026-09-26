@@ -6,8 +6,9 @@ Nafas is currently a bare FastAPI + Temporal skeleton (commit `cb4a8db`) with no
 `routes/` → `workflows/` → `activities/` → `utils/`, plus `schemas/`, `interfaces/`, `prompts/`, `enums/` and `exceptions/`.
 The goal is to ship v1 of a two-sided medical assistant.
 
-- **Patient side:** runs on Telegram first, then email, with WhatsApp later. Input can be text or voice notes.
-  - Book, reschedule or cancel an appointment, with the time checked to the minute against the doctor's real schedule.
+- **Patient side:** the Nafas web app. Messaging channels (Telegram, email, WhatsApp) are deferred and may be added later. Input can be text or voice recorded in the browser.
+  - Sign up, pick a doctor by specialization, and book with a slot picker or by talking to the assistant. The time is checked to the minute against the doctor's real schedule.
+  - Reschedule or cancel an appointment.
   - After a booking is confirmed, chat about medical topics based on the patient's own history, limited to the doctor's specialization.
   - Sensitive questions go to the doctor instead of getting an answer from the model.
 - **Doctor side:** a web dashboard.
@@ -19,6 +20,7 @@ The goal is to ship v1 of a two-sided medical assistant.
 Decisions confirmed with the user:
 - Sessions: **both** in-person (recorded in the browser) and online video (in a later phase).
 - Doctor UI: **web dashboard**.
+- 2026-09-26: **everything in the web app**. One React app has a patient portal and a doctor portal. Patients sign up themselves and choose a doctor, and book with a slot picker plus the AI chat, by text or voice. The Telegram and email bots are deferred.
 - Tenancy: **multi-doctor platform**.
 - Languages: **Arabic (including dialects) and English** for both text and voice.
 
@@ -27,9 +29,9 @@ Decisions confirmed with the user:
 ## 1. Architecture
 
 ```
- Telegram ──┐                         ┌──────────── Doctor web dashboard (React/Vite, web/)
- Email ─────┤  webhooks               │  REST + SSE
- (WhatsApp)─┘                         ▼
+         Nafas web app (React/Vite, web/): patient portal + doctor portal
+                                      │  REST + SSE
+                                      ▼
         ┌──────────────── FastAPI (routes/) ────────────────┐
         │ channel webhooks · doctor API · auth · uploads    │
         └──────────────┬────────────────────────────────────┘
@@ -41,7 +43,7 @@ Decisions confirmed with the user:
                        │ activities (thin) → utils (logic) → interfaces (ports)
    ┌──────────┬────────┼─────────┬──────────┬──────────┬───────────┐
  Postgres   S3 store  Claude     STT       Embeddings  Channel     LiveKit
- +pgvector  (files)   (LLM)    (Whisper-   (bge-m3,    senders     (phase 9)
+ +pgvector  (files)   (LLM)    (Whisper-   (bge-m3,    senders     (phase 8)
                                class)      multiling.) (TG/email)
 ```
 
@@ -69,13 +71,11 @@ Decisions confirmed with the user:
   - Voice: **zero-shot cloning from a reference recording Nafas owns, made with the speaker's written consent.** The two trained voices (Eqkawkab, Noselleel) come from YouTube creators' audio, their card asks for permission before commercial use, and v2 declares no licence. They are not shipped.
   - Safety: the model cannot say English words and mangles digits. So TTS speaks **booking and administrative messages only** (confirmations, reminders, "your question went to the doctor"). Clinical answers, drug names and doses are text-only, and every voice note is sent with its text. Numbers, dates and times are converted to words by our own code before synthesis, never left to the model.
 - **Embeddings (`interfaces/embeddings`):** `bge-m3`, which is multilingual Arabic/English with 1024 dimensions. It sits behind a Protocol so a hosted model can replace it.
-- **Channels (`interfaces/channels`):** a `ChannelAdapter` Protocol (`parse_inbound`, `send_text`, `send_voice`, `download_media`).
-  - Implementations: `telegram` (aiogram, webhook mode) and `email` (inbound-parse webhook, SMTP out).
-  - WhatsApp becomes one more file.
+- **Channels (`interfaces/channels`), deferred:** a `ChannelAdapter` Protocol (`parse_inbound`, `send_text`, `send_voice`, `download_media`) is kept for when Telegram, email or WhatsApp return. Each would be one module plus the `channels` service.
 - **Web:** `web/` holds a React + Vite + TypeScript app.
   - Auth uses JWT in an httpOnly cookie, with argon2 password hashes.
   - In-person recording uses the browser MediaRecorder with chunked upload.
-- **Online sessions (phase 9):** LiveKit (self-hosted or cloud), with Egress recording to S3.
+- **Online sessions (phase 8):** LiveKit (self-hosted or cloud), with Egress recording to S3.
 
 ### Why one database, not a database per doctor
 - Patients can see several doctors.
@@ -96,11 +96,11 @@ All times are `timestamptz` in UTC. Each doctor has an IANA `timezone` used for 
 **Identity and tenancy**
 | Table | Key columns |
 |---|---|
-| `users` | id, email (unique), password_hash, role enum(doctor, admin, staff), is_active, last_login_at |
+| `users` | id, email (unique), password_hash, role enum(doctor, patient, admin, staff), is_active, last_login_at |
 | `specializations` | id, code (unique, e.g. `cardiology`), name_en, name_ar, `scope_description` (text given to the scope classifier), `in_scope_topics` jsonb, `always_escalate` jsonb (topics that must go to the doctor) |
 | `doctors` | id, user_id → users, full_name_en/ar, specialization_id → specializations, languages text[]. Booking settings live in the scheduling service (below) |
-| `patients` | id, full_name, date_of_birth, sex, phone, email, preferred_language enum(ar, en), created_at |
-| `patient_channels` | id, patient_id, channel enum(telegram, email, whatsapp), external_id, verified_at. Unique on (channel, external_id) |
+| `patients` | id, user_id → users (their web login), full_name, date_of_birth, sex, phone, email, preferred_language enum(ar, en), created_at. Visible to the patient themself and to linked doctors |
+| `patient_channels` | id, patient_id, channel enum(telegram, email, whatsapp), external_id, verified_at. Unique on (channel, external_id). Unused until messaging channels return |
 | `doctor_patients` | doctor_id, patient_id, status enum(active, archived), first_seen_at. **This is the access-control boundary for every clinical query** |
 | `consents` | id, patient_id, doctor_id, kind enum(data_processing, session_recording, ai_chat), granted_at, revoked_at, channel, evidence (message id) |
 
@@ -162,7 +162,7 @@ The Temporal conventions come from the existing README and `workflows/__init__.p
    - An hour without am/pm that nothing settles gives both candidates. The one inside the doctor's hours wins, or the agent asks. Nothing is guessed.
    - A patient may book any whole minute inside the doctor's hours (17:40, not just the grid). The grid only drives suggestions. Holds are inserted as `held` rows, so the exclusion constraint settles any race. **`BookingWorkflow`** takes over from there:
    - It waits for a `confirm` signal. The hold expires after 10 minutes, which releases the slot.
-   - Once confirmed, it sends a confirmation (plus an `.ics` file for email).
+   - Once confirmed, it shows the confirmation in the app.
    - It fires reminder timers at T-24h and T-1h.
    - It handles `cancel` and `reschedule` signals.
    - It marks the appointment `completed` or `no_show`.
@@ -202,8 +202,8 @@ Every feature is its own deployable service, and all of them live in one reposit
 
 | Service | Package | Runs | Task queue / port | Owns (Postgres schema) |
 |---|---|---|---|---|
-| gateway | `services/gateway` | FastAPI | :8000 | none. It is the HTTP edge for the dashboard: auth, then routes to domain services |
-| channels | `services/channels` | FastAPI + worker | `channels` | the Telegram and email webhooks in; outbound sends as activities |
+| gateway | `services/gateway` | FastAPI | :8000 | none. It is the web app's HTTP edge: sessions for patients and doctors, a role check on every route, then the call to the owning service |
+| channels (deferred) | `services/channels` | FastAPI + worker | `channels` | Telegram and email, when they return |
 | identity | `services/identity` | FastAPI + worker | `identity` | `identity`: users, specializations, doctors, patients, patient_channels, doctor_patients, consents |
 | scheduling | `services/scheduling` | worker (+ internal API) | `scheduling` | `scheduling`: availability_rules, time_off, appointments, and `BookingWorkflow` |
 | conversation | `services/conversation` | worker | `conversation` | `conversation`: conversations, messages, escalations, plus `PatientConversationWorkflow`, the safety gates and `EscalationWorkflow` |
@@ -213,7 +213,12 @@ Every feature is its own deployable service, and all of them live in one reposit
 | dialect-router | `services/dialect_router` | FastAPI on **GPU** | :8410 | none. Arabic dialect identification (see §1) |
 | tts | `services/tts` | FastAPI on **GPU** | :8440 | none. Egyptian TTS (Lahgtna OmniVoice v3), for administrative messages only |
 | stt / embeddings | `services/stt`, `services/embeddings` | FastAPI on GPU, if self-hosted | :8420, :8430 | none. Built only if the vendor spike picks a self-hosted model |
-| web | `web/` | static | :5173 | none. The doctor dashboard |
+| web | `web/` | static | :5173 | none. One React app: the patient portal and the doctor portal |
+
+**Who may do what (patients and doctors share one web app)**
+- The gateway checks the session role on every route. Patient routes act only on the logged-in patient, and doctor routes act only on the logged-in doctor.
+- Row-level security has two scopes. `session_scope(doctor_id=...)` shows a doctor's rows, and `session_scope(patient_id=...)` shows a patient's own rows (their profile and their appointments with any doctor).
+- Booking is done by the scheduling service *on the patient's behalf*, inside the doctor's scope, because checking a slot means reading the doctor's whole calendar. The patient only ever receives their own appointment back. The care link to the doctor is created on the first booking.
 
 **Rules**
 - A service reads and writes only its own schema.
@@ -253,7 +258,7 @@ Where the plan's earlier modules land:
 - **Next-patient brief:** generated automatically 10 minutes before each appointment and pushed to the dashboard.
 - **Post-visit patient summary and instructions** in the patient's language, sent after the doctor approves.
 - **Voice replies (TTS)** for patients who send voice notes. **Chosen**: Lahgtna OmniVoice v3 for Egyptian, admin messages only (see §1).
-- **`.ics` invites** by email, and Google Calendar export for the doctor.
+- **Calendar export** (`.ics` download) for patients and doctors, and Google Calendar sync for the doctor.
 - **No-show tracking** and a simple per-doctor stats page.
 
 ---
@@ -279,7 +284,7 @@ Here "model" means anything whose behaviour is learned or prompted: the dialect-
    - Container images are pinned by digest in staging and production.
    - The service's config (model, revision, thresholds, batch sizes) lives in a versioned file inside the service, and the service reports it on `/health`. Anyone can then tell exactly what answered a request.
 2. **Promotion rules and rollback conditions across dev → staging → prod.**
-   - Each model has an eval set and pass thresholds, for example the safety-gate evals from Phase 5 and a labelled dialect set. CI runs them, and a change is promoted only if it passes.
+   - Each model has an eval set and pass thresholds, for example the safety-gate evals from Phase 4 and a labelled dialect set. CI runs them, and a change is promoted only if it passes.
    - Staging runs the candidate against replayed, de-identified traffic.
    - Production rolls out as a canary. It rolls back automatically on error-rate, latency or behavioural-metric regressions beyond set bounds, and by hand at any time by redeploying the previous pinned version.
    - Promotions and rollbacks are recorded, including who did it, what changed and why.
@@ -312,8 +317,8 @@ Tracked in [CHECKLIST.md](CHECKLIST.md). Each item is ticked in the same commit 
 - **DB tests:** a Postgres test container covers the exclusion constraint (two concurrent holds on overlapping minutes → one fails) and RLS isolation.
 - **Workflow tests:** `temporalio.testing.WorkflowEnvironment.start_time_skipping()` with fake interfaces covers hold expiry, reminders, escalation timeouts and consultation approval.
 - **LLM evals:** a fixed AR/EN dataset for the intent, scope, sensitivity and output guards and for booking-time extraction, with pass-rate thresholds.
-- **End to end:** `docker compose up` plus a test Telegram bot.
-  - Book by voice in Arabic, then confirm the row in the DB and the reminders in the Temporal UI.
-  - Ask an in-scope question, an out-of-scope question and a sensitive one, and confirm the escalation appears in the dashboard and the doctor's reply reaches Telegram.
+- **End to end:** `make up`, then through the web app:
+  - Sign up as a patient, book with the slot picker, then book by voice in Arabic. Confirm the rows in the DB and the reminders in the Temporal UI.
+  - Ask an in-scope question, an out-of-scope question and a sensitive one, and confirm the escalation appears in the doctor portal and the doctor's reply appears in the patient's chat.
   - Upload a PDF and ask the doctor chat about it.
   - Record a short session, then approve it and confirm it appears in the timeline.

@@ -10,7 +10,7 @@ def get_embeddings() -> Embeddings:
     global _embeddings
     if _embeddings is None:
         provider = get_setting().embeddings_provider
-        # bge-m3 is wired in phase 7, when the first document gets indexed
+        # bge-m3 is wired in phase 6, when the first document gets indexed
         raise MissingSettingError(f"EMBEDDINGS_PROVIDER {provider!r} has no implementation yet")
 
     return _embeddings

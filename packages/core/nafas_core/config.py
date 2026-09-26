@@ -58,15 +58,6 @@ class Settings(BaseSettings):
 
     dialect_router_url: str = Field("http://localhost:8410", description="Base URL of the dialect-router service")
 
-    telegram_bot_token: SecretStr = Field(SecretStr(""), description="Token of the patient-facing Telegram bot")
-    telegram_webhook_secret: SecretStr = Field(SecretStr(""), description="Secret Telegram echoes on every webhook call")
-
-    smtp_host: str = Field("", description="SMTP server for outbound email")
-    smtp_port: int = Field(587, description="SMTP port (STARTTLS)")
-    smtp_username: str = Field("", description="SMTP username")
-    smtp_password: SecretStr = Field(SecretStr(""), description="SMTP password")
-    email_from: str = Field("", description="From address on outbound email")
-
     internal_api_token: SecretStr = Field(
         SecretStr(""), description="Shared secret on service-to-service calls; empty refuses them all"
     )

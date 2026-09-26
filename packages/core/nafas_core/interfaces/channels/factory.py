@@ -6,7 +6,7 @@ _channels: dict[Channel, ChannelAdapter] = {}
 
 
 def get_channel(channel: Channel) -> ChannelAdapter:
-    """The adapter for one channel. Telegram arrives in phase 2, email in phase 4."""
+    """The adapter for one channel. Deferred: Telegram, email and WhatsApp return in a later phase (docs/CHECKLIST.md)."""
     if channel not in _channels:
         raise MissingSettingError(f"no adapter for the {channel} channel yet")
 
