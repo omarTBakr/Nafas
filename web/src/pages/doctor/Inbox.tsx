@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 
 import { api, type Consultation, type Escalation } from "../../api";
 import { useI18n } from "../../i18n";
@@ -8,6 +8,10 @@ function Question({ item, onAnswered }: { item: Escalation; onAnswered: () => vo
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  // every reply box is labelled "Your reply"; these ids tell a screen reader
+  // whose question each one answers
+  const who = useId();
+  const what = useId();
 
   async function send() {
     setBusy(true);
@@ -26,10 +30,12 @@ function Question({ item, onAnswered }: { item: Escalation; onAnswered: () => vo
   return (
     <article className={`card stack ${item.reason === "emergency" ? "urgent" : ""}`}>
       <div className="row spread">
-        <strong>{item.patient_name ?? t("unknownPatient")}</strong>
+        <strong id={who}>{item.patient_name ?? t("unknownPatient")}</strong>
         <span className={`badge ${item.reason === "emergency" ? "cancelled" : "held"}`}>{t(`escalation_${item.reason}`)}</span>
       </div>
-      <p className="question">{item.question}</p>
+      <p className="question" id={what}>
+        {item.question}
+      </p>
       <span className="muted small">
         {t("waiting")} {since}
         {item.nudged_at && ` · ${t("nudged")}`}
@@ -38,7 +44,12 @@ function Question({ item, onAnswered }: { item: Escalation; onAnswered: () => vo
         <>
           <label>
             {t("yourReply")}
-            <textarea value={reply} maxLength={4000} onChange={(e) => setReply(e.target.value)} />
+            <textarea
+              value={reply}
+              maxLength={4000}
+              aria-describedby={`${who} ${what}`}
+              onChange={(e) => setReply(e.target.value)}
+            />
           </label>
           <div>
             <button disabled={busy || !reply.trim()} onClick={send}>

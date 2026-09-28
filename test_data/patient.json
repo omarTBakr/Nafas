@@ -1,0 +1,9 @@
+{
+  "email": "patient.synthetic@example.test",
+  "full_name": "Synthetic Patient",
+  "preferred_language": "en",
+  "dialect": "eg",
+  "voice": "female",
+  "specialization": "cardiology",
+  "consents": ["data_processing", "ai_chat"]
+}

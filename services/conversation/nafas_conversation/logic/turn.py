@@ -8,6 +8,7 @@ questions get a fixed, safe reply until the gated medical pipeline exists
 """
 
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -73,6 +74,7 @@ async def answer_booking(
     history: list[dict],
     model: str,
     now: datetime,
+    on_text: Callable[[str], Awaitable[None]] | None = None,
 ) -> AgentReply:
     doctor = await identity.doctor(doctor_id)
     zone = ZoneInfo((await scheduling.booking_info(doctor_id))["timezone"])
@@ -85,6 +87,7 @@ async def answer_booking(
         prompt_version=booking.PROMPT_VERSION,
         history=history,
         apology=booking.APOLOGIES["en" if profile["preferred_language"] == "en" else "ar"],
+        on_text=on_text,
     )
 
 
@@ -100,6 +103,7 @@ async def answer_turn(
     models: Models,
     now: datetime,
     context: PatientContext | None = None,
+    on_text: Callable[[str], Awaitable[None]] | None = None,
 ) -> Turn:
     """
     The answer to the last patient message in `history`, and what it was for.
@@ -177,6 +181,9 @@ async def answer_turn(
             history=history,
             model=models.chat,
             now=now,
+            # booking replies stream as they are written; medical answers never
+            # do, because the output guard must pass them before the patient sees them
+            on_text=on_text,
         )
         return Turn(reply, intent)
     except Exception:

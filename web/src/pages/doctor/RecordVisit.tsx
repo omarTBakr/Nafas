@@ -14,9 +14,18 @@ function clock(seconds: number): string {
 /**
  * Records an in-person visit. The doctor confirms the patient agreed to this
  * recording (asked afresh every time), then records; parts upload as they
- * end. Stopping sends it to be transcribed and drafted for review.
+ * end. Stopping sends it to be transcribed and drafted for review. From a
+ * visit's page the recording is filed under that visit.
  */
-export default function RecordVisit({ patientId, onChange }: { patientId: string; onChange: () => void }) {
+export default function RecordVisit({
+  patientId,
+  appointmentId = null,
+  onChange,
+}: {
+  patientId: string;
+  appointmentId?: string | null;
+  onChange: () => void;
+}) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [agreed, setAgreed] = useState(false);
@@ -32,7 +41,7 @@ export default function RecordVisit({ patientId, onChange }: { patientId: string
   async function start() {
     setError(null);
     try {
-      const consultation = await api.startConsultation(patientId, "verbal, in the room");
+      const consultation = await api.startConsultation(patientId, "verbal, in the room", appointmentId);
       const rec = new ChunkedRecorder(consultation.consultation_id, setProgress);
       await rec.start();
       recorder.current = rec;

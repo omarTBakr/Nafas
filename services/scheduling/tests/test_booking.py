@@ -162,3 +162,15 @@ async def test_the_database_refuses_seconds_whoever_writes(clinic, database):
                 )
     finally:
         await owner.dispose()
+
+
+async def test_a_lapsed_hold_is_not_on_the_patients_list(clinic):
+    """Nothing may have cancelled it yet (the releasing workflow is best effort), but it is not a booking."""
+    held = await _hold(clinic)
+
+    async with session_scope(patient_id=clinic.patient_id) as session:
+        while_live = await booking.patient_appointments(session, NOW + timedelta(minutes=5))
+        after_expiry = await booking.patient_appointments(session, NOW + timedelta(minutes=11))
+
+    assert [a.id for a in while_live] == [held.id]
+    assert after_expiry == []

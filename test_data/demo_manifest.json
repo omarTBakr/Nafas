@@ -1,0 +1,168 @@
+{
+  "password": "NafasDemo!2026",
+  "doctors": [
+    {
+      "email": "salma.hassan.doctor@example.test",
+      "name_en": "Dr Salma Hassan",
+      "specialization": "cardiology",
+      "doctor_id": "b1328a37-7fa0-48b4-846f-996f6ad45a0c"
+    },
+    {
+      "email": "omar.nassar.doctor@example.test",
+      "name_en": "Dr Omar Nassar",
+      "specialization": "dermatology",
+      "doctor_id": "d727adfa-703b-496a-a176-204a4e4b8a31"
+    },
+    {
+      "email": "lina.adel.doctor@example.test",
+      "name_en": "Dr Lina Adel",
+      "specialization": "pediatrics",
+      "doctor_id": "028e191b-ab47-4dd4-b69d-d2d8a741f641"
+    },
+    {
+      "email": "karim.youssef.doctor@example.test",
+      "name_en": "Dr Karim Youssef",
+      "specialization": "internal_medicine",
+      "doctor_id": "5ef27751-90be-4d71-a4c3-3aae1d2ed4b7"
+    },
+    {
+      "email": "nour.farouk.doctor@example.test",
+      "name_en": "Dr Nour Farouk",
+      "specialization": "obstetrics_gynecology",
+      "doctor_id": "0cc98cd4-00c7-47d6-ab6d-7a049e27686e"
+    },
+    {
+      "email": "hany.mahmoud.doctor@example.test",
+      "name_en": "Dr Hany Mahmoud",
+      "specialization": "orthopedics",
+      "doctor_id": "6dbcf5d1-ff06-4a12-bd7f-e78a56df1623"
+    },
+    {
+      "email": "reem.tarek.doctor@example.test",
+      "name_en": "Dr Reem Tarek",
+      "specialization": "ophthalmology",
+      "doctor_id": "45ea86ca-d7a5-49d2-8873-597a2131a8d8"
+    },
+    {
+      "email": "yara.samir.doctor@example.test",
+      "name_en": "Dr Yara Samir",
+      "specialization": "psychiatry",
+      "doctor_id": "69915015-539b-4617-a7f7-9ee6bcaa8c42"
+    }
+  ],
+  "patients": [
+    {
+      "email": "mariam.ali.patient@example.test",
+      "name_en": "Mariam Ali",
+      "patient_id": "1117df50-4b7c-4af7-8961-38e7b7c162cb",
+      "dialect": "eg",
+      "language": "ar"
+    },
+    {
+      "email": "youssef.adel.patient@example.test",
+      "name_en": "Youssef Adel",
+      "patient_id": "89ccf162-6bb6-42bb-af4b-586bcaf5640c",
+      "dialect": "sa",
+      "language": "ar"
+    },
+    {
+      "email": "huda.karim.patient@example.test",
+      "name_en": "Huda Karim",
+      "patient_id": "6cd3678c-bdf5-42f3-a82e-c30302510f74",
+      "dialect": "lb",
+      "language": "ar"
+    },
+    {
+      "email": "adam.nabil.patient@example.test",
+      "name_en": "Adam Nabil",
+      "patient_id": "aa7e8122-82c5-436f-ad7a-1b06944ba33f",
+      "dialect": "eg",
+      "language": "en"
+    },
+    {
+      "email": "sara.mostafa.patient@example.test",
+      "name_en": "Sara Mostafa",
+      "patient_id": "2e09e9ff-a193-4da2-9ff4-21029065aedf",
+      "dialect": "ma",
+      "language": "ar"
+    },
+    {
+      "email": "khaled.taha.patient@example.test",
+      "name_en": "Khaled Taha",
+      "patient_id": "51097ac0-cee5-4ac2-a4d6-673483607edd",
+      "dialect": "sd",
+      "language": "ar"
+    },
+    {
+      "email": "noha.sameh.patient@example.test",
+      "name_en": "Noha Sameh",
+      "patient_id": "724677ad-e793-44f8-a83e-f36dca3235b6",
+      "dialect": "sy",
+      "language": "ar"
+    },
+    {
+      "email": "daniel.george.patient@example.test",
+      "name_en": "Daniel George",
+      "patient_id": "041d4d20-a13c-4727-8309-82e43f3b61d6",
+      "dialect": "iq",
+      "language": "en"
+    },
+    {
+      "email": "rana.fathy.patient@example.test",
+      "name_en": "Rana Fathy",
+      "patient_id": "602fba13-48d8-49f7-a2b7-9c22dadb9d8e",
+      "dialect": "ps",
+      "language": "ar"
+    },
+    {
+      "email": "hassan.wael.patient@example.test",
+      "name_en": "Hassan Wael",
+      "patient_id": "599a2c30-cb22-4277-a265-9548db18d83f",
+      "dialect": "ly",
+      "language": "ar"
+    },
+    {
+      "email": "aya.reda.patient@example.test",
+      "name_en": "Aya Reda",
+      "patient_id": "e4115944-97d0-4600-9de0-fdd9bf52a0c4",
+      "dialect": "tn",
+      "language": "ar"
+    },
+    {
+      "email": "mina.fawzy.patient@example.test",
+      "name_en": "Mina Fawzy",
+      "patient_id": "fa69e11e-0ee6-4147-862c-6dff189feaf3",
+      "dialect": "bh",
+      "language": "ar"
+    },
+    {
+      "email": "layla.hatem.patient@example.test",
+      "name_en": "Layla Hatem",
+      "patient_id": "ec89723a-1f45-4987-a391-ee8eeebd9855",
+      "dialect": "dz",
+      "language": "ar"
+    },
+    {
+      "email": "fadi.nader.patient@example.test",
+      "name_en": "Fadi Nader",
+      "patient_id": "13011e11-a143-49ab-b0e7-ef32363e6eab",
+      "dialect": "ye",
+      "language": "ar"
+    },
+    {
+      "email": "jana.saeed.patient@example.test",
+      "name_en": "Jana Saeed",
+      "patient_id": "7cd40ed9-42e9-4353-886e-756e34cd9a9b",
+      "dialect": "sa",
+      "language": "ar"
+    },
+    {
+      "email": "peter.sameh.patient@example.test",
+      "name_en": "Peter Sameh",
+      "patient_id": "f31230d6-92aa-4ac6-af0d-5165306aedde",
+      "dialect": "eg",
+      "language": "en"
+    }
+  ],
+  "care_links": 20
+}

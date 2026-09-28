@@ -42,6 +42,8 @@ class HistoryEntry(Base):
     # where it came from: a consultation's approved summary, a document, the doctor by hand
     source_type: Mapped[str | None] = mapped_column(String(32))
     source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # the visit it was written in, when the doctor wrote it from that visit's page
+    appointment_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     visibility: Mapped[Visibility] = _visibility()
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -73,6 +75,8 @@ class Document(Base):
     error: Mapped[str | None] = mapped_column(Text)
     visibility: Mapped[Visibility] = _visibility()
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # the visit it was brought to, when uploaded from that visit's page
+    appointment_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
 
 

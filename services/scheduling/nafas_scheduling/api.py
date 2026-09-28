@@ -13,8 +13,8 @@ from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
-from pydantic import AwareDatetime, BaseModel
-from sqlalchemy import select, update
+from pydantic import AwareDatetime, BaseModel, model_validator
+from sqlalchemy import and_, select, update
 
 from nafas_core.db import session_scope
 from nafas_core.health import health_info
@@ -110,13 +110,28 @@ class DayRefIn(BaseModel):
 
 
 class TimeExpressionIn(BaseModel):
-    """What the patient said about time, as the language model extracted it; nothing computed."""
+    """
+    What the patient said about time, as the language model extracted it; nothing computed.
+
+    Written by models, so it tolerates their habits where the meaning is not in
+    doubt: an explicit null for a field they had no value for, and "pm" said
+    again on a 24-hour afternoon hour. A real contradiction (18 "am") is still
+    refused.
+    """
 
     day: DayRefIn
     hour: int | None = None
-    minute: int = 0
+    minute: int | None = 0
     meridiem: Meridiem | None = None
     period: DayPeriod | None = None
+
+    @model_validator(mode="after")
+    def _settle_model_habits(self) -> "TimeExpressionIn":
+        if self.minute is None:
+            self.minute = 0
+        if self.hour is not None and self.hour > 12 and self.meridiem is Meridiem.PM:
+            self.meridiem = None
+        return self
 
 
 class CandidateOut(BaseModel):
@@ -337,17 +352,21 @@ async def appointment(
 @router.get("/patients/{patient_id}/appointments", response_model=list[AppointmentOut])
 async def patient_appointments(patient_id: uuid.UUID) -> list[AppointmentOut]:
     async with session_scope(patient_id=patient_id) as session:
-        return [_appointment(a) for a in await booking.patient_appointments(session)]
+        return [_appointment(a) for a in await booking.patient_appointments(session, _now())]
 
 
 @router.get("/doctors/{doctor_id}/patients/{patient_id}/appointments", response_model=list[AppointmentOut])
 async def doctor_patient_appointments(doctor_id: uuid.UUID, patient_id: uuid.UUID) -> list[AppointmentOut]:
-    """One patient's appointments with this doctor, every status, oldest first: for the doctor's timeline."""
+    """
+    One patient's appointments with this doctor, every status, oldest first: for the doctor's timeline.
+    A hold past its expiry is left out, as on the patient's own list: it is not a booking.
+    """
+    lapsed = and_(Appointment.status == AppointmentStatus.HELD, Appointment.hold_expires_at <= _now())
     async with session_scope(doctor_id=doctor_id) as session:
         rows = (
             await session.scalars(
                 select(Appointment)
-                .where(Appointment.doctor_id == doctor_id, Appointment.patient_id == patient_id)
+                .where(Appointment.doctor_id == doctor_id, Appointment.patient_id == patient_id, ~lapsed)
                 .order_by(Appointment.starts_at)
             )
         ).all()

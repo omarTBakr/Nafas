@@ -48,12 +48,17 @@ class Settings(BaseSettings):
     )
 
     s3_endpoint_url: str = Field("http://localhost:8333", description="S3 endpoint; empty for AWS itself")
+    s3_public_endpoint_url: str = Field(
+        "", description="S3 endpoint as browsers reach it, for upload and download links; empty: the same as S3_ENDPOINT_URL"
+    )
     s3_region: str = Field("us-east-1", description="S3 region")
     s3_access_key: SecretStr = Field(SecretStr("nafas"), description="S3 access key")
     s3_secret_key: SecretStr = Field(SecretStr("nafas-secret"), description="S3 secret key")
     s3_bucket: str = Field("nafas", description="Bucket holding recordings, voice notes and documents")
 
     llm_provider: LLMProvider = Field(LLMProvider.ANTHROPIC, description="Which language model backend to use")
+    llm_base_url: str = Field("http://localhost:11434/v1", description="OpenAI-compatible local LLM endpoint")
+    llm_api_key: SecretStr = Field(SecretStr("ollama"), description="API key for an OpenAI-compatible local LLM")
     stt_provider: STTProvider = Field(STTProvider.SELF_HOSTED, description="Speech-to-text backend")
     stt_url: str = Field("http://localhost:8420", description="Base URL of the stt service")
     embeddings_provider: EmbeddingsProvider = Field(EmbeddingsProvider.NONE, description="Embeddings backend")
@@ -63,9 +68,9 @@ class Settings(BaseSettings):
     anthropic_workspace_id: str = Field(
         "", description="Workspace to bill; required when the API key is not scoped to one workspace"
     )
-    llm_chat_model: str = Field("claude-sonnet-5", description="Model for patient and doctor chat")
-    llm_classifier_model: str = Field("claude-haiku-4-5", description="Model for intent and safety classifiers")
-    llm_summary_model: str = Field("claude-opus-5-5", description="Model for consultation summaries")
+    llm_chat_model: str = Field("gemma4:e4b", description="Model for patient and doctor chat")
+    llm_classifier_model: str = Field("gemma4:e4b", description="Model for intent and safety classifiers")
+    llm_summary_model: str = Field("gemma4:e4b", description="Model for consultation summaries")
 
     tavily_api_key: SecretStr = Field(SecretStr(""), description="Tavily web search; empty turns web grounding off")
     web_search_doctor: bool = Field(True, description="The doctor assistant may search the web (with a Tavily key)")

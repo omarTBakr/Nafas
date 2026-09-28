@@ -16,6 +16,7 @@ dependencies = [
     "nafas-clinical-records",
     "nafas-doctor-assistant",
     "nafas-consultation",
+    "deepagents>=0.7.19",
 ]
 
 [tool.uv]

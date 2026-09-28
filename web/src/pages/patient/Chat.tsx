@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, ApiError, type Appointment, type ChatAction, type ChatMessage, type ChatReply } from "../../api";
 import { useI18n } from "../../i18n";
+import Markdown from "../../Markdown";
 import { recorderType } from "../../recorder";
 import { clinicClock, clinicDay } from "../../time";
 
@@ -99,8 +100,31 @@ function ActionCard({ action, timezone, onChange }: { action: ChatAction; timezo
  * The patient's chat with this doctor's assistant. Holds it makes are ordinary
  * appointments: the slot picker, "my appointments" and this card all act on the same rows.
  */
-export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId: string; timezone: string; onBookingChange: () => void }) {
+export default function Chat({
+  doctorId,
+  timezone,
+  onBookingChange: notifyBookingChange,
+}: {
+  doctorId: string;
+  timezone: string;
+  onBookingChange: () => void;
+}) {
   const { t, reason } = useI18n();
+  // The patient's live holds with this doctor, read from their appointments.
+  // A reply's cards live only in that reply, so after a reload a hold made in
+  // chat would have no Confirm button left; these bring it back.
+  const [holds, setHolds] = useState<Appointment[]>([]);
+  const loadHolds = useCallback(() => {
+    api
+      .mine()
+      .then((mine) => setHolds(mine.filter((a) => a.doctor_id === doctorId && a.status === "held")))
+      .catch(() => setHolds([]));
+  }, [doctorId]);
+  useEffect(loadHolds, [loadHolds]);
+  const onBookingChange = useCallback(() => {
+    loadHolds();
+    notifyBookingChange();
+  }, [loadHolds, notifyBookingChange]);
   const [lines, setLines] = useState<Line[] | null>(null);
   const [draft, setDraft] = useState("");
   const [typing, setTyping] = useState(false);
@@ -133,16 +157,39 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
     end.current?.scrollIntoView?.({ block: "end" });
   }, [lines, typing]);
 
-  /** Sends one message, typed or spoken, and shows the patient's side at once and the reply when it comes. */
-  async function deliver(pendingText: string, voice: boolean, run: () => Promise<ChatReply>, onFail: () => void) {
+  /**
+   * Sends one message, typed or spoken: the patient's side shows at once, the
+   * reply streams into a live bubble as it is written, and the finished reply
+   * (which may differ, and may carry a booking card) replaces it at the end.
+   */
+  async function deliver(
+    pendingText: string,
+    voice: boolean,
+    run: (onDelta: (text: string) => void) => Promise<ChatReply>,
+    onFail: () => void,
+  ) {
     setFailed(false);
-    const pending: Line = { id: `pending-${Date.now()}`, role: "patient", text: pendingText };
+    const stamp = Date.now();
+    const pending: Line = { id: `pending-${stamp}`, role: "patient", text: pendingText };
+    const live: Line = { id: `pending-reply-${stamp}`, role: "assistant", text: "" };
     setLines((current) => [...(current ?? []), pending]);
     setTyping(true);
+    let streaming = false;
+    const onDelta = (piece: string) => {
+      setLines((current) => {
+        const list = current ?? [];
+        if (!streaming) {
+          streaming = true;
+          setTyping(false);
+          return [...list, { ...live, text: piece }];
+        }
+        return list.map((l) => (l.id === live.id ? { ...l, text: l.text + piece } : l));
+      });
+    };
     try {
-      const reply = await run();
+      const reply = await run(onDelta);
       setLines((current) => [
-        ...(current ?? []).filter((l) => l.id !== pending.id),
+        ...(current ?? []).filter((l) => l.id !== pending.id && l.id !== live.id),
         {
           id: reply.patient_message_id ?? `${reply.message_id}-patient`,
           role: "patient",
@@ -156,7 +203,7 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
       if (e instanceof ApiError && e.reason === "consent_required") setMissing(["data_processing", "ai_chat"]);
       else setFailed(e instanceof ApiError && e.reason === "rate_limited" ? "rate_limited" : true);
       onFail();
-      setLines((current) => (current ?? []).filter((l) => l.id !== pending.id));
+      setLines((current) => (current ?? []).filter((l) => l.id !== pending.id && l.id !== live.id));
     } finally {
       setTyping(false);
     }
@@ -167,7 +214,7 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
     const text = draft.trim();
     if (!text || typing) return;
     setDraft("");
-    await deliver(text, false, () => api.chatSend(doctorId, text), () => setDraft(text));
+    await deliver(text, false, (onDelta) => api.chatSendStreamed(doctorId, text, onDelta), () => setDraft(text));
   }
 
   async function startRecording() {
@@ -186,7 +233,8 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
     rec.onstop = () => {
       stream.getTracks().forEach((track) => track.stop());
       const note = new Blob(chunks, { type: rec.mimeType || type || "audio/webm" });
-      if (note.size > 0) void deliver(t("voiceNote"), true, () => api.chatVoice(doctorId, note), () => undefined);
+      if (note.size > 0)
+        void deliver(t("voiceNote"), true, (onDelta) => api.chatVoiceStreamed(doctorId, note, onDelta), () => undefined);
     };
     recorder.current = rec;
     rec.start();
@@ -232,7 +280,7 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
               <span className="who small muted">
                 {line.role === "patient" ? t("you") : line.role === "doctor" ? t("doctorReply") : t("assistant")}
               </span>
-              <p>{line.text}</p>
+              {line.role === "patient" ? <p>{line.text}</p> : <Markdown text={line.text} />}
               {line.audio && <audio controls preload="none" src={api.audioUrl(doctorId, line.id)} aria-label={t("voiceNote")} />}
               {line.role === "assistant" && !line.id.startsWith("pending") && <Thumbs doctorId={doctorId} line={line} />}
             </div>
@@ -246,6 +294,13 @@ export default function Chat({ doctorId, timezone, onBookingChange }: { doctorId
             ))}
           </div>
         ))}
+        {holds
+          .filter((hold) => !lines.some((line) => line.actions?.some((a) => a.appointment.appointment_id === hold.appointment_id)))
+          .map((hold) => (
+            <div key={`hold-${hold.appointment_id}`} className="bubble-row assistant">
+              <ActionCard action={{ type: "hold", appointment: hold }} timezone={timezone} onChange={onBookingChange} />
+            </div>
+          ))}
         {typing && <p className="muted small typing">{t("typing")}</p>}
         <div ref={end} />
       </div>

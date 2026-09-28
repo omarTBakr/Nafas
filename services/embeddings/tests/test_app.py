@@ -36,7 +36,8 @@ def test_a_model_of_the_wrong_width_is_caught():
     assert client.post("/v1/embed", json={"texts": ["a"]}).status_code == 500
 
 
-def test_health_says_the_model_is_not_pinned_yet():
+def test_health_reports_the_model_pinned_to_a_commit():
     health = TestClient(create_app(FakeEncoder(), Settings())).get("/health").json()
 
-    assert health["pinned"] is False and health["device"] == "cpu"
+    assert health["pinned"] is True and health["device"] == "cpu"
+    assert len(Settings().model_revision) == 40

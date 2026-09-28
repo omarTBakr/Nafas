@@ -41,6 +41,7 @@ async def new_document(
     mime: str,
     size_bytes: int,
     uploaded_by: uuid.UUID | None,
+    appointment_id: uuid.UUID | None = None,
 ) -> Document:
     """A row waiting for its file; the caller hands out an upload link to its key."""
     if mime not in ACCEPTED_TYPES:
@@ -58,6 +59,7 @@ async def new_document(
         size_bytes=size_bytes,
         object_key=document_key(doctor_id, patient_id, document_id, mime),
         uploaded_by=uploaded_by,
+        appointment_id=appointment_id,
     )
     session.add(document)
     await session.flush()
@@ -91,6 +93,7 @@ async def add_history(
     source_id: uuid.UUID | None = None,
     created_by: uuid.UUID | None = None,
     entry_id: uuid.UUID | None = None,
+    appointment_id: uuid.UUID | None = None,
 ) -> tuple[HistoryEntry, bool]:
     """
     The entry, and whether it is new. A caller that names the id (a workflow
@@ -111,6 +114,7 @@ async def add_history(
         source_type=source_type,
         source_id=source_id,
         created_by=created_by,
+        appointment_id=appointment_id,
     )
     session.add(entry)
     await session.flush()

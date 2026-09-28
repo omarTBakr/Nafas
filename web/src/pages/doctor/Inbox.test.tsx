@@ -75,3 +75,23 @@ it("lists the questions waiting, and a reply goes to the patient and clears it",
   await waitFor(() => expect(screen.queryByText("Can I double my dose?")).not.toBeInTheDocument());
   expect(posted).toEqual([["/api/doctor/escalations/e2/reply", { reply: "No, keep the same dose until Wednesday." }]]);
 });
+
+it("tells a screen reader whose question each reply box answers", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (url: string) => json(url.includes("status=open") ? OPEN : [])),
+  );
+  localStorage.setItem("nafas.lang", "en");
+  render(
+    <I18nProvider>
+      <Inbox />
+    </I18nProvider>,
+  );
+
+  await screen.findByText("I have crushing chest pain");
+  const boxes = screen.getAllByRole("textbox", { name: /your reply/i });
+
+  expect(boxes).toHaveLength(2);
+  expect(boxes[0]).toHaveAccessibleDescription("Sara I have crushing chest pain");
+  expect(boxes[1]).toHaveAccessibleDescription("Patient Can I double my dose?");
+});

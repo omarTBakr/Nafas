@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from nafas_core.clients.clinical import get_clinical
 from nafas_core.clients.identity import Account
+from nafas_gateway.routes.patient_visits import visit_of
 from nafas_gateway.sessions import current_doctor, current_patient
 
 router = APIRouter(prefix="/api", tags=["records"])
@@ -22,12 +23,16 @@ class UploadRequest(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
     mime: str
     size_bytes: int = Field(gt=0)
+    # filed under this visit, when uploaded from its page
+    appointment_id: uuid.UUID | None = None
 
 
 class NoteIn(BaseModel):
     kind: str = "note"
     content: str = Field(min_length=1, max_length=20000)
     visibility: Literal["doctor_only", "patient_visible"] = "doctor_only"
+    # filed under this visit, when written from its page
+    appointment_id: uuid.UUID | None = None
 
 
 class VisibilityIn(BaseModel):
@@ -42,7 +47,9 @@ async def documents(patient_id: uuid.UUID, doctor: Account = Depends(current_doc
 @router.post("/doctor/patients/{patient_id}/documents", status_code=201)
 async def start_upload(patient_id: uuid.UUID, body: UploadRequest, doctor: Account = Depends(current_doctor)) -> dict:
     """A link the browser PUTs the file to directly, then /uploaded to read and index it."""
-    return await get_clinical().new_document(doctor.doctor_id, patient_id, body.model_dump())
+    if body.appointment_id:
+        await visit_of(doctor.doctor_id, patient_id, body.appointment_id)
+    return await get_clinical().new_document(doctor.doctor_id, patient_id, body.model_dump(mode="json"))
 
 
 @router.post("/doctor/documents/{document_id}/uploaded")
@@ -62,7 +69,10 @@ async def history(patient_id: uuid.UUID, doctor: Account = Depends(current_docto
 
 @router.post("/doctor/patients/{patient_id}/history", status_code=201)
 async def add_note(patient_id: uuid.UUID, body: NoteIn, doctor: Account = Depends(current_doctor)) -> dict:
-    return await get_clinical().add_entry(doctor.doctor_id, patient_id, body.model_dump() | {"author_id": str(doctor.user_id)})
+    if body.appointment_id:
+        await visit_of(doctor.doctor_id, patient_id, body.appointment_id)
+    note = body.model_dump(mode="json") | {"author_id": str(doctor.user_id)}
+    return await get_clinical().add_entry(doctor.doctor_id, patient_id, note)
 
 
 @router.patch("/doctor/records/{source_type}/{record_id}/visibility", status_code=204)

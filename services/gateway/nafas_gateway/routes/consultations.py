@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from nafas_core.clients.consultation import get_consultation
 from nafas_core.clients.identity import Account
+from nafas_gateway.routes.patient_visits import visit_of
 from nafas_gateway.sessions import current_doctor
 
 router = APIRouter(prefix="/api/doctor", tags=["consultations"])
@@ -37,6 +38,8 @@ class ApproveIn(BaseModel):
 
 @router.post("/patients/{patient_id}/consultations", status_code=201)
 async def start(patient_id: uuid.UUID, body: StartIn, doctor: Account = Depends(current_doctor)) -> dict:
+    if body.appointment_id:
+        await visit_of(doctor.doctor_id, patient_id, body.appointment_id)
     return await get_consultation().start(doctor.doctor_id, patient_id, body.model_dump(mode="json"))
 
 

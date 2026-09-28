@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { ApiError, streamAssistant } from "../../api";
 import { useI18n } from "../../i18n";
+import Markdown from "../../Markdown";
 
 interface Line {
   role: "user" | "assistant";
@@ -56,7 +57,7 @@ export default function Assistant({ patientId }: { patientId?: string }) {
         {lines.map((line, i) => (
           <div key={i} className={`bubble-row ${line.role === "user" ? "patient" : "assistant"}`}>
             <div className={`bubble ${line.role === "user" ? "patient" : "assistant"}`}>
-              <p>{line.content}</p>
+              {line.role === "assistant" ? <Markdown text={line.content} /> : <p>{line.content}</p>}
             </div>
           </div>
         ))}

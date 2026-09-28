@@ -187,6 +187,8 @@ export interface DocumentRecord {
   visibility: Visibility;
   ai_description: string | null;
   ai_label: string;
+  // the visit it was filed under, when uploaded from that visit's page
+  appointment_id?: string | null;
   created_at: string;
 }
 
@@ -198,6 +200,8 @@ export interface HistoryRecord {
   visibility: Visibility;
   source_type: string | null;
   source_id?: string | null;
+  // the visit it was filed under, when written from that visit's page
+  appointment_id?: string | null;
   occurred_at: string;
 }
 
@@ -262,6 +266,28 @@ export interface Timeline {
   items: TimelineItem[];
 }
 
+/** A visit in a patient's file: the appointment, and how much was filed under it. */
+export interface VisitSummary extends Appointment {
+  recordings: number;
+  notes: number;
+  documents: number;
+}
+
+export interface Visits {
+  patient: PatientCard;
+  timezone: string;
+  visits: VisitSummary[];
+}
+
+export interface VisitDetail {
+  patient: PatientCard;
+  timezone: string;
+  appointment: Appointment;
+  consultations: Consultation[];
+  history: HistoryRecord[];
+  documents: DocumentRecord[];
+}
+
 export interface NextPatient {
   appointment: Appointment | null;
   timezone: string;
@@ -316,11 +342,22 @@ export async function streamAssistant(
 }
 
 /** Puts a file straight into storage through the upload link, then asks for it to be read. */
-export async function uploadDocument(patientId: string, file: File, kind: string): Promise<DocumentRecord> {
+export async function uploadDocument(
+  patientId: string,
+  file: File,
+  kind: string,
+  appointmentId: string | null = null,
+): Promise<DocumentRecord> {
   const started = await call<{ document: DocumentRecord; upload_url: string; content_type: string }>(
     "POST",
     `/api/doctor/patients/${patientId}/documents`,
-    { kind, filename: file.name, mime: file.type || "application/octet-stream", size_bytes: file.size },
+    {
+      kind,
+      filename: file.name,
+      mime: file.type || "application/octet-stream",
+      size_bytes: file.size,
+      appointment_id: appointmentId,
+    },
   );
   const put = await fetch(started.upload_url, { method: "PUT", body: file, headers: { "Content-Type": started.content_type } });
   if (!put.ok) throw new ApiError(put.status, "the file could not be uploaded");
@@ -381,6 +418,46 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return payload as T;
 }
 
+/**
+ * A streamed chat reply: the server's `delta` events are handed to `onDelta`
+ * as the model writes; the `done` event's reply resolves the promise (it is
+ * the authority, and replaces what was streamed), an `error` event rejects it.
+ * fetch rather than EventSource, which cannot POST.
+ */
+async function streamReply(path: string, body: FormData | object, onDelta: (text: string) => void): Promise<ChatReply> {
+  const form = body instanceof FormData;
+  const response = await fetch(path, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: form ? undefined : { "Content-Type": "application/json" },
+    body: form ? body : JSON.stringify(body),
+  });
+  if (!response.ok || !response.body) {
+    const payload = await response.json().catch(() => ({}));
+    throw new ApiError(response.status, typeof payload.detail === "string" ? payload.detail : response.statusText, payload.reason);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let boundary: number;
+    while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+      const block = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const name = block.match(/^event: (.*)$/m)?.[1];
+      const data = JSON.parse(block.match(/^data: (.*)$/m)?.[1] ?? "{}");
+      if (name === "delta") onDelta(data.text ?? "");
+      else if (name === "done") return data as ChatReply;
+      else if (name === "error") throw new ApiError(data.status ?? 500, data.detail ?? "error");
+    }
+  }
+  throw new ApiError(502, "the reply stream ended early");
+}
+
 const query = (params: Record<string, string | number | undefined>) =>
   new URLSearchParams(
     Object.entries(params).filter((e): e is [string, string | number] => e[1] !== undefined) as [string, string][],
@@ -427,6 +504,13 @@ export const api = {
     form.append("audio", audio, "voice-note");
     return call<ChatReply>("POST", `/api/chat/${doctorId}/voice`, form);
   },
+  chatSendStreamed: (doctorId: string, text: string, onDelta: (text: string) => void) =>
+    streamReply(`/api/chat/${doctorId}/messages/stream`, { text }, onDelta),
+  chatVoiceStreamed: (doctorId: string, audio: Blob, onDelta: (text: string) => void) => {
+    const form = new FormData();
+    form.append("audio", audio, "voice-note");
+    return streamReply(`/api/chat/${doctorId}/voice/stream`, form, onDelta);
+  },
   audioUrl: (doctorId: string, messageId: string) => `/api/chat/${doctorId}/messages/${messageId}/audio`,
   consents: () => call<Consent[]>("GET", "/api/me/consents"),
   grantConsent: (kind: "data_processing" | "ai_chat" | "service_improvement", doctorId?: string) =>
@@ -446,14 +530,22 @@ export const api = {
   patients: () => call<PatientCard[]>("GET", "/api/doctor/patients"),
   timeline: (patientId: string) => call<Timeline>("GET", `/api/doctor/patients/${patientId}/timeline`),
   nextPatient: () => call<NextPatient>("GET", "/api/doctor/next"),
-  addNote: (patientId: string, content: string, visibility: Visibility, kind = "note") =>
-    call<HistoryRecord>("POST", `/api/doctor/patients/${patientId}/history`, { content, visibility, kind }),
+  addNote: (patientId: string, content: string, visibility: Visibility, kind = "note", appointmentId: string | null = null) =>
+    call<HistoryRecord>("POST", `/api/doctor/patients/${patientId}/history`, {
+      content,
+      visibility,
+      kind,
+      appointment_id: appointmentId,
+    }),
+  visits: (patientId: string) => call<Visits>("GET", `/api/doctor/patients/${patientId}/visits`),
+  visit: (patientId: string, appointmentId: string) =>
+    call<VisitDetail>("GET", `/api/doctor/patients/${patientId}/visits/${appointmentId}`),
   setVisibility: (sourceType: "document" | "history", id: string, visibility: Visibility) =>
     call<void>("PATCH", `/api/doctor/records/${sourceType}/${id}/visibility`, { visibility }),
   documentLink: (documentId: string) => call<{ url: string }>("GET", `/api/doctor/documents/${documentId}/download`),
 
-  startConsultation: (patientId: string, evidence: string) =>
-    call<Consultation>("POST", `/api/doctor/patients/${patientId}/consultations`, { evidence }),
+  startConsultation: (patientId: string, evidence: string, appointmentId: string | null = null) =>
+    call<Consultation>("POST", `/api/doctor/patients/${patientId}/consultations`, { evidence, appointment_id: appointmentId }),
   consultationPart: (id: string, part: { index: number; mime: string; offset_seconds: number; size_bytes: number }) =>
     call<{ index: number; upload_url: string; content_type: string }>("POST", `/api/doctor/consultations/${id}/parts`, part),
   finishConsultation: (id: string) => call<Consultation>("POST", `/api/doctor/consultations/${id}/finish`),

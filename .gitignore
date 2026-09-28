@@ -27,3 +27,7 @@ services/conversation/evals/last-run.json
 # feedback exports: de-identified, but reviewed before anything leaves the machine
 data/
 backups/
+
+# local planning notes, kept out of the repository
+cluade_plan_files/
+claude_plan_files/

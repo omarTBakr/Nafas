@@ -99,6 +99,9 @@ export default function Register() {
       )}
       <button disabled={busy || !consented}>{t("register")}</button>
       <p className="small muted">
+        {t("doctorAccountHint")} <Link to="/login">{t("doctorLogin")}</Link>
+      </p>
+      <p className="small muted">
         {t("haveAccount")} <Link to={`/login${params.get("next") ? `?next=${encodeURIComponent(params.get("next")!)}` : ""}`}>{t("login")}</Link>
       </p>
     </form>

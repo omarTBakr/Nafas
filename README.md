@@ -26,6 +26,8 @@ workspace and coordinate through Temporal.
 - [Getting started](#getting-started)
   - [Requirements](#requirements)
   - [Setup](#setup)
+  - [Local startup and verification](#local-startup-and-verification)
+  - [Architecture diagrams](#architecture-diagrams)
 - [Running it](#running-it)
   - [The whole stack](#the-whole-stack)
   - [One service on the host](#one-service-on-the-host)
@@ -82,6 +84,254 @@ Check it works:
 
 ```bash
 make test
+```
+
+### Local startup and verification
+
+For a machine without an NVIDIA GPU, use the CPU compose override. The local
+stack uses Ollama as the LLM provider and pulls the configured `gemma4:e4b` model
+into its own volume. Postgres remains the single local database; conversation,
+clinical-records and the other services use separate schemas and service roles.
+
+If a host gateway is already running, stop it with `Ctrl+C` before starting the
+Compose stack because both use port `8000`. To identify a process holding the
+port, run `ss -ltnp 'sport = :8000'`. A stale process owned by another user may
+require the host administrator to stop it.
+
+Follow this sequence from the repository root:
+
+1. Install the Python workspace and frontend dependencies.
+2. Copy `.env.example` to `.env` only when `.env` does not already exist. Keep
+  `LLM_PROVIDER=ollama` and set the local model to the tag installed in Ollama,
+  normally `gemma4:e4b`.
+3. Stop any host gateway using port `8000`.
+4. Start the complete stack. Use `make up` with NVIDIA GPU support or
+  `make up-cpu` without it.
+5. Apply migrations with `make migrate`.
+6. Seed specializations with `make seed`.
+7. Create the local object-storage bucket with `make storage`.
+8. Create a test doctor and configure bookable hours.
+9. Verify health, API docs, model loading, and the web UI.
+10. Run `make test` only after the dependent services report healthy.
+
+```bash
+uv sync
+cd web && npm ci && cd ..
+
+# Do not overwrite an existing .env containing local settings.
+test -f .env || cp .env.example .env
+
+ss -ltnp 'sport = :8000' || true
+make up-cpu                         # or: make up
+make migrate
+make seed
+make storage
+```
+
+Create a test doctor and configure bookable hours. Save the printed doctor ID
+for API or integration tests:
+
+```bash
+uv run python -m nafas_identity.cli create-doctor \
+  --email dr@example.com \
+  --name-en "Dr Example" \
+  --name-ar "د. مثال" \
+  --specialization cardiology
+
+uv run python -m nafas_scheduling.cli set-hours \
+  --doctor-id <printed-id> \
+  --hours wed=17:00-21:00 \
+  --hours sat=10:00-14:00/in_person
+```
+
+Verify the running stack:
+
+```bash
+curl -fsS http://localhost:8000/health
+curl -fsS http://localhost:8000/docs >/dev/null
+docker compose logs --no-log-prefix --tail=50 llm-model
+```
+
+Open these local interfaces:
+
+- Web app: `http://localhost:8088`
+- Gateway API documentation: `http://localhost:8000/docs`
+- Gateway health: `http://localhost:8000/health`
+- Ollama: `http://localhost:11434`
+- Mailpit: `http://localhost:8025`
+
+The gateway is an API and does not serve the frontend at `/`; `GET /` returning
+`404` is expected. Use the web app on port `8088` or the API documentation on
+port `8000` instead.
+
+Run the complete local checks after the services are healthy:
+
+```bash
+make test
+```
+
+If the Ollama image is slow to pull, wait for `ollama/ollama` to finish before
+running migrations. The local host Ollama endpoint can be checked independently:
+
+```bash
+curl -fsS http://localhost:11434/api/tags
+curl -fsS http://localhost:11434/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"gemma4:e4b","messages":[{"role":"user","content":"Reply with exactly OK."}],"max_tokens":8}'
+```
+
+### Architecture diagrams
+
+The web app is the only public application surface. The gateway authenticates
+the request and calls the service that owns the data. Temporal coordinates
+long-running workflows; provider interfaces keep model and storage choices
+replaceable.
+
+```mermaid
+flowchart LR
+  Browser[React web app] -->|REST and SSE| Gateway[Gateway API]
+  Gateway --> Identity[Identity service]
+  Gateway --> Scheduling[Scheduling service]
+  Gateway --> Conversation[Conversation service]
+  Gateway --> Clinical[Clinical records service]
+  Gateway --> Doctor[Doctor assistant]
+  Gateway --> Consultation[Consultation service]
+
+  Conversation --> Temporal[Temporal workflows]
+  Scheduling --> Temporal
+  Clinical --> Temporal
+  Consultation --> Temporal
+
+  Conversation --> LLM[LLM provider interface]
+  Doctor --> LLM
+  Clinical --> LLM
+  Consultation --> LLM
+  LLM --> Gemma[Ollama Gemma local model]
+
+  Conversation --> STT[Arabic STT service]
+  Conversation --> TTS[Lahgtna TTS service]
+  Conversation --> Dialect[Dialect router]
+  Clinical --> Embeddings[Local embeddings service]
+
+  Identity --> Postgres[(Postgres and RLS)]
+  Scheduling --> Postgres
+  Conversation --> Postgres
+  Clinical --> Postgres
+  Consultation --> Postgres
+  Clinical --> Storage[(S3-compatible object storage)]
+  Scheduling --> Mail[Mailpit or SMTP]
+```
+
+The database is one Postgres database with service-owned schemas, not one
+database per doctor. Clinical rows carry both `doctor_id` and `patient_id`;
+row-level security and scoped transactions enforce access.
+
+```mermaid
+erDiagram
+  IDENTITY_USERS ||--o| IDENTITY_DOCTORS : has
+  IDENTITY_USERS ||--o| IDENTITY_PATIENTS : has
+  IDENTITY_DOCTORS ||--o{ IDENTITY_DOCTOR_PATIENTS : cares_for
+  IDENTITY_PATIENTS ||--o{ IDENTITY_DOCTOR_PATIENTS : linked_to
+  IDENTITY_DOCTORS ||--o{ SCHEDULING_APPOINTMENTS : owns
+  IDENTITY_PATIENTS ||--o{ SCHEDULING_APPOINTMENTS : books
+  IDENTITY_DOCTORS ||--o{ CONVERSATIONS : serves
+  IDENTITY_PATIENTS ||--o{ CONVERSATIONS : starts
+  CONVERSATIONS ||--o{ MESSAGES : contains
+  MESSAGES ||--o{ ESCALATIONS : creates
+  IDENTITY_DOCTORS ||--o{ CLINICAL_HISTORY : writes
+  IDENTITY_PATIENTS ||--o{ CLINICAL_HISTORY : has
+  IDENTITY_PATIENTS ||--o{ CLINICAL_DOCUMENTS : owns
+  CLINICAL_DOCUMENTS ||--o{ CLINICAL_CHUNKS : produces
+  CLINICAL_HISTORY ||--o{ CLINICAL_CHUNKS : produces
+  IDENTITY_DOCTORS ||--o{ CONSULTATIONS : conducts
+  IDENTITY_PATIENTS ||--o{ CONSULTATIONS : attends
+  SCHEDULING_APPOINTMENTS ||--o| CONSULTATIONS : records
+
+  IDENTITY_USERS {
+    uuid id PK
+    string email UK
+    enum role
+    string password_hash
+    boolean is_active
+  }
+  IDENTITY_DOCTORS {
+    uuid id PK
+    uuid user_id FK
+    uuid specialization_id FK
+    string timezone
+  }
+  IDENTITY_PATIENTS {
+    uuid id PK
+    uuid user_id FK
+    string dialect
+    string preferred_language
+    string voice
+  }
+  IDENTITY_DOCTOR_PATIENTS {
+    uuid doctor_id FK
+    uuid patient_id FK
+    enum status
+  }
+  SCHEDULING_APPOINTMENTS {
+    uuid id PK
+    uuid doctor_id FK
+    uuid patient_id FK
+    timestamptz starts_at
+    timestamptz ends_at
+    enum status
+  }
+  CONVERSATIONS {
+    uuid id PK
+    uuid doctor_id FK
+    uuid patient_id FK
+    enum audience
+    string workflow_id
+  }
+  MESSAGES {
+    uuid id PK
+    uuid conversation_id FK
+    enum role
+    enum modality
+    text content
+    jsonb safety
+  }
+  ESCALATIONS {
+    uuid id PK
+    uuid doctor_id FK
+    uuid patient_id FK
+    uuid message_id FK
+    enum status
+  }
+  CLINICAL_HISTORY {
+    uuid id PK
+    uuid doctor_id FK
+    uuid patient_id FK
+    enum visibility
+    text content
+  }
+  CLINICAL_DOCUMENTS {
+    uuid id PK
+    uuid doctor_id FK
+    uuid patient_id FK
+    string object_key
+    enum status
+  }
+  CLINICAL_CHUNKS {
+    uuid id PK
+    uuid doctor_id FK
+    uuid patient_id FK
+    vector embedding
+    tsvector tsv
+  }
+  CONSULTATIONS {
+    uuid id PK
+    uuid appointment_id FK
+    uuid doctor_id FK
+    uuid patient_id FK
+    enum status
+    jsonb summary_draft
+    jsonb summary_final
+  }
 ```
 
 ## Running it

@@ -10,14 +10,16 @@ from nafas_core.interfaces.embeddings.factory import set_embeddings
 from nafas_core.interfaces.embeddings.fake import FakeEmbeddings
 from nafas_scheduling.models import AvailabilityRule, BookingSettings
 
-from .conftest import DOCTOR_PASSWORD, browser, sign_up
+from .conftest import CAIRO, DOCTOR_PASSWORD, browser, sign_up
 
 
 @pytest.fixture
 async def open_all_day(doctor_id):
     """Hours every day, all day, bookable at once: so a visit can be booked for today."""
     async with session_scope(doctor_id=doctor_id) as session:
-        await session.execute(update(BookingSettings).where(BookingSettings.doctor_id == doctor_id).values(min_notice_minutes=0))
+        await session.execute(
+            update(BookingSettings).where(BookingSettings.doctor_id == doctor_id).values(min_notice_minutes=0, slot_minutes=5)
+        )
         for weekday in range(7):
             session.add(AvailabilityRule(doctor_id=doctor_id, weekday=weekday, start_local=time(0), end_local=time(23, 59)))
     set_embeddings(FakeEmbeddings())
@@ -27,10 +29,12 @@ async def open_all_day(doctor_id):
 
 async def book_soonest(sara, doctor_id) -> dict:
     now = datetime.now(UTC)
+    today_in_clinic = now.astimezone(CAIRO).date()
+    end_of_day = datetime.combine(today_in_clinic + timedelta(days=1), time.min, tzinfo=CAIRO)
     slots = (
         await sara.get(
             f"/api/doctors/{doctor_id}/slots",
-            params={"start": now.isoformat(), "end": (now + timedelta(hours=6)).isoformat(), "limit": 1},
+            params={"start": now.isoformat(), "end": end_of_day.isoformat(), "limit": 1},
         )
     ).json()
     held = (await sara.post("/api/appointments", json={"doctor_id": str(doctor_id), "start": slots[0]["start"]})).json()

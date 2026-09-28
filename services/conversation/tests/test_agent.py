@@ -2,7 +2,7 @@ import json
 
 from anthropic.types import Message, ToolUseBlock, Usage
 
-from nafas_conversation.logic.agent import MAX_STEPS, run_booking_turn
+from nafas_conversation.logic.agent import EMPTY_ANSWER_NUDGE, MAX_STEPS, run_booking_turn
 from nafas_conversation.prompts.booking import PROMPT_VERSION, TOOLS
 from nafas_core.clients.base import UpstreamRefusal
 from nafas_core.exceptions.providers import LLMError
@@ -154,12 +154,35 @@ async def test_a_loop_that_never_ends_is_cut_off():
     assert len(llm.requests) == MAX_STEPS
 
 
-async def test_an_empty_final_answer_is_never_shown_as_blank():
-    empty = text_message("")
+async def test_an_empty_final_answer_is_asked_for_once_more():
+    """Local models sometimes end a turn silently, often right after a tool; one nudge usually brings the words."""
+    llm = FakeLLM([text_message(""), "حجزتلك الخميس الساعة ٦. أكد من الزرار."])
 
-    reply = await turn(FakeLLM([empty]), FakeCalendar())
+    reply = await turn(llm, FakeCalendar())
+
+    assert reply.text == "حجزتلك الخميس الساعة ٦. أكد من الزرار."
+    nudge = llm.requests[1]["messages"][-1]
+    assert nudge["role"] == "user" and nudge["content"] == EMPTY_ANSWER_NUDGE
+
+
+async def test_two_empty_answers_are_an_apology_never_a_blank():
+    reply = await turn(FakeLLM([text_message(""), text_message("")]), FakeCalendar())
 
     assert reply.text == APOLOGY
+
+
+async def test_a_time_the_model_cannot_write_is_told_back_not_raised():
+    class Picky(FakeCalendar):
+        async def hold(self, start, reason_for_visit):
+            raise ValueError(f"Invalid isoformat string: {start!r}")
+
+    llm = FakeLLM([tool_turn(("hold", {"start": "Thursday 6pm"})), "Sorry, which time exactly?"])
+
+    reply = await turn(llm, Picky())
+
+    result = llm.requests[1]["messages"][-1]["content"][0]
+    assert result["is_error"] is True and "invalid argument" in result["content"]
+    assert reply.text == "Sorry, which time exactly?"
 
 
 def test_every_tool_the_prompt_names_is_defined():
@@ -167,3 +190,41 @@ def test_every_tool_the_prompt_names_is_defined():
 
     assert names == {"interpret_time", "hold", "confirm", "cancel", "my_appointments"}
     assert all(tool["input_schema"]["type"] == "object" for tool in TOOLS)
+
+
+class StreamingLLM(FakeLLM):
+    """A FakeLLM whose replies can also be streamed, in word-sized pieces."""
+
+    async def stream(self, **params):
+        from nafas_core.interfaces.llm.base import StreamEvent
+
+        message = await self.create(**params)
+        for block in message.content:
+            if block.type == "text":
+                for word in block.text.split(" "):
+                    yield StreamEvent(text=word + " ")
+        yield StreamEvent(message=message)
+
+
+async def test_with_a_listener_the_reply_arrives_in_pieces_as_it_is_written():
+    pieces: list[str] = []
+
+    async def heard(piece: str) -> None:
+        pieces.append(piece)
+
+    llm = StreamingLLM([tool_turn(("my_appointments", {})), "You have no appointments yet."])
+    reply = await run_booking_turn(
+        llm,
+        FakeCalendar(),
+        model="m",
+        system="s",
+        tool_definitions=TOOLS,
+        prompt_version=PROMPT_VERSION,
+        history=[{"role": "user", "content": "my appointments?"}],
+        apology=APOLOGY,
+        on_text=heard,
+    )
+
+    assert reply.text == "You have no appointments yet."
+    assert "".join(pieces).strip() == "You have no appointments yet."
+    assert len(pieces) == 5

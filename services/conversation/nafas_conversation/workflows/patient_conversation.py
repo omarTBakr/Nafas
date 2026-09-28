@@ -122,7 +122,9 @@ class PatientConversationWorkflow:
             )
 
             result = await workflow.execute_activity_method(
-                ConversationActivities.answer, TurnRequest(patient_id, doctor_id, conversation_id), **TURN
+                ConversationActivities.answer,
+                TurnRequest(patient_id, doctor_id, conversation_id, message.stream_id),
+                **TURN,
             )
             reply_id = str(workflow.uuid4())
 

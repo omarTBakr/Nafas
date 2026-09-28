@@ -63,6 +63,8 @@ class TurnRequest:
     patient_id: str
     doctor_id: str
     conversation_id: str
+    # the gateway's stream for this reply, if it is listening (nafas_core.streams)
+    stream_id: str | None = None
 
 
 @dataclass

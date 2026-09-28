@@ -10,6 +10,7 @@ import Inbox from "./pages/doctor/Inbox";
 import PatientPage from "./pages/doctor/Patient";
 import Patients from "./pages/doctor/Patients";
 import Schedule from "./pages/doctor/Schedule";
+import VisitPage from "./pages/doctor/Visit";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Appointments from "./pages/patient/Appointments";
@@ -21,11 +22,17 @@ import Register from "./pages/Register";
 
 /** Renders its page only for the right role; otherwise to login, remembering where to come back to. */
 function RequireRole({ role, children }: { role: Role; children: ReactNode }) {
-  const { me, ready } = useAuth();
+  const { me, ready, unreachable } = useAuth();
   const location = useLocation();
   const { t } = useI18n();
 
   if (!ready) return <p className="muted">{t("loading")}</p>;
+  if (!me && unreachable)
+    return (
+      <p className="notice warn" role="alert">
+        {t("serverUnreachable")}
+      </p>
+    );
   if (!me) return <Navigate to={`/login?next=${encodeURIComponent(location.pathname)}`} replace />;
   if (me.role !== role) return <Navigate to={me.role === "doctor" ? "/doctor" : "/"} replace />;
   return <>{children}</>;
@@ -198,6 +205,14 @@ export default function App() {
             element={
               <RequireRole role="doctor">
                 <PatientPage />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/doctor/patients/:patientId/visits/:appointmentId"
+            element={
+              <RequireRole role="doctor">
+                <VisitPage />
               </RequireRole>
             }
           />

@@ -1,0 +1,7 @@
+Synthetic clinical note for local testing only.
+
+Patient reports intermittent chest discomfort after exertion for two days.
+No diagnosis is made in this fixture. The doctor should review any escalation.
+
+ملاحظة اصطناعية للاختبار المحلي فقط: يذكر المريض شعوراً متقطعاً بعدم الراحة
+في الصدر بعد المجهود. لا يحتوي هذا الملف على تشخيص حقيقي.

@@ -182,3 +182,28 @@ async def test_an_impossible_expression_is_422(api, clinic):
     )
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        # a local model fills every field, using null for the ones it has no value for
+        {"day": {"weekday": 2, "relative_days": None, "on": None}, "hour": 5, "minute": None, "meridiem": "pm", "period": None},
+        # "pm" said again on a 24-hour afternoon hour
+        {"day": {"weekday": 2}, "hour": 17, "meridiem": "pm"},
+    ],
+)
+async def test_interpreting_tolerates_how_models_fill_the_schema(api, clinic, expression):
+    response = await api.post(f"/internal/v1/doctors/{clinic.doctor_id}/interpret-time", json=expression)
+
+    assert response.status_code == 200
+    starts = [datetime.fromisoformat(c["start"]).astimezone(CAIRO).strftime("%H:%M") for c in response.json()["candidates"]]
+    assert starts == ["17:00"]
+
+
+async def test_a_contradictory_hour_is_still_refused(api, clinic):
+    response = await api.post(
+        f"/internal/v1/doctors/{clinic.doctor_id}/interpret-time", json={"day": {"weekday": 2}, "hour": 18, "meridiem": "am"}
+    )
+
+    assert response.status_code == 422

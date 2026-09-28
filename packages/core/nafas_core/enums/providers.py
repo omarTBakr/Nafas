@@ -3,6 +3,7 @@ from enum import StrEnum
 
 class LLMProvider(StrEnum):
     ANTHROPIC = "anthropic"
+    OLLAMA = "ollama"
 
 
 class STTProvider(StrEnum):
