@@ -18,6 +18,15 @@ def get_llm() -> LLM:
                     api_key=settings.anthropic_api_key.get_secret_value(),
                     workspace_id=settings.anthropic_workspace_id,
                 )
+            case LLMProvider.OLLAMA:
+                from nafas_core.interfaces.llm.ollama import OllamaLLM
+
+                _llm = OllamaLLM(
+                    base_url=settings.llm_base_url,
+                    api_key=settings.llm_api_key.get_secret_value(),
+                )
+            case _:
+                raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")
 
     return _llm
 

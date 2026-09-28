@@ -44,6 +44,9 @@ class PatientMessage:
     # a voice note in object storage; the workflow transcribes it into `text`
     audio_key: str | None = None
     audio_mime: str | None = None
+    # when set, the reply's text is published to this stream as it is written
+    # (nafas_core.streams); the full reply still comes back on the update
+    stream_id: str | None = None
 
 
 @dataclass
@@ -71,6 +74,7 @@ async def send_patient_message(
     text: str = "",
     audio_key: str | None = None,
     audio_mime: str | None = None,
+    stream_id: str | None = None,
     task_queue: str = TaskQueue.CONVERSATION,
 ) -> ChatReply:
     """
@@ -86,7 +90,10 @@ async def send_patient_message(
         id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
     )
     return await client.execute_update_with_start_workflow(
-        SEND_MESSAGE, PatientMessage(text, audio_key, audio_mime), start_workflow_operation=start, result_type=ChatReply
+        SEND_MESSAGE,
+        PatientMessage(text, audio_key, audio_mime, stream_id),
+        start_workflow_operation=start,
+        result_type=ChatReply,
     )
 
 

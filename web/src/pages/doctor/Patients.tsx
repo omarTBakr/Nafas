@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api, type PatientCard } from "../../api";
@@ -7,14 +7,34 @@ import { useI18n } from "../../i18n";
 export default function Patients() {
   const { t, locale } = useI18n();
   const [patients, setPatients] = useState<PatientCard[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setFailed(false);
     api
       .patients()
-      .then(setPatients)
-      .catch(() => setPatients([]));
+      .then((result) => {
+        setPatients(result);
+        setFailed(false);
+      })
+      .catch(() => setFailed(true));
   }, []);
 
+  useEffect(load, [load]);
+
+  if (failed)
+    return (
+      <div className="stack">
+        <p className="notice error" role="alert">
+          {t("error")}
+        </p>
+        <div>
+          <button className="secondary" onClick={load}>
+            {t("tryAgain")}
+          </button>
+        </div>
+      </div>
+    );
   if (!patients) return <p className="muted">{t("loading")}</p>;
   return (
     <div className="stack">

@@ -49,11 +49,28 @@ describe("recording an in-person visit", () => {
 
     expect(await screen.findByRole("button", { name: "Finish and send" })).toBeInTheDocument();
     expect(recorder.made).toEqual(["c1"]);
-    expect(calls.find((c) => c.url === "/api/doctor/patients/p1/consultations")!.body).toEqual({ evidence: "verbal, in the room" });
+    expect(calls.find((c) => c.url === "/api/doctor/patients/p1/consultations")!.body).toEqual({
+      evidence: "verbal, in the room",
+      appointment_id: null,
+    });
 
     await userEvent.click(screen.getByRole("button", { name: "Finish and send" }));
     await waitFor(() => expect(screen.getAllByTestId("where").map((w) => w.textContent)).toContain("/doctor/consultations/c1"));
     expect(recorder.stop).toHaveBeenCalled();
+  });
+
+  it("files a recording made from a visit's page under that visit", async () => {
+    recorder.start.mockResolvedValue(undefined);
+    const calls = stubFetch({
+      "POST /api/doctor/patients/p1/consultations": () => json({ consultation_id: "c3", status: "recording" }, 201),
+    });
+    renderPage(<RecordVisit patientId="p1" appointmentId="a1" onChange={() => {}} />, { path: "/doctor/patients/p1" });
+
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(screen.getByRole("button", { name: "Start recording" }));
+
+    expect(await screen.findByRole("button", { name: "Finish and send" })).toBeInTheDocument();
+    expect(calls.find((c) => c.url === "/api/doctor/patients/p1/consultations")!.body).toMatchObject({ appointment_id: "a1" });
   });
 
   it("says so when the microphone cannot start, and discards a recording thrown away", async () => {
@@ -85,6 +102,24 @@ describe("the doctor's lists", () => {
 
     const row = await screen.findByRole("link", { name: /Mona Ali/ });
     expect(row).toHaveAttribute("href", "/doctor/patients/p1");
+  });
+
+  it("keeps a failed roster request visible and can retry it without losing an Arabic patient name", async () => {
+    let unavailable = true;
+    stubFetch({
+      "GET /api/doctor/patients": () =>
+        unavailable
+          ? json({ detail: "a service is unavailable; try again shortly" }, 503)
+          : [{ patient_id: "p1", full_name: "سارة أحمد", first_seen_at: "2026-09-01T10:00:00Z" }],
+    });
+    renderPage(<Patients />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong, please try again");
+    expect(screen.queryByText("No patients under your care yet")).not.toBeInTheDocument();
+
+    unavailable = false;
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("link", { name: /سارة أحمد/ })).toHaveAttribute("href", "/doctor/patients/p1");
   });
 
   it("briefs the doctor on who is next, or says the day is done", async () => {
@@ -142,5 +177,52 @@ describe("the app's doors", () => {
 
     await waitFor(() => expect(screen.queryByRole("heading", { name: "My patients" })).not.toBeInTheDocument());
     expect(screen.getByRole("link", { name: "My records" })).toBeInTheDocument();
+  });
+});
+
+describe("a patient's file", () => {
+  it("names each reply box by its question, and keeps the answer when it fails to send", async () => {
+    const { default: PatientPage } = await import("./Patient");
+    stubFetch({
+      "GET /api/doctor/patients/p1/timeline": () => ({
+        patient: {
+          patient_id: "p1",
+          full_name: "Sara",
+          date_of_birth: null,
+          sex: null,
+          phone: null,
+          preferred_language: "en",
+          first_seen_at: "2026-09-26T00:00:00Z",
+        },
+        timezone: "Africa/Cairo",
+        items: [
+          {
+            type: "escalation",
+            at: "2026-09-28T06:43:00Z",
+            escalation_id: "e1",
+            patient_id: "p1",
+            patient_name: "Sara",
+            reason: "sensitive",
+            status: "open",
+            question: "Can I stop my blood pressure pills?",
+            doctor_reply: null,
+            nudged_at: null,
+            answered_at: null,
+            created_at: "2026-09-28T06:43:00Z",
+          },
+        ],
+      }),
+      "POST /api/doctor/escalations/e1/reply": () => json({ detail: "a service is unavailable" }, 503),
+    });
+    renderPage(<PatientPage />, { path: "/doctor/patients/:patientId", at: "/doctor/patients/p1" });
+
+    const box = await screen.findByRole("textbox", { name: /your reply/i });
+    expect(box).toHaveAccessibleDescription("Can I stop my blood pressure pills?");
+
+    await userEvent.type(box, "Keep taking them until Wednesday.");
+    await userEvent.click(screen.getByRole("button", { name: "Send reply" }));
+
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(box).toHaveValue("Keep taking them until Wednesday.");
   });
 });

@@ -108,3 +108,24 @@ async def test_s3_round_trip(s3_storage):
     await s3_storage.delete(key)
     with pytest.raises(StorageError):
         await s3_storage.get(key)
+
+
+async def test_links_for_the_browser_are_signed_for_the_public_endpoint():
+    """Inside compose the services reach the store as s3:8333; the browser cannot, so its links name the published port."""
+    storage = S3Storage(
+        bucket="nafas",
+        endpoint_url="http://s3:8333",
+        region="us-east-1",
+        access_key="key",
+        secret_key="secret",
+        public_endpoint_url="http://localhost:8333",
+    )
+    internal = S3Storage(bucket="nafas", endpoint_url="http://s3:8333", region="us-east-1", access_key="k", secret_key="s")
+
+    get = await storage.presigned_get_url("doctor/a/b.pdf")
+    put = await storage.presigned_put_url("doctor/a/b.pdf", "application/pdf")
+
+    assert get.startswith("http://localhost:8333/nafas/doctor/a/b.pdf?")
+    assert put.startswith("http://localhost:8333/nafas/doctor/a/b.pdf?")
+    # without a public endpoint, links are made as before
+    assert (await internal.presigned_get_url("x")).startswith("http://s3:8333/")

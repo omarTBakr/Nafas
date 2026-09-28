@@ -25,6 +25,14 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
+/** A streamed reply as the gateway sends it: the text in pieces, then the whole reply. */
+function sse(reply: { text: string } & Record<string, unknown>, pieces = reply.text.split(/(?<= )/)) {
+  const body =
+    pieces.map((piece) => `event: delta\ndata: ${JSON.stringify({ text: piece })}\n\n`).join("") +
+    `event: done\ndata: ${JSON.stringify(reply)}\n\n`;
+  return new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
+}
+
 function renderChat(onBookingChange = vi.fn()) {
   localStorage.setItem("nafas.lang", "en");
   render(
@@ -48,8 +56,8 @@ describe("the chat panel", () => {
       vi.fn(async (url: string, init?: RequestInit) => {
         calls.push(`${init?.method ?? "GET"} ${url}`);
         if (url === "/api/me/consents") return json(CONSENTED);
-        if (url === "/api/chat/d1/messages" && init?.method === "POST")
-          return json({
+        if (url === "/api/chat/d1/messages/stream" && init?.method === "POST")
+          return sse({
             conversation_id: "c1",
             message_id: "m2",
             text: "I held Wednesday 5:40 pm for you. Shall I confirm?",
@@ -80,6 +88,83 @@ describe("the chat panel", () => {
 
     await waitFor(() => expect(screen.getByText("Confirmed", { selector: "span.badge" })).toBeInTheDocument());
     expect(calls).toContain("POST /api/appointments/a1/confirm");
+  });
+
+  it("brings back the Confirm card of a hold made in chat after a reload", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === "/api/me/consents") return json(CONSENTED);
+        if (url === "/api/appointments/mine")
+          return json([HELD, { ...HELD, appointment_id: "other-doctor", doctor_id: "d2" }, { ...HELD, appointment_id: "a0", status: "confirmed" }]);
+        if (url === "/api/chat/d1/messages")
+          return json([
+            { message_id: "m1", role: "patient", content: "Wednesday 5:40", audio_key: null },
+            { message_id: "m2", role: "assistant", content: "I held Wednesday 5:40 pm for you.", audio_key: null },
+          ]);
+        return json({}, 404);
+      }),
+    );
+    renderChat();
+
+    expect(await screen.findByText("I held Wednesday 5:40 pm for you.")).toBeInTheDocument();
+    // only this doctor's live hold: not another doctor's, not a confirmed one
+    expect(await screen.findAllByRole("button", { name: "Confirm booking" })).toHaveLength(1);
+    expect(screen.getByText(/17:40/)).toBeInTheDocument();
+  });
+
+  it("does not show a hold twice when the reply already carries its card", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/api/me/consents") return json(CONSENTED);
+        if (url === "/api/appointments/mine") return json([HELD]);
+        if (url === "/api/chat/d1/messages/stream" && init?.method === "POST")
+          return sse({
+            conversation_id: "c1",
+            message_id: "m2",
+            text: "Held.",
+            actions: [{ type: "hold", appointment: HELD }],
+            intent: "booking",
+            patient_text: "Wednesday 5:40",
+            audio_key: null,
+          });
+        if (url === "/api/chat/d1/messages") return json([]);
+        return json({}, 404);
+      }),
+    );
+    renderChat();
+
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Confirm booking" })).toHaveLength(1));
+    await userEvent.type(screen.getByLabelText("Type your message"), "Wednesday 5:40");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("Held.")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Confirm booking" })).toHaveLength(1);
+  });
+
+  it("shows the reply as it streams, then keeps only the finished one", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === "/api/me/consents") return json(CONSENTED);
+        if (url === "/api/chat/d1/messages/stream" && init?.method === "POST")
+          // what streamed and what was stored differ: the stored reply wins
+          return sse(
+            { conversation_id: "c1", message_id: "m9", text: "Sorry, something went wrong.", actions: [], intent: "booking", patient_text: "hi", audio_key: null },
+            ["Let me ", "check that"],
+          );
+        return json([]);
+      }),
+    );
+    renderChat();
+
+    await userEvent.type(await screen.findByLabelText("Type your message"), "hi");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByText("Sorry, something went wrong.")).toBeInTheDocument();
+    expect(screen.queryByText("Let me check that")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Sorry, something went wrong.")).toHaveLength(1);
   });
 
   it("keeps the draft and says so when the assistant cannot answer", async () => {
@@ -128,9 +213,9 @@ describe("voice notes", () => {
       "fetch",
       vi.fn(async (url: string, init?: RequestInit) => {
         if (url === "/api/me/consents") return json(CONSENTED);
-        if (url === "/api/chat/d1/voice") {
+        if (url === "/api/chat/d1/voice/stream") {
           sent.push(init?.body as FormData);
-          return json({
+          return sse({
             conversation_id: "c1",
             message_id: "reply-1",
             text: "العيادة في المعادي",
@@ -215,5 +300,30 @@ describe("consent", () => {
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Helpful" })).toHaveAttribute("aria-pressed", "true"));
     expect(puts).toEqual([["/api/chat/d1/messages/m2/feedback", { rating: "up" }]]);
+  });
+});
+
+describe("markdown replies", () => {
+  it("renders what the model formats, and never raw HTML from it", async () => {
+    const { default: Markdown } = await import("../../Markdown");
+
+    const { container } = render(
+      <Markdown text={"You have **two** appointments:\n\n* **Wednesday** at 17:00\n* Saturday at 11:40\n\n<img src=x onerror=alert(1)>"} />,
+    );
+
+    expect(container.querySelector("strong")?.textContent).toBe("two");
+    expect(container.querySelectorAll("li")).toHaveLength(2);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.textContent).not.toContain("**");
+  });
+
+  it("opens links in a new tab without handing it this page", async () => {
+    const { default: Markdown } = await import("../../Markdown");
+
+    const { container } = render(<Markdown text={"See [the heart foundation](https://example.org)."} />);
+
+    const link = container.querySelector("a")!;
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
   });
 });

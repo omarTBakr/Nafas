@@ -24,6 +24,7 @@ from nafas_gateway.routes import (
     directory,
     doctor,
     notifications,
+    patient_visits,
     profile,
     records,
     visits,
@@ -50,6 +51,7 @@ app.include_router(records.router)
 app.include_router(consultations.router)
 app.include_router(visits.router)
 app.include_router(dashboard.router)
+app.include_router(patient_visits.router)
 app.include_router(assistant.router)
 
 

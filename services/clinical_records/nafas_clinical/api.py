@@ -36,6 +36,8 @@ class NewDocument(BaseModel):
     filename: str = Field(min_length=1, max_length=255)
     mime: str
     size_bytes: int = Field(gt=0)
+    # the visit it was brought to, when uploaded from that visit's page
+    appointment_id: uuid.UUID | None = None
 
 
 class DocumentOut(BaseModel):
@@ -53,6 +55,7 @@ class DocumentOut(BaseModel):
     # labelled wherever it is shown: a model's description, never a read
     ai_description: str | None
     ai_label: str = vision.LABEL
+    appointment_id: uuid.UUID | None = None
     created_at: datetime
 
 
@@ -69,6 +72,8 @@ class NewEntry(BaseModel):
     source_id: uuid.UUID | None = None
     # named by a caller that may retry (a workflow): the same id gives back the same entry
     entry_id: uuid.UUID | None = None
+    # the visit it was written in, when written from that visit's page
+    appointment_id: uuid.UUID | None = None
 
 
 class EntryOut(BaseModel):
@@ -80,6 +85,7 @@ class EntryOut(BaseModel):
     source_type: str | None
     source_id: uuid.UUID | None = None
     structured: dict = Field(default_factory=dict)
+    appointment_id: uuid.UUID | None = None
     occurred_at: datetime
 
 
@@ -119,6 +125,7 @@ def _document(d) -> DocumentOut:
         error=d.error,
         visibility=d.visibility,
         ai_description=d.ai_description,
+        appointment_id=d.appointment_id,
         created_at=d.created_at,
     )
 
@@ -133,6 +140,7 @@ def _entry(e) -> EntryOut:
         source_type=e.source_type,
         source_id=e.source_id,
         structured=e.structured or {},
+        appointment_id=e.appointment_id,
         occurred_at=e.occurred_at,
     )
 
@@ -174,6 +182,7 @@ async def new_document(doctor_id: uuid.UUID, patient_id: uuid.UUID, body: NewDoc
                 mime=body.mime,
                 size_bytes=body.size_bytes,
                 uploaded_by=doctor_id,
+                appointment_id=body.appointment_id,
             )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -244,6 +253,7 @@ async def add_entry(doctor_id: uuid.UUID, patient_id: uuid.UUID, body: NewEntry)
             source_id=body.source_id,
             created_by=body.author_id,
             entry_id=body.entry_id,
+            appointment_id=body.appointment_id,
         )
         if not new:
             return _entry(entry)

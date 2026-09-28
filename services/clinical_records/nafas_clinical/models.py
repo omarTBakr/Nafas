@@ -31,7 +31,11 @@ class HistoryEntry(Base):
     """One fact in a patient's record with a doctor: a note, a visit summary, a medication, an allergy."""
 
     __tablename__ = "history_entries"
-    __table_args__ = (Index("ix_history_patient_doctor_occurred", "patient_id", "doctor_id", "occurred_at"), {"schema": SCHEMA})
+    __table_args__ = (
+        Index("ix_history_patient_doctor_occurred", "patient_id", "doctor_id", "occurred_at"),
+        Index("ix_history_entries_appointment", "appointment_id"),
+        {"schema": SCHEMA},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     patient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
@@ -42,6 +46,8 @@ class HistoryEntry(Base):
     # where it came from: a consultation's approved summary, a document, the doctor by hand
     source_type: Mapped[str | None] = mapped_column(String(32))
     source_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # the visit it was written in, when the doctor wrote it from that visit's page
+    appointment_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     visibility: Mapped[Visibility] = _visibility()
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -52,7 +58,11 @@ class Document(Base):
     """An uploaded report, scan or image, and what was read from it."""
 
     __tablename__ = "documents"
-    __table_args__ = (Index("ix_documents_patient_doctor_created", "patient_id", "doctor_id", "created_at"), {"schema": SCHEMA})
+    __table_args__ = (
+        Index("ix_documents_patient_doctor_created", "patient_id", "doctor_id", "created_at"),
+        Index("ix_documents_appointment", "appointment_id"),
+        {"schema": SCHEMA},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     patient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
@@ -73,6 +83,8 @@ class Document(Base):
     error: Mapped[str | None] = mapped_column(Text)
     visibility: Mapped[Visibility] = _visibility()
     uploaded_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    # the visit it was brought to, when uploaded from that visit's page
+    appointment_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, server_default=func.now())
 
 

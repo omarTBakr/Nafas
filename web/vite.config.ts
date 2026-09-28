@@ -17,5 +17,11 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test-setup.ts"],
+    // Worker threads, not forked processes: on a slow disk (this project lives
+    // on a USB drive) a forked worker loading jsdom could miss Vitest's start
+    // deadline, and whole test files failed as "no tests" without running.
+    pool: "threads",
+    // and a few at a time rather than one per core, for the same reason
+    maxWorkers: 4,
   },
 });

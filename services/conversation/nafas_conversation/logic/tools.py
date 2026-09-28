@@ -47,7 +47,20 @@ class SchedulingTools:
         result["free_slots"] = [await self._local(s) for s in result["free_slots"]]
         return result
 
+    async def as_clinic_time(self, start: str) -> str:
+        """
+        The start the model typed, read as clinic wall-clock time.
+
+        Every time the model is shown is already in clinic time, so the clock
+        reading is what the patient agreed to. The offset is the part a model
+        gets wrong when it copies a timestamp back (gemma turned +03:00 into
+        +02:00, which is an hour later in Cairo), so it is dropped, never trusted.
+        """
+        wall = datetime.fromisoformat(start).replace(tzinfo=None)
+        return wall.replace(tzinfo=await self._clinic_zone()).isoformat()
+
     async def hold(self, start: str, reason_for_visit: str | None) -> dict:
+        start = await self.as_clinic_time(start)
         body = {"patient_id": str(self._patient_id), "start": start, "mode": "in_person", "reason_for_visit": reason_for_visit}
         return await self._local(await self._scheduling.hold(self._doctor_id, body))
 

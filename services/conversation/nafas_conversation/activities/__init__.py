@@ -30,7 +30,7 @@ from nafas_conversation.schemas import (
     TurnResult,
     escalation_workflow_id,
 )
-from nafas_core import audit
+from nafas_core import audit, streams
 from nafas_core.clients.identity import IdentityClient
 from nafas_core.clients.scheduling import SchedulingClient
 from nafas_core.interfaces.llm import LLM
@@ -92,6 +92,14 @@ class ConversationActivities:
             detail={"messages": len(stored), "models": [self._models.classifier, self._models.chat]},
         )
         history = messages.model_history(stored)
+
+        on_text = None
+        if request.stream_id:
+            stream_id = request.stream_id
+
+            async def on_text(piece: str) -> None:
+                await streams.publish(stream_id, {"type": "delta", "text": piece})
+
         turn = await answer_turn(
             self._llm,
             self._identity,
@@ -102,6 +110,7 @@ class ConversationActivities:
             models=self._models,
             now=datetime.now(UTC),
             context=self._context,
+            on_text=on_text,
         )
         reply = turn.reply
         return TurnResult(

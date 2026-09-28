@@ -4,6 +4,7 @@ real Temporal, the real conversation activities with a scripted model, and
 the real identity and scheduling services over the database.
 """
 
+import json
 from datetime import time
 
 import pytest
@@ -40,7 +41,7 @@ def conversation(doctor_id, temporal, task_queue):
     def run(llm, voice=None):
         activities = ConversationActivities(llm, get_identity(), get_scheduling(), Models("chat", "classifier"), voice)
 
-        async def sender(*, patient_id, doctor_id, text, audio_key, audio_mime):
+        async def sender(*, patient_id, doctor_id, text, audio_key, audio_mime, stream_id=None):
             return await send_patient_message(
                 temporal,
                 patient_id=patient_id,
@@ -48,6 +49,7 @@ def conversation(doctor_id, temporal, task_queue):
                 text=text,
                 audio_key=audio_key,
                 audio_mime=audio_mime,
+                stream_id=stream_id,
                 task_queue=task_queue,
             )
 
@@ -91,6 +93,62 @@ async def test_a_time_held_in_chat_is_confirmed_with_the_slot_picker(doctor_id, 
         ("patient", "عايز الأربعاء ٥:٤٠"),
         ("assistant", "حجزتلك الأربعاء الساعة ٥:٤٠. تأكد؟"),
     ]
+
+
+def server_sent_events(body: str) -> list[tuple[str, dict]]:
+    events = []
+    for block in body.strip().split("\n\n"):
+        lines = dict(line.split(": ", 1) for line in block.splitlines())
+        events.append((lines["event"], json.loads(lines["data"])))
+    return events
+
+
+async def test_a_booking_reply_streams_as_it_is_written_then_arrives_whole(doctor_id, conversation):
+    """
+    The whole path: the gateway listens, the workflow runs the turn in its
+    activity, the agent streams the model, and the pieces come back over
+    Postgres NOTIFY before the complete reply closes the stream.
+    """
+    reply_text = "عندك ميعاد واحد بس. تحب أحجزلك ميعاد تاني؟"
+    llm = FakeLLM([classified("booking"), tool_use_message("my_appointments", {}), reply_text])
+
+    async with conversation(llm), browser() as sara:
+        await sign_up(sara)
+        await consent_to_chat(sara, doctor_id)
+        response = await sara.post(f"/api/chat/{doctor_id}/messages/stream", json={"text": "مواعيدي ايه؟"})
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    events = server_sent_events(response.text)
+    deltas = [data["text"] for name, data in events if name == "delta"]
+    assert len(deltas) > 1, "the reply should arrive in pieces"
+    assert "".join(deltas) == reply_text
+    name, done = events[-1]
+    assert name == "done" and done["text"] == reply_text and done["intent"] == "booking"
+
+
+async def test_a_streamed_medical_answer_is_never_shown_before_its_guard(doctor_id, conversation):
+    """Medical answers pass the output guard first: nothing of them streams, the reply arrives whole."""
+    from nafas_conversation.prompts import safety as safety_prompt
+
+    answer = "Salt matters: less than a teaspoon a day helps most people's blood pressure."
+    llm = FakeLLM(
+        [
+            classified("medical"),
+            tool_use_message(safety_prompt.SCOPE_TOOL["name"], {"verdict": "in_scope"}),
+            tool_use_message(safety_prompt.SENSITIVITY_TOOL["name"], {"sensitive": False, "category": "general"}),
+            answer,
+            tool_use_message(safety_prompt.GUARD_TOOL["name"], {"verdict": "pass"}),
+        ]
+    )
+
+    async with conversation(llm), browser() as sara:
+        await sign_up(sara)
+        await consent_to_chat(sara, doctor_id)
+        response = await sara.post(f"/api/chat/{doctor_id}/messages/stream", json={"text": "does salt matter?"})
+
+    events = server_sent_events(response.text)
+    assert [name for name, _ in events] == ["done"]
 
 
 async def test_chat_is_for_patients_and_known_doctors(doctor_id, conversation):
