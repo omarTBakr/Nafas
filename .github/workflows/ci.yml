@@ -26,6 +26,12 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 20
+      # the email tests send through it
+      mailpit:
+        image: axllent/mailpit@sha256:74d609a42ec279aa63c6b4622a6fa9b5408d1ad5b1d76a1c4be40a265ce0863d
+        ports:
+          - 1025:1025
+          - 8025:8025
 
     steps:
       - uses: actions/checkout@v4
@@ -50,6 +56,17 @@ jobs:
       # scanned pages and images are read by OCR in clinical-records' tests
       - name: Install tesseract
         run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-ara
+
+      # the storage tests need an S3; SeaweedFS as in docker-compose (a service
+      # container cannot be given its command, so it is started here)
+      - name: Start S3
+        run: |
+          docker run -d --name s3 -p 8333:8333 \
+            -v "$PWD/deploy/seaweedfs/s3.json:/etc/seaweedfs/s3.json:ro" \
+            chrislusf/seaweedfs@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882 \
+            server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -ip.bind=0.0.0.0
+          for i in $(seq 1 60); do curl -s -o /dev/null http://localhost:8333 && exit 0; sleep 2; done
+          docker logs s3; exit 1
 
       - name: Run tests
         # the database and workflow tests must run here, never skip
