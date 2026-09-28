@@ -205,6 +205,15 @@ label:has(> input[type="checkbox"]), label:has(> input[type="radio"]) {
 .consent input { margin-block-start: 5px; }
 .urgent { border-inline-start: 4px solid var(--danger); }
 .question { white-space: pre-wrap; margin: 0; }
+/* a button that is only an icon (its name is in aria-label), and one with an icon beside its words */
+.icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 40px; }
+.icon-text { display: inline-flex; align-items: center; gap: 6px; }
+.bubble .icon-button { min-width: 0; padding: 4px; margin-block-start: 4px; color: var(--muted); }
+.bubble .icon-button:hover, .bubble .icon-button[aria-pressed="true"] { color: var(--primary); }
+.voice-settings { flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.voice-settings select { width: auto; }
+.voice-settings .consent { align-items: center; }
+.voice-settings .consent input { margin-block-start: 0; }
 
 /* doctor portal */
 .patient-page { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 380px); gap: 16px; align-items: start; }
