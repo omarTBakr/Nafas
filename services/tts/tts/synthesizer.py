@@ -24,6 +24,22 @@ LAHGTNA_LANGUAGES = {
 }
 
 
+def register_dialects() -> None:
+    """
+    Teaches the omnivoice library the Lahgtna dialect names. The fine-tunes
+    were trained with each dialect's code in the prompt's language slot
+    (Lahgtna's own fork of the library maps "egyptian lahgtna" to "eg"); the
+    library on PyPI does not know the names, and would drop them and speak
+    with no dialect at all. Idempotent.
+    """
+    from omnivoice.utils import lang_map
+
+    for code, name in LAHGTNA_LANGUAGES.items():
+        lang_map.LANG_NAME_TO_ID[name] = code
+        lang_map.LANG_NAMES.add(name)
+        lang_map.LANG_IDS.add(code)
+
+
 @dataclass
 class Speech:
     samples: np.ndarray
@@ -62,6 +78,7 @@ class OmniVoiceSynthesizer:
         import torch
 
         self.device = ("cuda" if torch.cuda.is_available() else "cpu") if settings.device == "auto" else settings.device
+        register_dialects()
         self._settings = settings
         self._model = _load(settings.model_dir, settings.model_id, settings.model_revision, self.device)
         self._egyptian = (

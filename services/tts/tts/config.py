@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     model_id: str
     model_revision: str
     model_dir: str
+    audio_tokenizer_id: str
+    audio_tokenizer_revision: str
     egyptian_model_id: str
     egyptian_model_revision: str
     egyptian_model_dir: str

@@ -508,6 +508,12 @@ export const api = {
     form.append("audio", audio, "voice-note");
     return call<ChatReply>("POST", `/api/chat/${doctorId}/voice`, form);
   },
+  /** The doctor's dictated question as text, to read over before asking; the recording is not kept. */
+  transcribeDictation: (audio: Blob) => {
+    const form = new FormData();
+    form.append("audio", audio, "dictation");
+    return call<{ text: string; language: string | null }>("POST", "/api/doctor/transcribe", form);
+  },
   chatSendStreamed: (doctorId: string, text: string, onDelta: (text: string) => void) =>
     streamReply(`/api/chat/${doctorId}/messages/stream`, { text }, onDelta),
   chatVoiceStreamed: (doctorId: string, audio: Blob, onDelta: (text: string) => void) => {

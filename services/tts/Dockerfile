@@ -20,14 +20,17 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --extra model --no-install-project
 
-COPY tts ./tts
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --extra model --no-editable
-
-# bake the pinned weights in; the running container never reaches the Hub
+# bake the pinned weights in; the running container never reaches the Hub.
+# Only what the download reads is copied first, so a change to the service's
+# code does not fetch gigabytes of weights again.
+COPY tts/__init__.py tts/config.py tts/download.py tts/model.toml ./tts/
 RUN python -m tts.download
 ENV HF_HUB_OFFLINE=1 \
     TRANSFORMERS_OFFLINE=1
+
+COPY tts ./tts
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --extra model --no-editable
 
 RUN useradd --system --uid 10001 app
 USER app

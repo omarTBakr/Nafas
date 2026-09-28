@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api, ApiError, type Appointment, type ChatAction, type ChatMessage, type ChatReply } from "../../api";
 import { useI18n } from "../../i18n";
+import { MicIcon, StopIcon } from "../../icons";
 import Markdown from "../../Markdown";
 import { recorderType } from "../../recorder";
 import { clinicClock, clinicDay } from "../../time";
@@ -324,12 +325,20 @@ export default function Chat({
         />
         <button disabled={typing || recording || !draft.trim()}>{t("send")}</button>
         {recording ? (
-          <button type="button" className="danger" onClick={stopRecording} aria-live="polite">
+          <button type="button" className="danger icon-text" onClick={stopRecording} aria-live="polite">
+            <StopIcon />
             {t("stopRecording")}
           </button>
         ) : (
-          <button type="button" className="secondary" onClick={startRecording} disabled={typing} aria-label={t("record")}>
-            🎙
+          <button
+            type="button"
+            className="secondary icon-button"
+            onClick={startRecording}
+            disabled={typing}
+            aria-label={t("record")}
+            title={t("record")}
+          >
+            <MicIcon />
           </button>
         )}
       </form>

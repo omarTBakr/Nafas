@@ -81,3 +81,22 @@ def test_samples_outside_the_range_are_clipped_not_wrapped():
     with wave.open(io.BytesIO(wav)) as heard:
         frames = np.frombuffer(heard.readframes(3), dtype="<i2")
     assert list(frames) == [32767, -32767, 0]
+
+
+def test_the_model_speaks_through_a_pinned_audio_tokenizer_baked_beside_it():
+    settings = Settings()
+
+    assert settings.audio_tokenizer_id == "eustlb/higgs-audio-v2-tokenizer"
+    assert len(settings.audio_tokenizer_revision) == 40
+
+
+def test_the_library_is_taught_every_dialect_name_the_models_were_trained_with():
+    lang_map = pytest.importorskip("omnivoice.utils.lang_map")
+    from tts.synthesizer import register_dialects
+
+    register_dialects()
+    register_dialects()
+
+    for code, name in LAHGTNA_LANGUAGES.items():
+        assert lang_map.LANG_NAME_TO_ID[name] == code
+        assert name in lang_map.LANG_NAMES and code in lang_map.LANG_IDS
