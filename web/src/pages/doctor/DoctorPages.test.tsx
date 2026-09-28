@@ -184,7 +184,7 @@ describe("a patient's file", () => {
   it("names each reply box by its question, and keeps the answer when it fails to send", async () => {
     const { default: PatientPage } = await import("./Patient");
     stubFetch({
-      "GET /api/doctor/patients/p1/timeline": () => ({
+      "GET /api/doctor/patients/p1/visits": () => ({
         patient: {
           patient_id: "p1",
           full_name: "Sara",
@@ -195,10 +195,10 @@ describe("a patient's file", () => {
           first_seen_at: "2026-09-26T00:00:00Z",
         },
         timezone: "Africa/Cairo",
-        items: [
+        sessions: [],
+        general: { notes: [], documents: [] },
+        questions: [
           {
-            type: "escalation",
-            at: "2026-09-28T06:43:00Z",
             escalation_id: "e1",
             patient_id: "p1",
             patient_name: "Sara",

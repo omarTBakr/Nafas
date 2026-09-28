@@ -1,313 +1,131 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useCallback, useEffect, useState } from "react";
+import { Link, useLocation, useParams } from "react-router-dom";
 
-import { api, type Timeline, type TimelineItem, uploadDocument, type Visibility, type Visits } from "../../api";
-import { type Key, useI18n } from "../../i18n";
-import { clinicClock, clinicDay } from "../../time";
+import { api, type HistoryRecord, type PatientSessions, type Session, type Timeline, type TimelineItem } from "../../api";
+import { useI18n } from "../../i18n";
 import Assistant from "./Assistant";
-import RecordVisit from "./RecordVisit";
+import { AddMenu, Item, itemId, reading, Reply, SessionCard } from "./sessions";
 
-const KINDS = ["report", "lab", "xray", "ct", "mri", "ultrasound", "prescription", "other"];
+type Tab = "sessions" | "timeline";
+const TAB_KEY = "nafas.patientTab";
 
-function Sharing({ item, onChange }: { item: TimelineItem & { visibility: Visibility }; onChange: () => void }) {
-  const { t } = useI18n();
-  const shared = item.visibility === "patient_visible";
-  const [sourceType, id] = item.type === "document" ? (["document", item.document_id] as const) : (["history", (item as { entry_id: string }).entry_id] as const);
-  return (
-    <div className="row">
-      <span className={`badge ${shared ? "confirmed" : "held"}`}>{shared ? t("shared") : t("doctorOnly")}</span>
-      <button
-        className="link"
-        onClick={async () => {
-          await api.setVisibility(sourceType, id, shared ? "doctor_only" : "patient_visible");
-          onChange();
-        }}
-      >
-        {shared ? t("unshare") : t("share")}
-      </button>
-    </div>
-  );
+function savedTab(): Tab {
+  try {
+    return localStorage.getItem(TAB_KEY) === "timeline" ? "timeline" : "sessions";
+  } catch {
+    return "sessions";
+  }
 }
 
-function Reply({ escalationId, questionId, onDone }: { escalationId: string; questionId: string; onDone: () => void }) {
-  const { t } = useI18n();
-  const [reply, setReply] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
-  return (
-    <form
-      className="stack"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setBusy(true);
-        setFailed(false);
-        try {
-          await api.replyToEscalation(escalationId, reply.trim());
-          onDone();
-        } catch {
-          // the answer did not reach the patient: say so, and keep what was written
-          setFailed(true);
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      <label>
-        {t("yourReply")}
-        {/* several questions share this label on one page: say which one this answers */}
-        <textarea value={reply} onChange={(e) => setReply(e.target.value)} maxLength={4000} aria-describedby={questionId} />
-      </label>
-      <div>
-        <button disabled={busy || !reply.trim()}>{t("sendReply")}</button>
-      </div>
-      {failed && (
-        <p className="notice error" role="alert">
-          {t("error")}
-        </p>
-      )}
-    </form>
+/** The session opened on arrival: the one the link names, else the latest one that took place and has something in it. */
+function openedFirst(sessions: Session[], hash: string): string | null {
+  const named = hash.startsWith("#session-") ? hash.slice("#session-".length) : null;
+  if (named && sessions.some((s) => s.appointment.appointment_id === named)) return named;
+  const now = Date.now();
+  const latest = sessions.find(
+    (s) => new Date(s.appointment.start).getTime() <= now && s.counts.recordings + s.counts.documents + s.counts.notes > 0,
   );
+  return latest?.appointment.appointment_id ?? null;
 }
 
-export function Item({ item, tz, reload }: { item: TimelineItem; tz: string; reload: () => void }) {
-  const { t, locale } = useI18n();
-  const when = `${clinicDay(item.at, tz, locale)} · ${clinicClock(item.at, tz, locale)}`;
+function Questions({ file, reload }: { file: PatientSessions; reload: () => void }) {
+  const { t } = useI18n();
+  if (file.questions.length === 0) return null;
   return (
-    <article className={`card stack timeline-item ${item.type}`}>
-      <div className="row spread">
-        <strong>{item.type === "history" ? t(`kind_${item.kind}` as Key) : t(`item_${item.type}`)}</strong>
-        <span className="muted small">{when}</span>
-      </div>
-      {item.type === "appointment" && (
-        <div className="row">
-          <span className={`badge ${item.status}`}>{t(`status_${item.status}`)}</span>
-          {item.reason_for_visit && <span className="muted">{item.reason_for_visit}</span>}
-        </div>
-      )}
-      {item.type === "history" && item.kind === "visit_transcript" && (
-        <details>
-          <summary>{t("transcript")}</summary>
-          <p className="question transcript-text" dir="auto">
-            {item.content}
+    <section className="card stack questions-panel" aria-label={t("openQuestions")}>
+      <h2>{t("openQuestions")}</h2>
+      {file.questions.map((q) => (
+        <div key={q.escalation_id} className="stack">
+          <p className="question" id={`question-${q.escalation_id}`} dir="auto">
+            {q.question}
           </p>
-        </details>
-      )}
-      {item.type === "history" && item.kind !== "visit_transcript" && (
-        <>
-          <p className="question" dir="auto">{item.content}</p>
-          <Sharing item={item} onChange={reload} />
-        </>
-      )}
-      {item.type === "document" && (
-        <>
-          <div className="row spread">
-            <span>{item.filename}</span>
-            <span className={`badge ${item.status === "failed" ? "cancelled" : item.status === "indexed" ? "confirmed" : "held"}`}>
-              {t(`doc_${item.status}`)}
-            </span>
-          </div>
-          {item.error && <span className="notice error small">{item.error}</span>}
-          {item.ai_description && (
-            <p className="muted small">
-              <em>{item.ai_label}:</em> {item.ai_description}
-            </p>
-          )}
-          <div className="row">
-            <button
-              className="link"
-              onClick={async () => {
-                const { url } = await api.documentLink(item.document_id);
-                window.open(url, "_blank", "noopener");
-              }}
-            >
-              {t("open")}
-            </button>
-            <Sharing item={item} onChange={reload} />
-          </div>
-        </>
-      )}
-      {item.type === "consultation" && (
-        <div className="row spread">
-          <span className={`badge ${item.status}`}>{t(`consultation_${item.status}` as Key)}</span>
-          <Link to={`/doctor/consultations/${item.consultation_id}`}>{item.status === "draft_ready" ? t("reviewNote") : t("open")}</Link>
+          <span className={`badge ${q.reason === "emergency" ? "cancelled" : "held"}`}>{t(`escalation_${q.reason}`)}</span>
+          <Reply escalationId={q.escalation_id} questionId={`question-${q.escalation_id}`} onDone={reload} />
         </div>
-      )}
-      {item.type === "escalation" && (
-        <>
-          <p className="question" id={`question-${item.escalation_id}`}>
-            {item.question}
-          </p>
-          <span className={`badge ${item.reason === "emergency" ? "cancelled" : "held"}`}>{t(`escalation_${item.reason}`)}</span>
-          {item.status === "open" ? <Reply escalationId={item.escalation_id} questionId={`question-${item.escalation_id}`} onDone={reload} /> : item.doctor_reply && <p className="notice ok">{item.doctor_reply}</p>}
-        </>
-      )}
-    </article>
-  );
-}
-
-export function itemId(item: TimelineItem): string {
-  if ("document_id" in item) return item.document_id;
-  if ("entry_id" in item) return item.entry_id;
-  if ("consultation_id" in item) return item.consultation_id;
-  return "";
-}
-
-/** A note in the patient's record; filed under a visit when written from its page. */
-export function NoteForm({
-  patientId,
-  appointmentId = null,
-  onAdded,
-}: {
-  patientId: string;
-  appointmentId?: string | null;
-  onAdded: () => void;
-}) {
-  const { t } = useI18n();
-  const [note, setNote] = useState("");
-  const [shared, setShared] = useState(false);
-  return (
-    <form
-      className="card stack"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        await api.addNote(patientId, note.trim(), shared ? "patient_visible" : "doctor_only", "note", appointmentId);
-        setNote("");
-        onAdded();
-      }}
-    >
-      <label>
-        {t("addNote")}
-        <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={20000} />
-      </label>
-      <div className="row spread">
-        <label className="consent">
-          <input type="checkbox" checked={shared} onChange={(e) => setShared(e.target.checked)} />
-          <span>{t("shareWithPatient")}</span>
-        </label>
-        <button disabled={!note.trim()}>{t("addNote")}</button>
-      </div>
-    </form>
-  );
-}
-
-/** An upload to the patient's record; filed under a visit when made from its page. */
-export function UploadForm({
-  patientId,
-  appointmentId = null,
-  onDone,
-}: {
-  patientId: string;
-  appointmentId?: string | null;
-  onDone: () => void;
-}) {
-  const { t } = useI18n();
-  const [kind, setKind] = useState("report");
-  const [uploading, setUploading] = useState(false);
-  const file = useRef<HTMLInputElement>(null);
-  return (
-    <div className="card row">
-      <label style={{ flex: "1 1 200px" }}>
-        {t("chooseFile")}
-        <input ref={file} type="file" accept="application/pdf,image/png,image/jpeg,image/webp,image/tiff,text/plain" />
-      </label>
-      <select value={kind} onChange={(e) => setKind(e.target.value)} aria-label="kind" style={{ alignSelf: "end" }}>
-        {KINDS.map((k) => (
-          <option key={k} value={k}>
-            {k}
-          </option>
-        ))}
-      </select>
-      <button
-        className="secondary"
-        style={{ alignSelf: "end" }}
-        disabled={uploading}
-        onClick={async () => {
-          const chosen = file.current?.files?.[0];
-          if (!chosen) return;
-          setUploading(true);
-          try {
-            await uploadDocument(patientId, chosen, kind, appointmentId);
-            if (file.current) file.current.value = "";
-          } finally {
-            setUploading(false);
-            onDone();
-          }
-        }}
-      >
-        {uploading ? t("uploading") : t("upload")}
-      </button>
-    </div>
-  );
-}
-
-/** The patient's visits, newest first; each opens on its own page. */
-function VisitList({ patientId, visits }: { patientId: string; visits: Visits | null }) {
-  const { t, locale } = useI18n();
-  if (!visits) return null;
-  return (
-    <section className="stack" aria-label={t("visits")}>
-      <h2>{t("visits")}</h2>
-      {visits.visits.length === 0 && <p className="muted">{t("noVisits")}</p>}
-      <ul className="visit-list">
-        {visits.visits.map((v) => (
-          <li key={v.appointment_id}>
-            <Link to={`/doctor/patients/${patientId}/visits/${v.appointment_id}`} className="card row spread visit-link">
-              <span className="stack">
-                <span>
-                  {clinicDay(v.start, visits.timezone, locale)} · {clinicClock(v.start, visits.timezone, locale)}
-                </span>
-                {v.reason_for_visit && (
-                  <span className="muted small" dir="auto">
-                    {v.reason_for_visit}
-                  </span>
-                )}
-              </span>
-              <span className="row">
-                <span className={`badge ${v.status}`}>{t(`status_${v.status}`)}</span>
-                <span className="muted small">
-                  {t("visitRecordings")} {v.recordings} · {t("visitNotes")} {v.notes} · {t("visitDocuments")} {v.documents}
-                </span>
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      ))}
     </section>
   );
 }
 
-/** One patient's file: their timeline with this doctor, a note, an upload, what they may see, and the assistant beside it. */
+function General({ patientId, file, reload }: { patientId: string; file: PatientSessions; reload: () => void }) {
+  const { t } = useI18n();
+  const { notes, documents } = file.general;
+  const items: TimelineItem[] = [
+    ...documents.map((d): TimelineItem => ({ type: "document", at: d.created_at, ...d })),
+    ...notes.map((e: HistoryRecord): TimelineItem => ({ type: "history", at: e.occurred_at, ...e })),
+  ];
+  return (
+    <details className="card session" open={file.sessions.length === 0}>
+      <summary>
+        <span className="row spread session-head">
+          <strong>{t("notTiedToSession")}</strong>
+          <span className="muted small">
+            {t("visitDocuments")} {documents.length} · {t("visitNotes")} {notes.length}
+          </span>
+        </span>
+      </summary>
+      <div className="stack session-body">
+        {items.length === 0 && <p className="muted small">{t("nothingFiled")}</p>}
+        {items.map((item) => (
+          <Item key={`${item.type}-${itemId(item)}`} item={item} tz={file.timezone} reload={reload} />
+        ))}
+        <AddMenu patientId={patientId} onChange={reload} />
+      </div>
+    </details>
+  );
+}
+
+/** One patient's file, by session: what needs an answer first, then each visit, then what belongs to none; the assistant beside it. */
 export default function Patient() {
   const { patientId } = useParams<{ patientId: string }>();
+  const { hash } = useLocation();
   const { t } = useI18n();
+  const [file, setFile] = useState<PatientSessions | null>(null);
   const [timeline, setTimeline] = useState<Timeline | null>(null);
+  const [tab, setTab] = useState<Tab>(savedTab);
   const [failed, setFailed] = useState(false);
-  const [visits, setVisits] = useState<Visits | null>(null);
 
   const load = useCallback(() => {
     if (!patientId) return;
     api
-      .timeline(patientId)
-      .then(setTimeline)
-      .catch(() => setFailed(true));
-    api
       .visits(patientId)
-      .then(setVisits)
-      .catch(() => setVisits(null));
+      .then(setFile)
+      .catch(() => setFailed(true));
   }, [patientId]);
 
   useEffect(load, [load]);
 
+  // the full timeline, only once asked for
+  useEffect(() => {
+    if (tab !== "timeline" || !patientId) return;
+    api
+      .timeline(patientId)
+      .then(setTimeline)
+      .catch(() => setFailed(true));
+  }, [tab, patientId, file]);
+
   // a document being read changes status on its own: look again until it settles
   useEffect(() => {
-    const reading = timeline?.items.some((i) => i.type === "document" && ["uploaded", "processing"].includes(i.status));
-    if (!reading) return;
+    if (!file) return;
+    const all = [...file.general.documents, ...file.sessions.flatMap((s) => s.documents)];
+    if (!reading(all)) return;
     const timer = setTimeout(load, 2000);
     return () => clearTimeout(timer);
-  }, [timeline, load]);
+  }, [file, load]);
+
+  function choose(next: Tab) {
+    setTab(next);
+    try {
+      localStorage.setItem(TAB_KEY, next);
+    } catch {
+      // a remembered tab is a convenience; without storage the page still works
+    }
+  }
 
   if (failed) return <p className="notice error">{t("error")}</p>;
-  if (!timeline || !patientId) return <p className="muted">{t("loading")}</p>;
+  if (!file || !patientId) return <p className="muted">{t("loading")}</p>;
+
+  const opened = openedFirst(file.sessions, hash);
 
   return (
     <div className="patient-page">
@@ -316,23 +134,51 @@ export default function Patient() {
           <Link to="/doctor/patients" className="small">
             {t("back")}
           </Link>
-          <h1>{timeline.patient.full_name}</h1>
+          <h1>{file.patient.full_name}</h1>
           <p className="muted small">
-            {timeline.patient.phone ?? ""} {t("clinicTime")} ({timeline.timezone})
+            {file.patient.phone ?? ""} {t("clinicTime")} ({file.timezone})
           </p>
         </header>
 
-        <RecordVisit patientId={patientId} onChange={load} />
+        <Questions file={file} reload={load} />
 
-        <NoteForm patientId={patientId} onAdded={load} />
-        <UploadForm patientId={patientId} onDone={load} />
+        <div className="tabs" role="tablist">
+          {(["sessions", "timeline"] as const).map((name) => (
+            <button
+              key={name}
+              role="tab"
+              aria-selected={tab === name}
+              className={tab === name ? "tab active" : "tab"}
+              onClick={() => choose(name)}
+            >
+              {t(name)}
+            </button>
+          ))}
+        </div>
 
-        <VisitList patientId={patientId} visits={visits} />
-
-        <h2>{t("timeline")}</h2>
-        {timeline.items.map((item) => (
-          <Item key={`${item.type}-${item.at}-${itemId(item)}`} item={item} tz={timeline.timezone} reload={load} />
-        ))}
+        {tab === "sessions" ? (
+          <div className="stack" role="tabpanel" aria-label={t("sessions")}>
+            {file.sessions.length === 0 && <p className="muted">{t("noSessions")}</p>}
+            {file.sessions.map((s) => (
+              <SessionCard
+                key={s.appointment.appointment_id}
+                patientId={patientId}
+                session={s}
+                tz={file.timezone}
+                reload={load}
+                open={s.appointment.appointment_id === opened}
+              />
+            ))}
+            <General patientId={patientId} file={file} reload={load} />
+          </div>
+        ) : (
+          <div className="stack" role="tabpanel" aria-label={t("timeline")}>
+            {!timeline && <p className="muted">{t("loading")}</p>}
+            {timeline?.items.map((item) => (
+              <Item key={`${item.type}-${item.at}-${itemId(item)}`} item={item} tz={timeline.timezone} reload={load} />
+            ))}
+          </div>
+        )}
       </div>
       <aside>
         <Assistant patientId={patientId} />

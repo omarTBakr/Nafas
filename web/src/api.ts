@@ -266,26 +266,30 @@ export interface Timeline {
   items: TimelineItem[];
 }
 
-/** A visit in a patient's file: the appointment, and how much was filed under it. */
-export interface VisitSummary extends Appointment {
-  recordings: number;
-  notes: number;
-  documents: number;
-}
-
-export interface Visits {
-  patient: PatientCard;
-  timezone: string;
-  visits: VisitSummary[];
-}
-
-export interface VisitDetail {
-  patient: PatientCard;
-  timezone: string;
+/** One session (a visit) in a patient's file, and what was filed under it. */
+export interface Session {
   appointment: Appointment;
-  consultations: Consultation[];
-  history: HistoryRecord[];
+  // the approved note, and the plain-language summary the patient was given
+  summary: { note: HistoryRecord | null; patient: HistoryRecord | null };
+  recordings: (Consultation & { transcript: HistoryRecord | null })[];
   documents: DocumentRecord[];
+  notes: HistoryRecord[];
+  counts: { recordings: number; documents: number; notes: number };
+}
+
+/** A patient's file by session, what belongs to none, and the questions still open. */
+export interface PatientSessions {
+  patient: PatientCard;
+  timezone: string;
+  sessions: Session[];
+  general: { notes: HistoryRecord[]; documents: DocumentRecord[] };
+  questions: Escalation[];
+}
+
+export interface SessionDetail {
+  patient: PatientCard;
+  timezone: string;
+  session: Session;
 }
 
 export interface NextPatient {
@@ -537,9 +541,9 @@ export const api = {
       kind,
       appointment_id: appointmentId,
     }),
-  visits: (patientId: string) => call<Visits>("GET", `/api/doctor/patients/${patientId}/visits`),
+  visits: (patientId: string) => call<PatientSessions>("GET", `/api/doctor/patients/${patientId}/visits`),
   visit: (patientId: string, appointmentId: string) =>
-    call<VisitDetail>("GET", `/api/doctor/patients/${patientId}/visits/${appointmentId}`),
+    call<SessionDetail>("GET", `/api/doctor/patients/${patientId}/visits/${appointmentId}`),
   setVisibility: (sourceType: "document" | "history", id: string, visibility: Visibility) =>
     call<void>("PATCH", `/api/doctor/records/${sourceType}/${id}/visibility`, { visibility }),
   documentLink: (documentId: string) => call<{ url: string }>("GET", `/api/doctor/documents/${documentId}/download`),
