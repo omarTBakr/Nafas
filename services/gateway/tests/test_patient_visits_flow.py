@@ -9,6 +9,7 @@ from nafas_consultation.activities import ConsultationActivities
 from nafas_consultation.prompts import soap
 from nafas_consultation.schemas import ConsultationRef
 from nafas_core.clients.clinical import get_clinical
+from nafas_core.clients.conversation import get_conversation
 from nafas_core.clients.identity import get_identity
 from nafas_core.interfaces.llm.fake import FakeLLM, tool_use_message
 from nafas_core.interfaces.stt.fake import FakeSTT
@@ -18,7 +19,14 @@ from .test_consultation_flow import NOTE
 from .test_records_flow import booked
 
 
-async def test_each_visit_holds_what_was_filed_under_it(doctor_id, storage, consultation_events):
+async def test_each_visit_holds_what_was_filed_under_it(doctor_id, storage, consultation_events, monkeypatch):
+    asked = []
+
+    async def open_questions(doctor, statuses=None, patient_id=None):
+        asked.append((statuses, patient_id))
+        return [{"escalation_id": "e1", "status": "open", "question": "Can I stop the pills?"}]
+
+    monkeypatch.setattr(get_conversation(), "escalations", open_questions)
     async with browser() as sara, browser() as omar, browser() as doctor:
         await sign_up(sara)
         patient_id = await booked(sara, doctor_id)
@@ -33,7 +41,7 @@ async def test_each_visit_holds_what_was_filed_under_it(doctor_id, storage, cons
         await doctor.post("/api/auth/login", json={"email": "heart@example.com", "password": DOCTOR_PASSWORD})
 
         listed = (await doctor.get(f"/api/doctor/patients/{patient_id}/visits")).json()
-        first, second = listed["visits"][1]["appointment_id"], listed["visits"][0]["appointment_id"]
+        first, second = (s["appointment"]["appointment_id"] for s in reversed(listed["sessions"]))
 
         # a recording, a note and a document from the first visit's page; one note from the patient's file
         started = await doctor.post(f"/api/doctor/patients/{patient_id}/consultations", json={"appointment_id": first})
@@ -81,17 +89,27 @@ async def test_each_visit_holds_what_was_filed_under_it(doctor_id, storage, cons
         # a patient cannot read the doctor's view of their visits
         own = await sara.get(f"/api/doctor/patients/{patient_id}/visits")
 
-    assert [v["appointment_id"] for v in visits["visits"]] == [second, first]
-    counts = {v["appointment_id"]: (v["recordings"], v["notes"], v["documents"]) for v in visits["visits"]}
-    # the recording's filed note is four entries: summary, diagnosis, medication, transcript; plus the note
-    assert counts == {first: (1, 5, 1), second: (0, 0, 0)}
+    assert [s["appointment"]["appointment_id"] for s in visits["sessions"]] == [second, first]
+    newest, oldest = visits["sessions"]
+    # the recording's note: its SOAP summary, transcript, diagnosis and medication; and the note written there
+    assert oldest["counts"] == {"recordings": 1, "notes": 4, "documents": 1}
+    assert newest["counts"] == {"recordings": 0, "notes": 0, "documents": 0}
+    assert oldest["summary"]["note"]["content"].startswith("Subjective: Chest tightness")
+    assert oldest["summary"]["patient"] is None
+    [recording] = oldest["recordings"]
+    assert recording["consultation_id"] == cid and recording["transcript"]["kind"] == "visit_transcript"
+    assert sorted(e["kind"] for e in oldest["notes"]) == ["diagnosis", "medication", "note"]
+    assert [d["filename"] for d in oldest["documents"]] == ["lipids.pdf"]
+    # what belongs to no visit
+    assert [e["content"] for e in visits["general"]["notes"]] == ["Prefers morning visits."]
+    assert visits["general"]["documents"] == []
+    # only the open questions, only this patient's
+    assert [q["escalation_id"] for q in visits["questions"]] == ["e1"]
+    assert all(statuses == ["open"] and str(pid) == patient_id for statuses, pid in asked)
     assert note.status_code == 201 and upload.status_code == 201
-    assert one["appointment"]["appointment_id"] == first and one["timezone"] == "Africa/Cairo"
-    assert [c["consultation_id"] for c in one["consultations"]] == [cid]
-    assert "Walks 20 minutes a day." in [e["content"] for e in one["history"]]
-    assert "Prefers morning visits." not in [e["content"] for e in one["history"]]
-    assert [d["filename"] for d in one["documents"]] == ["lipids.pdf"]
-    assert two["consultations"] == two["history"] == two["documents"] == []
+    assert one["session"]["appointment"]["appointment_id"] == first and one["timezone"] == "Africa/Cairo"
+    assert one["session"]["counts"] == oldest["counts"]
+    assert two["session"]["recordings"] == two["session"]["notes"] == two["session"]["documents"] == []
     assert crossed.status_code == 404 and misfiled.status_code == 404
     assert unknown.status_code == 404
     assert own.status_code == 403
