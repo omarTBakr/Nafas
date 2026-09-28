@@ -31,7 +31,11 @@ class HistoryEntry(Base):
     """One fact in a patient's record with a doctor: a note, a visit summary, a medication, an allergy."""
 
     __tablename__ = "history_entries"
-    __table_args__ = (Index("ix_history_patient_doctor_occurred", "patient_id", "doctor_id", "occurred_at"), {"schema": SCHEMA})
+    __table_args__ = (
+        Index("ix_history_patient_doctor_occurred", "patient_id", "doctor_id", "occurred_at"),
+        Index("ix_history_entries_appointment", "appointment_id"),
+        {"schema": SCHEMA},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     patient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
@@ -54,7 +58,11 @@ class Document(Base):
     """An uploaded report, scan or image, and what was read from it."""
 
     __tablename__ = "documents"
-    __table_args__ = (Index("ix_documents_patient_doctor_created", "patient_id", "doctor_id", "created_at"), {"schema": SCHEMA})
+    __table_args__ = (
+        Index("ix_documents_patient_doctor_created", "patient_id", "doctor_id", "created_at"),
+        Index("ix_documents_appointment", "appointment_id"),
+        {"schema": SCHEMA},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     patient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
